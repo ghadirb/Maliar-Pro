@@ -24,18 +24,10 @@ jobs:
       - name: Install Android SDK commandline tools
         uses: android-actions/setup-android@v3
 
-      - name: Grant execute to gradlew
-        run: chmod +x ./gradlew
-
-      - name: Convert line endings to LF
-        run: |
-          sed -i 's/\r$//' ./gradlew
-          sed -i 's/\r$//' gradlew.bat
-
       - name: Build APK (debug)
         env:
           JAVA_TOOL_OPTIONS: "-Xmx4g"
-        run: bash ./gradlew :app:assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+        run: java -jar gradle/wrapper/gradle-wrapper.jar :app:assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
