@@ -24,10 +24,13 @@ jobs:
       - name: Install Android SDK commandline tools
         uses: android-actions/setup-android@v3
 
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v3
+
       - name: Build APK (debug)
         env:
           JAVA_TOOL_OPTIONS: "-Xmx4g"
-        run: java -jar gradle/wrapper/gradle-wrapper.jar :app:assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+        run: gradle :app:assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
