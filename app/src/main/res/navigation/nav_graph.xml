@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/profileFragment">
+
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.maliar.pro.ui.profile.ProfileFragment"
+        android:label="پروفایل" />
+
+    <fragment
+        android:id="@+id/accountingFragment"
+        android:name="com.maliar.pro.ui.accounting.AccountingFragment"
+        android:label="حسابداری" />
+
+    <fragment
+        android:id="@+id/remindersFragment"
+        android:name="com.maliar.pro.ui.reminders.RemindersFragment"
+        android:label="یادآوری" />
+
+    <fragment
+        android:id="@+id/assistantFragment"
+        android:name="com.maliar.pro.ui.assistant.AssistantFragment"
+        android:label="دستیار" />
+
+    <fragment
+        android:id="@+id/financialStatusFragment"
+        android:name="com.maliar.pro.ui.financial.FinancialStatusFragment"
+        android:label="وضعیت مالی" />
+
+</navigation>
