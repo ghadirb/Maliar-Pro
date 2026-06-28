@@ -29,9 +29,3 @@ enum class RecurringType {
     MONTHLY,
     YEARLY
 }
-
-enum class Priority {
-    LOW,
-    MEDIUM,
-    HIGH
-}

@@ -70,8 +70,11 @@ class ContactsFragment : Fragment() {
     }
 
     private fun loadContacts() {
-        val contacts = contactManager.getAllContacts()
-        adapter.submitList(contacts)
+        lifecycleScope.launch {
+            contactManager.getAllContacts().collect { contacts ->
+                adapter.submitList(contacts)
+            }
+        }
     }
 
     private fun showAddContactDialog() {
