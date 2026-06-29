@@ -32,7 +32,7 @@ class CheckAdapter(
             binding.checkNumberText.text = check.checkNumber
             binding.amountText.text = formatCurrency(check.amount)
             binding.dueDateText.text = formatDate(check.dueDate)
-            binding.payeeText.text = check.payee
+            binding.payeeText.text = check.recipient
 
             if (check.isCashed) {
                 binding.statusBadge.text = "وصول شده"

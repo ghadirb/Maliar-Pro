@@ -29,12 +29,12 @@ class InstallmentAdapter(
     inner class InstallmentViewHolder(private val binding: ItemInstallmentBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(installment: Installment) {
             binding.titleText.text = installment.title
-            binding.amountText.text = formatCurrency(installment.monthlyAmount)
-            binding.progressText.text = "${installment.paidInstallments}/${installment.installmentCount}"
-            binding.recipientText.text = installment.lender
-            binding.progressBar.progress = (installment.paidInstallments * 100 / installment.installmentCount)
+            binding.amountText.text = formatCurrency(installment.installmentAmount)
+            binding.progressText.text = "${installment.paidInstallments}/${installment.totalInstallments}"
+            binding.recipientText.text = installment.recipient
+            binding.progressBar.progress = (installment.paidInstallments * 100 / installment.totalInstallments)
 
-            if (installment.paidInstallments >= installment.installmentCount) {
+            if (installment.paidInstallments >= installment.totalInstallments) {
                 binding.statusBadge.text = "تکمیل شده"
                 binding.payButton.visibility = ViewGroup.GONE
             } else {

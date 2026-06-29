@@ -9,11 +9,13 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.maliar.pro.databinding.FragmentAccountingBinding
+import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.dialogs.AddIncomeDialog
 import com.maliar.pro.dialogs.AddExpenseDialog
 import com.maliar.pro.dialogs.AddCheckDialog
 import com.maliar.pro.dialogs.AddInstallmentDialog
 import com.maliar.pro.viewmodels.AccountingViewModel
+import com.maliar.pro.viewmodels.AccountingViewModelFactory
 import kotlinx.coroutines.launch
 
 class AccountingFragment : Fragment() {

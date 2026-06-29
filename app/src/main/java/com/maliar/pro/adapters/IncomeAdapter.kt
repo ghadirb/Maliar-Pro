@@ -27,7 +27,7 @@ class IncomeAdapter(
 
     inner class IncomeViewHolder(private val binding: ItemIncomeBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(income: Income) {
-            binding.sourceText.text = income.source
+            binding.sourceText.text = income.category
             binding.amountText.text = formatCurrency(income.amount)
             binding.dateText.text = formatDate(income.date)
             binding.descriptionText.text = income.description
