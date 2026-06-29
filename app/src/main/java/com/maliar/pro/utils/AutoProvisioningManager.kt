@@ -121,7 +121,6 @@ object AutoProvisioningManager {
             // 4) Save and activate in Preferences
             val prefsManager = PreferencesManager(context)
             prefsManager.saveAPIKeys(processedKeys)
-            prefsManager.setWorkingMode(PreferencesManager.WorkingMode.ONLINE)
             Log.d(TAG, "✅ ${processedKeys.size} keys saved and activated in prefs")
 
             Result.success(processedKeys)

@@ -41,7 +41,7 @@ class RemindersViewModel(private val reminderManager: ReminderManager) : ViewMod
 
     fun markAsCompleted(reminder: Reminder) {
         viewModelScope.launch {
-            reminderManager.markAsCompleted(reminder)
+            reminderManager.markAsCompleted(reminder.id)
             loadReminders()
         }
     }
