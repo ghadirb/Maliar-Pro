@@ -49,7 +49,10 @@ class AddCheckDialog(private val context: Context, private val viewModel: Accoun
                 val check = Check(
                     checkNumber = checkNumber,
                     amount = amount,
-                    payee = payee,
+                    recipient = payee,
+                    issuer = "کاربر",
+                    bankName = "بانک",
+                    accountNumber = "",
                     dueDate = selectedDueDate,
                     issueDate = Date().time,
                     isCashed = false

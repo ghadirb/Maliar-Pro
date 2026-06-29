@@ -53,14 +53,12 @@ class AddInstallmentDialog(private val context: Context, private val viewModel: 
                 val installment = Installment(
                     title = title,
                     totalAmount = totalAmount,
-                    installmentCount = installmentCount,
-                    monthlyAmount = monthlyAmount,
+                    installmentAmount = monthlyAmount,
+                    totalInstallments = installmentCount,
                     paidInstallments = 0,
-                    paidAmount = 0.0,
-                    remainingAmount = totalAmount,
-                    lender = lender,
-                    nextPaymentDate = Date(selectedStartDate),
-                    status = com.maliar.pro.database.InstallmentStatus.ACTIVE
+                    startDate = selectedStartDate,
+                    paymentDay = 1,
+                    recipient = lender
                 )
                 viewModel.addInstallment(installment)
             }
