@@ -26,7 +26,7 @@ class AddIncomeDialog(private val context: Context, private val viewModel: Accou
             
             if (source.isNotBlank() && amount > 0) {
                 val income = Income(
-                    source = source,
+                    category = source,
                     amount = amount,
                     description = description,
                     date = Date().time
