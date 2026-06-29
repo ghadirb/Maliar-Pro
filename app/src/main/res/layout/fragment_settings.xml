@@ -35,33 +35,27 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="حالت کار"
+                    android:text="نوع نوتیفیکیشن"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp" />
 
                 <RadioGroup
-                    android:id="@+id/workingModeGroup"
+                    android:id="@+id/notificationModeGroup"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
                     <RadioButton
-                        android:id="@+id/onlineMode"
+                        android:id="@+id/simpleNotification"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="آنلاین" />
+                        android:text="ساده (برای پس‌زمینه)" />
 
                     <RadioButton
-                        android:id="@+id/offlineMode"
+                        android:id="@+id/actionNotification"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="آفلاین" />
-
-                    <RadioButton
-                        android:id="@+id/hybridMode"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ترکیبی" />
+                        android:text="با اکشن (تماس و غیره)" />
 
                 </RadioGroup>
 

@@ -15,7 +15,7 @@ class PreferencesManager(context: Context) {
         private const val PREFS_NAME = "maliar_pro_prefs"
         private const val KEY_API_KEYS = "api_keys"
         private const val KEY_AUTO_PROVISIONING = "auto_provisioning"
-        private const val KEY_WORKING_MODE = "working_mode"
+        private const val KEY_NOTIFICATION_MODE = "notification_mode"
     }
 
     fun saveAPIKeys(keys: List<APIKey>) {
@@ -45,22 +45,11 @@ class PreferencesManager(context: Context) {
         return prefs.getBoolean(KEY_AUTO_PROVISIONING, true)
     }
 
-    enum class WorkingMode {
-        ONLINE,
-        OFFLINE,
-        HYBRID
+    fun setNotificationMode(mode: String) {
+        prefs.edit().putString(KEY_NOTIFICATION_MODE, mode).apply()
     }
 
-    fun setWorkingMode(mode: WorkingMode) {
-        prefs.edit().putString(KEY_WORKING_MODE, mode.name).apply()
-    }
-
-    fun getWorkingMode(): WorkingMode {
-        val name = prefs.getString(KEY_WORKING_MODE, WorkingMode.ONLINE.name)
-        return try {
-            WorkingMode.valueOf(name ?: WorkingMode.ONLINE.name)
-        } catch (_: Exception) {
-            WorkingMode.ONLINE
-        }
+    fun getNotificationMode(): String {
+        return prefs.getString(KEY_NOTIFICATION_MODE, "simple") ?: "simple"
     }
 }

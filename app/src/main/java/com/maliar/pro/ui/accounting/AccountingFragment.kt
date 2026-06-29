@@ -5,16 +5,23 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.maliar.pro.databinding.FragmentAccountingBinding
-import com.maliar.pro.database.AccountingManager
+import com.maliar.pro.dialogs.AddIncomeDialog
+import com.maliar.pro.dialogs.AddExpenseDialog
+import com.maliar.pro.dialogs.AddCheckDialog
+import com.maliar.pro.dialogs.AddInstallmentDialog
+import com.maliar.pro.viewmodels.AccountingViewModel
 import kotlinx.coroutines.launch
 
 class AccountingFragment : Fragment() {
 
     private lateinit var binding: FragmentAccountingBinding
-    private val accountingManager by lazy { AccountingManager(requireContext()) }
+    private val viewModel: AccountingViewModel by viewModels {
+        AccountingViewModelFactory(AccountingManager(requireContext()))
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -28,7 +35,7 @@ class AccountingFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupUI()
-        loadStats()
+        observeViewModel()
     }
 
     private fun setupUI() {
@@ -65,19 +72,31 @@ class AccountingFragment : Fragment() {
         }
     }
 
-    private fun loadStats() {
+    private fun observeViewModel() {
         lifecycleScope.launch {
-            val totalIncome = accountingManager.getTotalIncome()
-            val totalExpense = accountingManager.getTotalExpense()
-            val balance = accountingManager.getBalance()
-            val uncashedChecks = accountingManager.getUncashedChecks().size
-            val activeInstallments = accountingManager.getActiveInstallments().size
-
-            binding.incomeAmount.text = formatCurrency(totalIncome)
-            binding.expenseAmount.text = formatCurrency(totalExpense)
-            binding.balanceAmount.text = formatCurrency(balance)
-            binding.checksCount.text = "$uncashedChecks چک"
-            binding.installmentsCount.text = "$activeInstallments قسط"
+            viewModel.totalIncome.collect { income ->
+                binding.incomeAmount.text = formatCurrency(income)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.totalExpense.collect { expense ->
+                binding.expenseAmount.text = formatCurrency(expense)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.balance.collect { balance ->
+                binding.balanceAmount.text = formatCurrency(balance)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.uncashedChecksCount.collect { count ->
+                binding.checksCount.text = "$count چک"
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.activeInstallmentsCount.collect { count ->
+                binding.installmentsCount.text = "$count قسط"
+            }
         }
     }
 
@@ -86,18 +105,18 @@ class AccountingFragment : Fragment() {
     }
 
     private fun showAddIncomeDialog() {
-        // Show income dialog
+        AddIncomeDialog(requireContext(), viewModel).show()
     }
 
     private fun showAddExpenseDialog() {
-        // Show expense dialog
+        AddExpenseDialog(requireContext(), viewModel).show()
     }
 
     private fun showAddCheckDialog() {
-        // Show check dialog
+        AddCheckDialog(requireContext(), viewModel).show()
     }
 
     private fun showAddInstallmentDialog() {
-        // Show installment dialog
+        AddInstallmentDialog(requireContext(), viewModel).show()
     }
 }

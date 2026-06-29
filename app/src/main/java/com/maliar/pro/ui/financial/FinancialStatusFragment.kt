@@ -5,16 +5,21 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.maliar.pro.databinding.FragmentFinancialStatusBinding
 import com.maliar.pro.database.FinancialStatusManager
+import com.maliar.pro.viewmodels.FinancialStatusViewModel
+import com.maliar.pro.viewmodels.FinancialStatusViewModelFactory
 import kotlinx.coroutines.launch
 
 class FinancialStatusFragment : Fragment() {
 
     private lateinit var binding: FragmentFinancialStatusBinding
-    private val financialManager by lazy { FinancialStatusManager(requireContext()) }
+    private val viewModel: FinancialStatusViewModel by viewModels {
+        FinancialStatusViewModelFactory(FinancialStatusManager(requireContext()))
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -27,17 +32,8 @@ class FinancialStatusFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        setupCompletionProgress()
         setupSections()
-        loadFinancialData()
-    }
-
-    private fun setupCompletionProgress() {
-        lifecycleScope.launch {
-            val completion = financialManager.getCompletionPercentage()
-            binding.completionProgress.progress = completion
-            binding.completionPercentage.text = "$completion%"
-        }
+        observeViewModel()
     }
 
     private fun setupSections() {
@@ -66,15 +62,27 @@ class FinancialStatusFragment : Fragment() {
         }
     }
 
-    private fun loadFinancialData() {
+    private fun observeViewModel() {
         lifecycleScope.launch {
-            val totalAssets = financialManager.getTotalAssets()
-            val totalDebts = financialManager.getTotalUnpaidDebts()
-            val netWorth = totalAssets - totalDebts
-
-            binding.totalAssets.text = formatCurrency(totalAssets)
-            binding.totalDebts.text = formatCurrency(totalDebts)
-            binding.netWorth.text = formatCurrency(netWorth)
+            viewModel.totalAssets.collect { assets ->
+                binding.totalAssets.text = formatCurrency(assets)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.totalDebts.collect { debts ->
+                binding.totalDebts.text = formatCurrency(debts)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.netWorth.collect { netWorth ->
+                binding.netWorth.text = formatCurrency(netWorth)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.completionPercentage.collect { completion ->
+                binding.completionProgress.progress = completion
+                binding.completionPercentage.text = "$completion%"
+            }
         }
     }
 

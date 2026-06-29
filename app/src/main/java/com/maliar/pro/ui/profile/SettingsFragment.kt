@@ -6,10 +6,12 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.maliar.pro.databinding.FragmentSettingsBinding
+import com.maliar.pro.utils.PreferencesManager
 
 class SettingsFragment : Fragment() {
 
     private lateinit var binding: FragmentSettingsBinding
+    private val prefs by lazy { PreferencesManager(requireContext()) }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -26,6 +28,19 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupSettings() {
-        // Settings implementation will be added here
+        val notificationMode = prefs.getNotificationMode()
+        
+        when (notificationMode) {
+            "simple" -> binding.simpleNotification.isChecked = true
+            "action" -> binding.actionNotification.isChecked = true
+            else -> binding.simpleNotification.isChecked = true
+        }
+
+        binding.notificationModeGroup.setOnCheckedChangeListener { _, checkedId ->
+            when (checkedId) {
+                binding.simpleNotification.id -> prefs.setNotificationMode("simple")
+                binding.actionNotification.id -> prefs.setNotificationMode("action")
+            }
+        }
     }
 }
