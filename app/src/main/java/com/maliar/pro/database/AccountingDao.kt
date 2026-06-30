@@ -20,6 +20,9 @@ interface AccountingDao {
     
     @Query("SELECT SUM(amount) FROM incomes")
     suspend fun getTotalIncome(): Double?
+
+    @Query("SELECT SUM(amount) FROM incomes WHERE date >= :startDate")
+    suspend fun getMonthlyIncome(startDate: Long): Double?
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertIncome(income: Income): Long
@@ -42,6 +45,9 @@ interface AccountingDao {
     
     @Query("SELECT SUM(amount) FROM expenses")
     suspend fun getTotalExpense(): Double?
+
+    @Query("SELECT SUM(amount) FROM expenses WHERE date >= :startDate")
+    suspend fun getMonthlyExpense(startDate: Long): Double?
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExpense(expense: Expense): Long

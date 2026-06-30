@@ -2,7 +2,6 @@ package com.maliar.pro.dialogs
 
 import android.app.AlertDialog
 import android.content.Context
-import android.icu.util.Calendar
 import android.icu.util.IslamicCalendar
 import android.icu.util.ULocale
 import android.widget.Button
@@ -11,13 +10,13 @@ import com.maliar.pro.database.Check
 import com.maliar.pro.viewmodels.AccountingViewModel
 import java.util.Date
 
-class AddCheckDialog(private val context: Context, private val viewModel: AccountingViewModel) {
+class EditCheckDialog(private val context: Context, private val viewModel: AccountingViewModel, private val check: Check) {
 
-    private var selectedDueDate: Long = System.currentTimeMillis()
+    private var selectedDueDate: Long = check.dueDate
 
     fun show() {
         val builder = AlertDialog.Builder(context)
-        builder.setTitle("افزودن چک")
+        builder.setTitle("ویرایش چک")
 
         val view = android.view.LayoutInflater.from(context).inflate(com.maliar.pro.R.layout.dialog_add_check, null)
         val checkNumberInput = view.findViewById<EditText>(com.maliar.pro.R.id.checkNumberInput)
@@ -25,7 +24,12 @@ class AddCheckDialog(private val context: Context, private val viewModel: Accoun
         val payeeInput = view.findViewById<EditText>(com.maliar.pro.R.id.payeeInput)
         val dueDateButton = view.findViewById<Button>(com.maliar.pro.R.id.dueDateButton)
 
+        checkNumberInput.setText(check.checkNumber)
+        amountInput.setText(check.amount.toString())
+        payeeInput.setText(check.recipient)
+
         val persianCalendar = IslamicCalendar.getInstance(ULocale.forLanguageTag("fa_IR"))
+        persianCalendar.timeInMillis = check.dueDate
         dueDateButton.text = "${persianCalendar.get(IslamicCalendar.DAY_OF_MONTH)}/${persianCalendar.get(IslamicCalendar.MONTH) + 1}/${persianCalendar.get(IslamicCalendar.YEAR)}"
 
         dueDateButton.setOnClickListener {
@@ -49,18 +53,13 @@ class AddCheckDialog(private val context: Context, private val viewModel: Accoun
             val payee = payeeInput.text.toString()
 
             if (checkNumber.isNotBlank() && amount > 0) {
-                val check = Check(
+                val updatedCheck = check.copy(
                     checkNumber = checkNumber,
                     amount = amount,
                     recipient = payee,
-                    issuer = "کاربر",
-                    bankName = "بانک",
-                    accountNumber = "",
-                    dueDate = selectedDueDate,
-                    issueDate = Date().time,
-                    isCashed = false
+                    dueDate = selectedDueDate
                 )
-                viewModel.addCheck(check)
+                viewModel.updateCheck(updatedCheck)
             }
         }
         builder.setNegativeButton("لغو", null)

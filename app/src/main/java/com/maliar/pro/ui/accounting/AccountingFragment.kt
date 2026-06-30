@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.maliar.pro.databinding.FragmentAccountingBinding
 import com.maliar.pro.database.AccountingManager
@@ -42,19 +43,19 @@ class AccountingFragment : Fragment() {
 
     private fun setupUI() {
         binding.incomeCard.setOnClickListener {
-            // Navigate to income list
+            findNavController().navigate(R.id.action_accountingFragment_to_incomeListFragment)
         }
 
         binding.expenseCard.setOnClickListener {
-            // Navigate to expense list
+            findNavController().navigate(R.id.action_accountingFragment_to_expenseListFragment)
         }
 
         binding.checksCard.setOnClickListener {
-            // Navigate to checks list
+            findNavController().navigate(R.id.action_accountingFragment_to_checkListFragment)
         }
 
         binding.installmentsCard.setOnClickListener {
-            // Navigate to installments list
+            findNavController().navigate(R.id.action_accountingFragment_to_installmentListFragment)
         }
 
         binding.addIncomeButton.setOnClickListener {
@@ -88,6 +89,16 @@ class AccountingFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.balance.collect { balance ->
                 binding.balanceAmount.text = formatCurrency(balance)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.monthlyIncome.collect { income ->
+                binding.incomeAmount.text = "${formatCurrency(income)} (این ماه)"
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.monthlyExpense.collect { expense ->
+                binding.expenseAmount.text = "${formatCurrency(expense)} (این ماه)"
             }
         }
         lifecycleScope.launch {

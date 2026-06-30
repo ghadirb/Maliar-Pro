@@ -65,6 +65,50 @@ class RemindersFragment : Fragment() {
     }
 
     private fun showAddReminderDialog() {
-        // Show dialog to add reminder
+        val builder = android.app.AlertDialog.Builder(requireContext())
+        builder.setTitle("افزودن یادآوری")
+
+        val view = android.view.LayoutInflater.from(requireContext())
+            .inflate(com.maliar.pro.R.layout.dialog_add_reminder, null)
+        val titleInput = view.findViewById<android.widget.EditText>(com.maliar.pro.R.id.reminderTitleInput)
+        val descriptionInput = view.findViewById<android.widget.EditText>(com.maliar.pro.R.id.reminderDescriptionInput)
+        val dateButton = view.findViewById<android.widget.Button>(com.maliar.pro.R.id.reminderDateButton)
+
+        var selectedDate = System.currentTimeMillis()
+
+        dateButton.setOnClickListener {
+            val calendar = java.util.Calendar.getInstance()
+            android.app.DatePickerDialog(
+                requireContext(),
+                { _, year, month, day ->
+                    calendar.set(year, month, day)
+                    selectedDate = calendar.timeInMillis
+                    dateButton.text = "$day/${month + 1}/$year"
+                },
+                calendar.get(java.util.Calendar.YEAR),
+                calendar.get(java.util.Calendar.MONTH),
+                calendar.get(java.util.Calendar.DAY_OF_MONTH)
+            ).show()
+        }
+
+        builder.setView(view)
+        builder.setPositiveButton("ذخیره") { _, _ ->
+            val title = titleInput.text.toString()
+            val description = descriptionInput.text.toString()
+
+            if (title.isNotBlank()) {
+                lifecycleScope.launch {
+                    val reminder = com.maliar.pro.database.Reminder(
+                        title = title,
+                        description = description,
+                        reminderTime = selectedDate,
+                        priority = com.maliar.pro.database.Priority.MEDIUM
+                    )
+                    viewModel.addReminder(reminder)
+                }
+            }
+        }
+        builder.setNegativeButton("لغو", null)
+        builder.show()
     }
 }

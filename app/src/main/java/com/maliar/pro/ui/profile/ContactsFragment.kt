@@ -78,6 +78,31 @@ class ContactsFragment : Fragment() {
     }
 
     private fun showAddContactDialog() {
-        // Show dialog to add contact
+        val builder = android.app.AlertDialog.Builder(requireContext())
+        builder.setTitle("افزودن مخاطب")
+
+        val view = android.view.LayoutInflater.from(requireContext())
+            .inflate(com.maliar.pro.R.layout.dialog_add_contact, null)
+        val nameInput = view.findViewById<android.widget.EditText>(com.maliar.pro.R.id.contactNameInput)
+        val phoneInput = view.findViewById<android.widget.EditText>(com.maliar.pro.R.id.contactPhoneInput)
+
+        builder.setView(view)
+        builder.setPositiveButton("ذخیره") { _, _ ->
+            val name = nameInput.text.toString()
+            val phone = phoneInput.text.toString()
+
+            if (name.isNotBlank() && phone.isNotBlank()) {
+                lifecycleScope.launch {
+                    val contact = com.maliar.pro.database.Contact(
+                        name = name,
+                        phoneNumber = phone
+                    )
+                    contactManager.addContact(contact)
+                    loadContacts()
+                }
+            }
+        }
+        builder.setNegativeButton("لغو", null)
+        builder.show()
     }
 }

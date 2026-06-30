@@ -8,15 +8,14 @@ import android.widget.Button
 import android.widget.EditText
 import com.maliar.pro.database.Installment
 import com.maliar.pro.viewmodels.AccountingViewModel
-import java.util.Date
 
-class AddInstallmentDialog(private val context: Context, private val viewModel: AccountingViewModel) {
+class EditInstallmentDialog(private val context: Context, private val viewModel: AccountingViewModel, private val installment: Installment) {
 
-    private var selectedStartDate: Long = System.currentTimeMillis()
+    private var selectedStartDate: Long = installment.startDate
 
     fun show() {
         val builder = AlertDialog.Builder(context)
-        builder.setTitle("افزودن قسط")
+        builder.setTitle("ویرایش قسط")
 
         val view = android.view.LayoutInflater.from(context).inflate(com.maliar.pro.R.layout.dialog_add_installment, null)
         val titleInput = view.findViewById<EditText>(com.maliar.pro.R.id.titleInput)
@@ -26,7 +25,14 @@ class AddInstallmentDialog(private val context: Context, private val viewModel: 
         val lenderInput = view.findViewById<EditText>(com.maliar.pro.R.id.lenderInput)
         val startDateButton = view.findViewById<Button>(com.maliar.pro.R.id.startDateButton)
 
+        titleInput.setText(installment.title)
+        totalAmountInput.setText(installment.totalAmount.toString())
+        installmentCountInput.setText(installment.totalInstallments.toString())
+        monthlyAmountInput.setText(installment.installmentAmount.toString())
+        lenderInput.setText(installment.recipient)
+
         val persianCalendar = IslamicCalendar.getInstance(ULocale.forLanguageTag("fa_IR"))
+        persianCalendar.timeInMillis = installment.startDate
         startDateButton.text = "${persianCalendar.get(IslamicCalendar.DAY_OF_MONTH)}/${persianCalendar.get(IslamicCalendar.MONTH) + 1}/${persianCalendar.get(IslamicCalendar.YEAR)}"
 
         startDateButton.setOnClickListener {
@@ -52,17 +58,15 @@ class AddInstallmentDialog(private val context: Context, private val viewModel: 
             val lender = lenderInput.text.toString()
 
             if (title.isNotBlank() && totalAmount > 0 && installmentCount > 0) {
-                val installment = Installment(
+                val updatedInstallment = installment.copy(
                     title = title,
                     totalAmount = totalAmount,
                     installmentAmount = monthlyAmount,
                     totalInstallments = installmentCount,
-                    paidInstallments = 0,
                     startDate = selectedStartDate,
-                    paymentDay = 1,
                     recipient = lender
                 )
-                viewModel.addInstallment(installment)
+                viewModel.updateInstallment(updatedInstallment)
             }
         }
         builder.setNegativeButton("لغو", null)

@@ -12,7 +12,44 @@
     <fragment
         android:id="@+id/accountingFragment"
         android:name="com.maliar.pro.ui.accounting.AccountingFragment"
-        android:label="حسابداری" />
+        android:label="حسابداری">
+
+        <action
+            android:id="@+id/action_accountingFragment_to_incomeListFragment"
+            app:destination="@id/incomeListFragment" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_expenseListFragment"
+            app:destination="@id/expenseListFragment" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_checkListFragment"
+            app:destination="@id/checkListFragment" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_installmentListFragment"
+            app:destination="@id/installmentListFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/incomeListFragment"
+        android:name="com.maliar.pro.ui.accounting.IncomeListFragment"
+        android:label="درآمدها" />
+
+    <fragment
+        android:id="@+id/expenseListFragment"
+        android:name="com.maliar.pro.ui.accounting.ExpenseListFragment"
+        android:label="هزینه‌ها" />
+
+    <fragment
+        android:id="@+id/checkListFragment"
+        android:name="com.maliar.pro.ui.accounting.CheckListFragment"
+        android:label="چک‌ها" />
+
+    <fragment
+        android:id="@+id/installmentListFragment"
+        android:name="com.maliar.pro.ui.accounting.InstallmentListFragment"
+        android:label="اقساط" />
 
     <fragment
         android:id="@+id/remindersFragment"
@@ -27,6 +64,15 @@
     <fragment
         android:id="@+id/financialStatusFragment"
         android:name="com.maliar.pro.ui.financial.FinancialStatusFragment"
-        android:label="وضعیت مالی" />
+        android:label="وضعیت مالی">
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_accountingFragment"
+            app:destination="@id/accountingFragment" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_assistantFragment"
+            app:destination="@id/assistantFragment" />
+    </fragment>
 
 </navigation>

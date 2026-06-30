@@ -29,8 +29,110 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
     private val _activeInstallmentsCount = MutableStateFlow(0)
     val activeInstallmentsCount: StateFlow<Int> = _activeInstallmentsCount.asStateFlow()
 
+    private val _monthlyIncome = MutableStateFlow(0.0)
+    val monthlyIncome: StateFlow<Double> = _monthlyIncome.asStateFlow()
+
+    private val _monthlyExpense = MutableStateFlow(0.0)
+    val monthlyExpense: StateFlow<Double> = _monthlyExpense.asStateFlow()
+
+    private val _incomeList = MutableStateFlow(emptyList<com.maliar.pro.database.Income>())
+    val incomeList: StateFlow<List<com.maliar.pro.database.Income>> = _incomeList.asStateFlow()
+
+    private val _expenseList = MutableStateFlow(emptyList<com.maliar.pro.database.Expense>())
+    val expenseList: StateFlow<List<com.maliar.pro.database.Expense>> = _expenseList.asStateFlow()
+
+    private val _checkList = MutableStateFlow(emptyList<com.maliar.pro.database.Check>())
+    val checkList: StateFlow<List<com.maliar.pro.database.Check>> = _checkList.asStateFlow()
+
+    private val _installmentList = MutableStateFlow(emptyList<com.maliar.pro.database.Installment>())
+    val installmentList: StateFlow<List<com.maliar.pro.database.Installment>> = _installmentList.asStateFlow()
+
     init {
         loadStats()
+        loadIncomeList()
+        loadExpenseList()
+        loadCheckList()
+        loadInstallmentList()
+    }
+
+    private fun loadIncomeList() {
+        viewModelScope.launch {
+            accountingManager.getAllIncomes().collect { _incomeList.value = it }
+        }
+    }
+
+    private fun loadExpenseList() {
+        viewModelScope.launch {
+            accountingManager.getAllExpenses().collect { _expenseList.value = it }
+        }
+    }
+
+    private fun loadCheckList() {
+        viewModelScope.launch {
+            accountingManager.getAllChecks().collect { _checkList.value = it }
+        }
+    }
+
+    private fun loadInstallmentList() {
+        viewModelScope.launch {
+            accountingManager.getAllInstallments().collect { _installmentList.value = it }
+        }
+    }
+
+    fun deleteIncome(income: com.maliar.pro.database.Income) {
+        viewModelScope.launch {
+            accountingManager.deleteIncome(income)
+            loadStats()
+        }
+    }
+
+    fun deleteExpense(expense: com.maliar.pro.database.Expense) {
+        viewModelScope.launch {
+            accountingManager.deleteExpense(expense)
+            loadStats()
+        }
+    }
+
+    fun deleteCheck(check: com.maliar.pro.database.Check) {
+        viewModelScope.launch {
+            accountingManager.deleteCheck(check)
+            loadStats()
+        }
+    }
+
+    fun deleteInstallment(installment: com.maliar.pro.database.Installment) {
+        viewModelScope.launch {
+            accountingManager.deleteInstallment(installment)
+            loadStats()
+        }
+    }
+
+    fun updateIncome(income: com.maliar.pro.database.Income) {
+        viewModelScope.launch {
+            accountingManager.updateIncome(income)
+            loadStats()
+        }
+    }
+
+    fun updateExpense(expense: com.maliar.pro.database.Expense) {
+        viewModelScope.launch {
+            accountingManager.updateExpense(expense)
+            loadStats()
+        }
+    }
+
+    fun updateCheck(check: com.maliar.pro.database.Check) {
+        viewModelScope.launch {
+            accountingManager.updateCheck(check)
+            loadStats()
+        }
+    }
+
+    fun updateInstallment(installment: com.maliar.pro.database.Installment) {
+        viewModelScope.launch {
+            accountingManager.updateInstallment(installment)
+            loadStats()
+        }
     }
 
     fun loadStats() {
@@ -40,12 +142,16 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
             val bal = accountingManager.getBalance()
             val checks = accountingManager.getUncashedChecks()
             val installments = accountingManager.getActiveInstallments()
+            val monthlyInc = accountingManager.getMonthlyIncome()
+            val monthlyExp = accountingManager.getMonthlyExpense()
 
             _totalIncome.value = income
             _totalExpense.value = expense
             _balance.value = bal
             _uncashedChecksCount.value = checks.size
             _activeInstallmentsCount.value = installments.size
+            _monthlyIncome.value = monthlyInc
+            _monthlyExpense.value = monthlyExp
         }
     }
 

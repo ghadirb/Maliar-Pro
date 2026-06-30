@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.maliar.pro.databinding.FragmentFinancialStatusBinding
 import com.maliar.pro.database.FinancialStatusManager
@@ -38,27 +39,27 @@ class FinancialStatusFragment : Fragment() {
 
     private fun setupSections() {
         binding.assetsCard.setOnClickListener {
-            // Navigate to assets section
+            android.widget.Toast.makeText(requireContext(), "بخش دارایی‌ها به زودی اضافه می‌شود", android.widget.Toast.LENGTH_SHORT).show()
         }
 
         binding.debtsCard.setOnClickListener {
-            // Navigate to debts section
+            android.widget.Toast.makeText(requireContext(), "بخش بدهی‌ها به زودی اضافه می‌شود", android.widget.Toast.LENGTH_SHORT).show()
         }
 
         binding.goalsCard.setOnClickListener {
-            // Navigate to goals section
+            android.widget.Toast.makeText(requireContext(), "بخش اهداف مالی به زودی اضافه می‌شود", android.widget.Toast.LENGTH_SHORT).show()
         }
 
         binding.incomeCard.setOnClickListener {
-            // Navigate to fixed income section
+            findNavController().navigate(com.maliar.pro.R.id.action_financialStatusFragment_to_accountingFragment)
         }
 
         binding.preferencesCard.setOnClickListener {
-            // Navigate to preferences section
+            android.widget.Toast.makeText(requireContext(), "بخش ترجیحات مالی به زودی اضافه می‌شود", android.widget.Toast.LENGTH_SHORT).show()
         }
 
         binding.aiSettingsCard.setOnClickListener {
-            // Navigate to AI settings section
+            findNavController().navigate(com.maliar.pro.R.id.action_financialStatusFragment_to_assistantFragment)
         }
     }
 
