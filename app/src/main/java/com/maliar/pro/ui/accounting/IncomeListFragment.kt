@@ -12,6 +12,7 @@ import com.maliar.pro.adapters.IncomeAdapter
 import com.maliar.pro.databinding.FragmentIncomeListBinding
 import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.dialogs.AddIncomeDialog
+import com.maliar.pro.dialogs.EditIncomeDialog
 import com.maliar.pro.viewmodels.AccountingViewModel
 import com.maliar.pro.viewmodels.AccountingViewModelFactory
 import kotlinx.coroutines.launch

@@ -31,7 +31,7 @@ class CheckListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        adapter = CheckAdapter(onItemClick = { showEditCheckDialog(it) }, onDeleteClick = { deleteCheck(it) })
+        adapter = CheckAdapter(onItemClick = { showEditCheckDialog(it) }, onDeleteClick = { deleteCheck(it) }, onStatusClick = { toggleCheckStatus(it) })
         binding.checkRecyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.checkRecyclerView.adapter = adapter
         binding.addCheckFab.setOnClickListener { AddCheckDialog(requireContext(), viewModel).show() }
@@ -50,5 +50,13 @@ class CheckListFragment : Fragment() {
 
     private fun deleteCheck(check: com.maliar.pro.database.Check) {
         lifecycleScope.launch { viewModel.deleteCheck(check); loadChecks() }
+    }
+
+    private fun toggleCheckStatus(check: com.maliar.pro.database.Check) {
+        lifecycleScope.launch {
+            val updatedCheck = check.copy(isCashed = !check.isCashed)
+            viewModel.updateCheck(updatedCheck)
+            loadChecks()
+        }
     }
 }
