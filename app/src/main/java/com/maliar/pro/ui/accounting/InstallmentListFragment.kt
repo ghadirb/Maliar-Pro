@@ -31,7 +31,7 @@ class InstallmentListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        adapter = InstallmentAdapter(onItemClick = { showEditInstallmentDialog(it) }, onDeleteClick = { deleteInstallment(it) })
+        adapter = InstallmentAdapter(onItemClick = { showEditInstallmentDialog(it) }, onDeleteClick = { deleteInstallment(it) }, onPayClick = { payInstallment(it) })
         binding.installmentRecyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.installmentRecyclerView.adapter = adapter
         binding.addInstallmentFab.setOnClickListener { AddInstallmentDialog(requireContext(), viewModel).show() }
@@ -50,5 +50,15 @@ class InstallmentListFragment : Fragment() {
 
     private fun deleteInstallment(installment: com.maliar.pro.database.Installment) {
         lifecycleScope.launch { viewModel.deleteInstallment(installment); loadInstallments() }
+    }
+
+    private fun payInstallment(installment: com.maliar.pro.database.Installment) {
+        if (installment.paidInstallments < installment.totalInstallments) {
+            lifecycleScope.launch {
+                val updatedInstallment = installment.copy(paidInstallments = installment.paidInstallments + 1)
+                viewModel.updateInstallment(updatedInstallment)
+                loadInstallments()
+            }
+        }
     }
 }
