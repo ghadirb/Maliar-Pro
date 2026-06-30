@@ -68,7 +68,17 @@ class AssistantViewModel(
         if (lower.contains("افزودن یادآوری") || lower.contains("add reminder")) {
             val title = message.substringAfter("یادآوری").trim()
             if (title.isNotBlank()) {
-                reminderManager.addReminder(Reminder(title = title, description = message, reminderTime = System.currentTimeMillis() + 86400000, priority = Priority.MEDIUM))
+                reminderManager.addReminder(Reminder(
+                    title = title,
+                    description = message,
+                    reminderTime = System.currentTimeMillis() + 86400000,
+                    priority = Priority.MEDIUM,
+                    isRecurring = false,
+                    recurringType = RecurringType.NONE,
+                    recurringInterval = 1,
+                    isCompleted = false,
+                    category = ""
+                ))
                 return "یادآوری '$title' برای فردا اضافه شد"
             }
             return "لطفاً عنوان یادآوری را مشخص کنید"

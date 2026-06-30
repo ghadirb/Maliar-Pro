@@ -93,7 +93,9 @@ class ContactsFragment : Fragment() {
 
             if (name.isNotBlank() && phone.isNotBlank()) {
                 lifecycleScope.launch {
+                    val rowNumber = contactManager.getNextRowNumber()
                     val contact = com.maliar.pro.database.Contact(
+                        rowNumber = rowNumber,
                         name = name,
                         phoneNumber = phone
                     )

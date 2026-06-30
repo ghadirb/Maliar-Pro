@@ -102,6 +102,11 @@ class RemindersFragment : Fragment() {
                         title = title,
                         description = description,
                         reminderTime = selectedDate,
+                        isRecurring = false,
+                        recurringType = com.maliar.pro.database.RecurringType.NONE,
+                        recurringInterval = 1,
+                        isCompleted = false,
+                        category = "",
                         priority = com.maliar.pro.database.Priority.MEDIUM
                     )
                     viewModel.addReminder(reminder)
