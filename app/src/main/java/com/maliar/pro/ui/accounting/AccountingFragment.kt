@@ -9,6 +9,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.maliar.pro.R
 import com.maliar.pro.databinding.FragmentAccountingBinding
 import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.dialogs.AddIncomeDialog
