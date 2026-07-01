@@ -2,47 +2,72 @@ package com.maliar.pro.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.maliar.pro.database.Reminder
-import com.maliar.pro.database.ReminderManager
+import com.maliar.pro.database.ReminderEntity
+import com.maliar.pro.database.SmartReminderManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class RemindersViewModel(private val reminderManager: ReminderManager) : ViewModel() {
+class RemindersViewModel(private val smartManager: SmartReminderManager) : ViewModel() {
 
-    private val _reminders = MutableStateFlow<List<Reminder>>(emptyList())
-    val reminders: StateFlow<List<Reminder>> = _reminders.asStateFlow()
+    private val _reminders = MutableStateFlow<List<ReminderEntity>>(emptyList())
+    val reminders: StateFlow<List<ReminderEntity>> = _reminders.asStateFlow()
+
+    private val _filter = MutableStateFlow("all")
+    val filter: StateFlow<String> = _filter.asStateFlow()
 
     init {
         loadReminders()
     }
 
-    fun loadReminders() {
+    private fun loadReminders() {
         viewModelScope.launch {
-            val reminderList = reminderManager.getActiveRemindersList()
-            _reminders.value = reminderList
+            smartManager.getAllReminders().collect { allReminders ->
+                applyFilter(allReminders)
+            }
         }
     }
 
-    fun addReminder(reminder: Reminder) {
+    fun setFilter(filterType: String) {
+        _filter.value = filterType
         viewModelScope.launch {
-            reminderManager.addReminder(reminder)
-            loadReminders()
+            val allReminders = smartManager.getAllRemindersList()
+            applyFilter(allReminders)
         }
     }
 
-    fun deleteReminder(reminder: Reminder) {
+    private fun applyFilter(allReminders: List<ReminderEntity>) {
+        val filtered = when (_filter.value) {
+            "time" -> allReminders.filter { it.reminderType == "SIMPLE" || it.reminderType == "TASK" }
+            "recurring" -> allReminders.filter { it.repeatPattern != "ONCE" }
+            "high_priority" -> allReminders.filter { it.priority == "HIGH" || it.priority == "URGENT" }
+            else -> allReminders
+        }
+        _reminders.value = filtered
+    }
+
+    fun addReminder(reminder: ReminderEntity) {
         viewModelScope.launch {
-            reminderManager.deleteReminder(reminder)
-            loadReminders()
+            smartManager.addReminder(reminder)
         }
     }
 
-    fun markAsCompleted(reminder: Reminder) {
+    fun deleteReminder(reminder: ReminderEntity) {
         viewModelScope.launch {
-            reminderManager.markAsCompleted(reminder.id)
-            loadReminders()
+            smartManager.deleteReminder(reminder)
+        }
+    }
+
+    fun completeReminder(reminder: ReminderEntity) {
+        viewModelScope.launch {
+            smartManager.completeReminder(reminder.id)
+        }
+    }
+
+    fun updateReminder(reminder: ReminderEntity) {
+        viewModelScope.launch {
+            smartManager.updateReminder(reminder)
         }
     }
 }

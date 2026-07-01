@@ -15,10 +15,10 @@
             android:layout_marginBottom="8dp">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/reminderTitleInput"
+                android:id="@+id/recurringTitleInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="عنوان یادآوری"
+                android:hint="عنوان یادآوری تکراری"
                 android:inputType="text" />
 
         </com.google.android.material.textfield.TextInputLayout>
@@ -29,7 +29,7 @@
             android:layout_marginBottom="8dp">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/reminderDescriptionInput"
+                android:id="@+id/recurringDescriptionInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="توضیحات"
@@ -38,77 +38,33 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="الگوی تکرار:"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
         <Spinner
-            android:id="@+id/categorySpinner"
+            android:id="@+id/recurringPatternSpinner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
-
-            <Button
-                android:id="@+id/reminderDateButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="انتخاب تاریخ" />
-
-            <Button
-                android:id="@+id/reminderTimeButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:text="انتخاب ساعت" />
-
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="اولویت:"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="8dp" />
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/priorityChipGroup"
+        <Button
+            android:id="@+id/recurringSelectTimeButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:singleSelection="true">
+            android:text="انتخاب ساعت" />
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipLowPriority"
-                style="@style/Widget.Material3.Chip.Assist"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="کم"
-                android:checkable="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipMediumPriority"
-                style="@style/Widget.Material3.Chip.Assist"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="متوسط"
-                android:checked="true"
-                android:checkable="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipHighPriority"
-                style="@style/Widget.Material3.Chip.Assist"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="زیاد"
-                android:checkable="true" />
-
-        </com.google.android.material.chip.ChipGroup>
+        <Button
+            android:id="@+id/recurringSelectDaysButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="انتخاب روزهای هفته" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -119,14 +75,14 @@
             android:layout_marginTop="8dp" />
 
         <com.google.android.material.chip.ChipGroup
-            android:id="@+id/alertTypeChipGroup"
+            android:id="@+id/recurringAlertTypeChipGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             app:singleSelection="true">
 
             <com.google.android.material.chip.Chip
-                android:id="@+id/chipAlertNotification"
+                android:id="@+id/chipRecurringAlertNotification"
                 style="@style/Widget.Material3.Chip.Assist"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -135,7 +91,7 @@
                 android:checkable="true" />
 
             <com.google.android.material.chip.Chip
-                android:id="@+id/chipAlertFullScreen"
+                android:id="@+id/chipRecurringAlertFullScreen"
                 style="@style/Widget.Material3.Chip.Assist"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -143,7 +99,7 @@
                 android:checkable="true" />
 
             <com.google.android.material.chip.Chip
-                android:id="@+id/chipAlertSmart"
+                android:id="@+id/chipRecurringAlertSmart"
                 style="@style/Widget.Material3.Chip.Assist"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

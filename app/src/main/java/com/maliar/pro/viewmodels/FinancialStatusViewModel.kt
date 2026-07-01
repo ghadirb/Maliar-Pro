@@ -39,6 +39,41 @@ class FinancialStatusViewModel(private val financialManager: FinancialStatusMana
         }
     }
 
+    fun addAsset(name: String, amount: Double) {
+        viewModelScope.launch {
+            financialManager.addAsset(name, amount)
+            loadFinancialData()
+        }
+    }
+
+    fun addDebt(name: String, amount: Double) {
+        viewModelScope.launch {
+            financialManager.addDebt(name, amount)
+            loadFinancialData()
+        }
+    }
+
+    fun addFinancialGoal(name: String, targetAmount: Double) {
+        viewModelScope.launch {
+            financialManager.addFinancialGoal(name, targetAmount)
+            loadFinancialData()
+        }
+    }
+
+    fun addFixedIncome(name: String, amount: Double) {
+        viewModelScope.launch {
+            financialManager.addFixedIncome(name, amount)
+            loadFinancialData()
+        }
+    }
+
+    fun setFinancialPreferences(emergencyFund: Double, savingGoal: Double) {
+        viewModelScope.launch {
+            financialManager.setPreferences(emergencyFund, savingGoal)
+            loadFinancialData()
+        }
+    }
+
     fun refreshData() {
         loadFinancialData()
     }

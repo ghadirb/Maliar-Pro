@@ -8,6 +8,8 @@ import android.widget.Button
 import android.widget.EditText
 import com.maliar.pro.database.Installment
 import com.maliar.pro.viewmodels.AccountingViewModel
+import java.text.NumberFormat
+import java.util.Locale
 
 class EditInstallmentDialog(private val context: Context, private val viewModel: AccountingViewModel, private val installment: Installment) {
 
@@ -26,9 +28,10 @@ class EditInstallmentDialog(private val context: Context, private val viewModel:
         val startDateButton = view.findViewById<Button>(com.maliar.pro.R.id.startDateButton)
 
         titleInput.setText(installment.title)
-        totalAmountInput.setText(installment.totalAmount.toString())
+        // Format amounts properly - show as whole numbers (Toman)
+        totalAmountInput.setText(String.format("%.0f", installment.totalAmount))
         installmentCountInput.setText(installment.totalInstallments.toString())
-        monthlyAmountInput.setText(installment.installmentAmount.toString())
+        monthlyAmountInput.setText(String.format("%.0f", installment.installmentAmount))
         lenderInput.setText(installment.recipient)
 
         val persianCalendar = IslamicCalendar.getInstance(ULocale.forLanguageTag("fa_IR"))

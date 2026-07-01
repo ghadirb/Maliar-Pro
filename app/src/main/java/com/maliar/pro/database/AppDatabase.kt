@@ -7,8 +7,9 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [Contact::class, Income::class, Expense::class, Check::class, Installment::class, Reminder::class, 
-               Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class],
-    version = 1,
+               Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
+               ReminderEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -17,6 +18,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun accountingDao(): AccountingDao
     abstract fun reminderDao(): ReminderDao
     abstract fun financialStatusDao(): FinancialStatusDao
+    abstract fun reminderEntityDao(): ReminderEntityDao
     
     companion object {
         @Volatile
@@ -28,7 +30,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).build()
+                ).fallbackToDestructiveMigration()
+                 .build()
                 INSTANCE = instance
                 instance
             }

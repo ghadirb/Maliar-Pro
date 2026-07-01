@@ -25,6 +25,11 @@ class FinancialStatusManager(context: Context) {
         return financialDao.insertAsset(asset)
     }
     
+    suspend fun addAsset(name: String, amount: Double): Long {
+        val asset = Asset(type = AssetType.OTHER, title = name, value = amount)
+        return financialDao.insertAsset(asset)
+    }
+    
     suspend fun updateAsset(asset: Asset) {
         financialDao.updateAsset(asset)
     }
@@ -47,6 +52,11 @@ class FinancialStatusManager(context: Context) {
     }
     
     suspend fun addDebt(debt: Debt): Long {
+        return financialDao.insertDebt(debt)
+    }
+    
+    suspend fun addDebt(name: String, amount: Double): Long {
+        val debt = Debt(type = DebtType.OTHER, title = name, amount = amount, isPaid = false)
         return financialDao.insertDebt(debt)
     }
     
@@ -75,6 +85,18 @@ class FinancialStatusManager(context: Context) {
         return financialDao.insertGoal(goal)
     }
     
+    suspend fun addFinancialGoal(name: String, targetAmount: Double): Long {
+        val goal = FinancialGoal(
+            type = GoalType.CUSTOM, 
+            title = name, 
+            targetAmount = targetAmount, 
+            targetDate = System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L,
+            priority = Priority.MEDIUM,
+            currentProgress = 0.0
+        )
+        return financialDao.insertGoal(goal)
+    }
+    
     suspend fun updateGoal(goal: FinancialGoal) {
         financialDao.updateGoal(goal)
     }
@@ -100,6 +122,11 @@ class FinancialStatusManager(context: Context) {
         return financialDao.insertFixedIncome(income)
     }
     
+    suspend fun addFixedIncome(name: String, amount: Double): Long {
+        val income = FixedIncome(type = IncomeType.OTHER, title = name, amount = amount)
+        return financialDao.insertFixedIncome(income)
+    }
+    
     suspend fun updateFixedIncome(income: FixedIncome) {
         financialDao.updateFixedIncome(income)
     }
@@ -121,10 +148,29 @@ class FinancialStatusManager(context: Context) {
         financialDao.updatePreferences(preferences)
     }
     
+    suspend fun setPreferences(emergencyFund: Double, savingGoal: Double) {
+        val prefs = getPreferences()
+        if (prefs != null) {
+            updatePreferences(prefs.copy(
+                emergencyFundTarget = emergencyFund, 
+                monthlySavingGoal = savingGoal
+            ))
+        } else {
+            savePreferences(FinancialPreferences(
+                emergencyFundTarget = emergencyFund, 
+                monthlySavingGoal = savingGoal,
+                riskTolerance = RiskTolerance.MEDIUM,
+                investmentInterest = false,
+                savingsInterest = true,
+                purchasePreference = PurchasePreference.CASH
+            ))
+        }
+    }
+    
     // Completion Percentage
     suspend fun getCompletionPercentage(): Int {
         var completed = 0
-        var total = 7
+        val total = 7
         
         val assets = getAllAssetsList()
         if (assets.isNotEmpty()) completed++

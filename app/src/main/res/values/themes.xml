@@ -8,4 +8,13 @@
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
     </style>
+
+    <!-- Alarm Theme for FullScreenAlarmActivity -->
+    <style name="Theme.MaliarPro.Alarm" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/alarm_background</item>
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">#B3FFFFFF</item>
+        <item name="android:statusBarColor">#FF1A1A2E</item>
+        <item name="android:navigationBarColor">#FF1A1A2E</item>
+    </style>
 </resources>

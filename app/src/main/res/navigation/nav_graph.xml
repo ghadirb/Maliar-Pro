@@ -73,6 +73,15 @@
         <action
             android:id="@+id/action_financialStatusFragment_to_assistantFragment"
             app:destination="@id/assistantFragment" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_apiKeysFragment"
+            app:destination="@id/apiKeysFragment" />
     </fragment>
+
+    <fragment
+        android:id="@+id/apiKeysFragment"
+        android:name="com.maliar.pro.ui.profile.APIKeysFragment"
+        android:label="کلیدهای API" />
 
 </navigation>

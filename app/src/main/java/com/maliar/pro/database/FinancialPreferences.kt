@@ -1,5 +1,6 @@
 package com.maliar.pro.database
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -14,6 +15,8 @@ data class FinancialPreferences(
     val householdSize: Int? = null,
     val dependents: Int? = null,
     val maritalStatus: MaritalStatus? = null,
+    val emergencyFundTarget: Double = 0.0,
+    val monthlySavingGoal: Double = 0.0,
     val aiAccessAccounting: Boolean = true,
     val aiUseAssets: Boolean = true,
     val aiUseGoals: Boolean = true,

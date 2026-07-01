@@ -46,16 +46,22 @@
                     android:layout_height="wrap_content">
 
                     <RadioButton
+                        android:id="@+id/noneNotification"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="بدون نوتیفیکیشن" />
+
+                    <RadioButton
                         android:id="@+id/simpleNotification"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="ساده (برای پس‌زمینه)" />
+                        android:text="ساده (فقط نمایش)" />
 
                     <RadioButton
                         android:id="@+id/actionNotification"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="با اکشن (تماس و غیره)" />
+                        android:text="با اکشن (دکمه انجام/تعویق)" />
 
                 </RadioGroup>
 

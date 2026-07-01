@@ -38,6 +38,24 @@
             </intent-filter>
         </activity>
 
+        <!-- Full Screen Alarm Activity -->
+        <activity
+            android:name=".ui.reminders.FullScreenAlarmActivity"
+            android:exported="true"
+            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.MaliarPro.Alarm" />
+
+        <!-- Reminder Receivers -->
+        <receiver
+            android:name=".receivers.ReminderReceiver"
+            android:exported="true" />
+
+        <receiver
+            android:name=".receivers.ReminderActionReceiver"
+            android:exported="true" />
+
     </application>
 
 </manifest>
