@@ -55,7 +55,10 @@ class FinancialStatusFragment : Fragment() {
 
     private fun showAddAssetDialog() {
         val nameInput = EditText(requireContext()).apply { hint = "نام دارایی" }
-        val amountInput = EditText(requireContext()).apply { hint = "مبلغ (تومان)"; inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+        val amountInput = EditText(requireContext()).apply { 
+            hint = "مبلغ (تومان)"; 
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER 
+        }
         val container = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             addView(nameInput)
@@ -72,9 +75,119 @@ class FinancialStatusFragment : Fragment() {
             .show()
     }
 
-    // Similar for other dialogs (debt, goal, fixed income, preferences) - abbreviated for brevity but full in code
+    private fun showAddDebtDialog() {
+        val nameInput = EditText(requireContext()).apply { hint = "نام بدهی" }
+        val amountInput = EditText(requireContext()).apply { 
+            hint = "مبلغ (تومان)"; 
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER 
+        }
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(nameInput)
+            addView(amountInput)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("افزودن بدهی")
+            .setView(container)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val name = nameInput.text.toString()
+                val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
+                if (name.isNotEmpty()) viewModel.addDebt(name, amount)
+            }
+            .show()
+    }
+
+    private fun showAddGoalDialog() {
+        val nameInput = EditText(requireContext()).apply { hint = "نام هدف" }
+        val amountInput = EditText(requireContext()).apply { 
+            hint = "مبلغ هدف (تومان)"; 
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER 
+        }
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(nameInput)
+            addView(amountInput)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("افزودن هدف مالی")
+            .setView(container)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val name = nameInput.text.toString()
+                val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
+                if (name.isNotEmpty()) viewModel.addFinancialGoal(name, amount)
+            }
+            .show()
+    }
+
+    private fun showFixedIncomeDialog() {
+        val nameInput = EditText(requireContext()).apply { hint = "نام درآمد ثابت" }
+        val amountInput = EditText(requireContext()).apply { 
+            hint = "مبلغ (تومان)"; 
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER 
+        }
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(nameInput)
+            addView(amountInput)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("افزودن درآمد ثابت")
+            .setView(container)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val name = nameInput.text.toString()
+                val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
+                if (name.isNotEmpty()) viewModel.addFixedIncome(name, amount)
+            }
+            .show()
+    }
+
+    private fun showFinancialPreferencesDialog() {
+        val emergencyInput = EditText(requireContext()).apply { 
+            hint = "هدف صندوق اضطراری (تومان)" 
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER 
+        }
+        val savingInput = EditText(requireContext()).apply { 
+            hint = "هدف پس‌انداز ماهانه (تومان)" 
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER 
+        }
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(emergencyInput)
+            addView(savingInput)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("تنظیمات مالی")
+            .setView(container)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val emergency = emergencyInput.text.toString().toDoubleOrNull() ?: 0.0
+                val saving = savingInput.text.toString().toDoubleOrNull() ?: 0.0
+                viewModel.setFinancialPreferences(emergency, saving)
+            }
+            .show()
+    }
+
     private fun observeViewModel() {
-        // Flow observers for totals
+        lifecycleScope.launch {
+            viewModel.totalAssets.collect { amount ->
+                binding.totalAssets.text = formatCurrency(amount)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.totalDebts.collect { amount ->
+                binding.totalDebts.text = formatCurrency(amount)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.netWorth.collect { amount ->
+                binding.netWorth.text = formatCurrency(amount)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.completionPercentage.collect { percent ->
+                binding.completionPercentage.text = "$percent%"
+                binding.completionProgress.progress = percent
+            }
+        }
     }
 
     private fun formatCurrency(amount: Double): String = String.format("%,.0f تومان", amount)
