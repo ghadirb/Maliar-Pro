@@ -199,10 +199,10 @@ object AutoProvisioningManager {
         if (lower.startsWith("sk-or")) return AIProvider.OPENROUTER
         if (lower.startsWith("aiml") || lower.startsWith("sk-aiml")) return AIProvider.AIML
         if (trimmed.startsWith("eyJ")) return AIProvider.LIARA
-        if (trimmed.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\$")))
+        if (trimmed.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")))
             return AIProvider.GLADIA
         if (lower.startsWith("hf_")) return AIProvider.OPENROUTER
-        if (trimmed.matches(Regex("^[a-fA-F0-9]{32}\$"))) return AIProvider.AIML
+        if (trimmed.matches(Regex("^[a-fA-F0-9]{32}$"))) return AIProvider.AIML
         if (lower.startsWith("sk-") && trimmed.length > 50) return AIProvider.GAPGPT
         if (lower.startsWith("sk-")) return AIProvider.OPENAI
         if (trimmed.startsWith("AIza")) return AIProvider.OPENAI
