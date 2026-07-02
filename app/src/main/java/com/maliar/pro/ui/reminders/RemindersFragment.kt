@@ -61,12 +61,6 @@ class RemindersFragment : Fragment() {
         )
         recyclerView.adapter = adapter
 
-        // Add button for full reminder creation with 3 notification modes + Jalali + TTS
-        val addBtn = view.findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.addReminderButton)
-        addBtn.setOnClickListener {
-            // Open add screen with smart features
-        }
-
         loadReminders()
         return view
     }
