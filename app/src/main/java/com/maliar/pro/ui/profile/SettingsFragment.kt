@@ -29,7 +29,6 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupNotificationSettings() {
-        // Load current notification mode
         val notificationMode = prefs.getNotificationMode()
 
         when (notificationMode) {
@@ -40,20 +39,15 @@ class SettingsFragment : Fragment() {
         }
 
         binding.notificationModeGroup.setOnCheckedChangeListener { _, checkedId ->
-            when (checkedId) {
-                binding.noneNotification.id -> {
-                    prefs.setNotificationMode("none")
-                    Toast.makeText(requireContext(), "نوتیفیکیشن‌ها غیرفعال شدند", Toast.LENGTH_SHORT).show()
-                }
-                binding.simpleNotification.id -> {
-                    prefs.setNotificationMode("simple")
-                    Toast.makeText(requireContext(), "نوتیفیکیشن ساده فعال شد", Toast.LENGTH_SHORT).show()
-                }
-                binding.actionNotification.id -> {
-                    prefs.setNotificationMode("action")
-                    Toast.makeText(requireContext(), "نوتیفیکیشن با دکمه‌های عملیاتی فعال شد", Toast.LENGTH_SHORT).show()
-                }
+            val mode = when (checkedId) {
+                binding.noneNotification.id -> "none"
+                binding.simpleNotification.id -> "simple"
+                binding.actionNotification.id -> "action"
+                else -> "simple"
             }
+            prefs.setNotificationMode(mode)
+            Toast.makeText(requireContext(), "حالت نوتیفیکیشن تغییر کرد: $mode", Toast.LENGTH_SHORT).show()
+            // Trigger receiver integration if needed
         }
     }
 }
