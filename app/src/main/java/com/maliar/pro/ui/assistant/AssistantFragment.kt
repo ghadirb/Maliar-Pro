@@ -17,42 +17,45 @@ class AssistantFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View {
+    ): View? {
         val view = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
+            setPadding(32, 64, 32, 32)
+            setBackgroundColor(android.graphics.Color.WHITE)
         }
 
-        // Title
         val title = TextView(requireContext()).apply {
-            text = "دستیار هوشمند Maliar"
-            textSize = 20f
-            setTextAppearance(R.style.TextAppearance_Material3_HeadlineMedium)
+            text = "🤖 دستیار هوشمند Maliar"
+            textSize = 24f
+            setTextAppearance(androidx.appcompat.R.style.TextAppearance_AppCompat_Large)
         }
         view.addView(title)
 
-        // Chat area (placeholder)
-        val chatArea = TextView(requireContext()).apply {
-            text = "چت با دستیار...
-(در حال توسعه کامل با GAPGPT)"
+        val status = TextView(requireContext()).apply {
+            text = "در حال اتصال به GAPGPT..."
             textSize = 16f
         }
-        view.addView(chatArea)
+        view.addView(status)
 
-        // Input
-        val input = EditText(requireContext()).apply {
-            hint = "پیام خود را بنویسید..."
+        val inputLayout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
         }
-        view.addView(input)
 
-        // Send button
-        val sendButton = MaterialButton(requireContext()).apply {
+        val input = EditText(requireContext()).apply {
+            hint = "سوال یا دستور خود را بنویسید..."
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        inputLayout.addView(input)
+
+        val sendBtn = MaterialButton(requireContext()).apply {
             text = "ارسال"
             setOnClickListener {
-                // TODO: Integrate GAPGPT / voice
+                // GAPGPT integration placeholder
+                status.text = "در حال پردازش..."
             }
         }
-        view.addView(sendButton)
+        inputLayout.addView(sendBtn)
+        view.addView(inputLayout)
 
         return view
     }
