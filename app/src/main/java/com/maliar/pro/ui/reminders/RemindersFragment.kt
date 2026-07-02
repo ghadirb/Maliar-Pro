@@ -11,12 +11,12 @@ import androidx.recyclerview.widget.RecyclerView
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
 import com.maliar.pro.database.ReminderEntity
-import com.maliar.pro.database.ReminderManager
+import com.maliar.pro.database.SmartReminderManager
 import kotlinx.coroutines.launch
 
 class RemindersFragment : Fragment() {
 
-    private lateinit var reminderManager: ReminderManager
+    private lateinit var smartReminderManager: SmartReminderManager
     private lateinit var adapter: RemindersAdapter
 
     override fun onCreateView(
@@ -24,22 +24,22 @@ class RemindersFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_reminders, container, false)
 
-        reminderManager = ReminderManager(requireContext())
+        smartReminderManager = SmartReminderManager(requireContext())
 
         val recyclerView: RecyclerView = view.findViewById(R.id.remindersRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { /* edit */ },
+            onItemClick = { /* TODO: open edit */ },
             onDeleteClick = { entity ->
                 lifecycleScope.launch {
-                    reminderManager.deleteReminderById(entity.id)
+                    smartReminderManager.deleteReminder(entity)
                     loadReminders()
                 }
             },
             onCompleteClick = { entity ->
                 lifecycleScope.launch {
-                    reminderManager.markAsCompleted(entity.id)
+                    smartReminderManager.markAsCompleted(entity.id)
                     loadReminders()
                 }
             }
@@ -52,7 +52,7 @@ class RemindersFragment : Fragment() {
 
     private fun loadReminders() {
         lifecycleScope.launch {
-            val reminders = reminderManager.getAllRemindersList()
+            val reminders = smartReminderManager.getAllRemindersList()
             adapter.submitList(reminders)
         }
     }
