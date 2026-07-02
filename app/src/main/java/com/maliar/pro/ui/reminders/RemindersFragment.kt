@@ -47,11 +47,10 @@ class RemindersFragment : Fragment() {
         )
         recyclerView.adapter = adapter
 
-        // Add FAB listener for new reminder
-        view.findViewById<FloatingActionButton>(R.id.fabAddReminder)?.setOnClickListener {
+        // FAB for add reminder
+        view.findViewById<FloatingActionButton>(R.id.addReminderFab).setOnClickListener {
             // TODO: Show add reminder dialog
-            // For now, log
-            android.util.Log.d("Reminders", "Add reminder clicked")
+            android.util.Log.d("Reminders", "Add reminder clicked - implement dialog")
         }
 
         loadReminders()
