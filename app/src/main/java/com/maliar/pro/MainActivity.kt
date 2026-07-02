@@ -2,10 +2,13 @@ package com.maliar.pro
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.maliar.pro.databinding.ActivityMainBinding
+import com.maliar.pro.utils.KeyManager
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -15,6 +18,16 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Load encrypted keys at startup
+        lifecycleScope.launch {
+            try {
+                KeyManager.loadKeys(this@MainActivity)
+                // Initialize AI services with keys
+            } catch (e: Exception) {
+                // Handle key loading error
+            }
+        }
 
         setupNavigation()
     }
