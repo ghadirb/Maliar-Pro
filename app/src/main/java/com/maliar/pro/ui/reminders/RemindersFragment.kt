@@ -10,7 +10,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
-import com.maliar.pro.database.Reminder
 import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.database.ReminderManager
 import kotlinx.coroutines.launch
@@ -34,21 +33,7 @@ class RemindersFragment : Fragment() {
             onItemClick = { /* edit */ },
             onDeleteClick = { entity ->
                 lifecycleScope.launch {
-                    val reminder = Reminder(
-                        id = entity.id,
-                        title = entity.title,
-                        description = entity.description,
-                        reminderTime = entity.triggerTime,
-                        isRecurring = false,
-                        recurringType = com.maliar.pro.database.RecurringType.NONE,
-                        isCompleted = entity.isCompleted,
-                        completedAt = entity.completedAt,
-                        linkedCheckId = entity.linkedCheckId,
-                        linkedInstallmentId = entity.linkedInstallmentId,
-                        category = entity.category,
-                        priority = com.maliar.pro.database.Priority.MEDIUM
-                    )
-                    reminderManager.deleteReminder(reminder)
+                    reminderManager.deleteReminderById(entity.id)
                     loadReminders()
                 }
             },
