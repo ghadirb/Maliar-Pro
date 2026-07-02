@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
+import com.maliar.pro.database.Priority
 import com.maliar.pro.database.Reminder
 import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.database.ReminderManager
@@ -40,16 +41,16 @@ class RemindersFragment : Fragment() {
                     val reminder = Reminder(
                         id = entity.id,
                         title = entity.title,
-                        description = entity.description ?: "",
-                        reminderTime = entity.reminderTime,
-                        isRecurring = entity.isRecurring,
-                        recurringType = entity.recurringType,
+                        description = entity.description,
+                        reminderTime = entity.triggerTime,
+                        isRecurring = entity.repeatPattern != "ONCE",
+                        recurringType = com.maliar.pro.database.RecurringType.valueOf(entity.repeatPattern),
                         isCompleted = entity.isCompleted,
                         completedAt = entity.completedAt,
                         linkedCheckId = entity.linkedCheckId,
                         linkedInstallmentId = entity.linkedInstallmentId,
-                        category = entity.category ?: "",
-                        priority = entity.priority
+                        category = entity.category,
+                        priority = Priority.valueOf(entity.priority)
                     )
                     reminderManager.deleteReminder(reminder)
                     loadReminders()
@@ -71,8 +72,24 @@ class RemindersFragment : Fragment() {
     private fun loadReminders() {
         lifecycleScope.launch {
             val reminders = reminderManager.getAllRemindersList()
-            // Map to ReminderEntity if adapter requires
-            adapter.submitList(reminders) // Adjust adapter if needed
+            adapter.submitList(reminders.map { it.toReminderEntity() } ) // Map if adapter expects Entity
         }
     }
+}
+
+// Extension if needed
+private fun Reminder.toReminderEntity(): ReminderEntity {
+    return ReminderEntity(
+        id = this.id,
+        title = this.title,
+        description = this.description,
+        triggerTime = this.reminderTime,
+        repeatPattern = this.recurringType.name,
+        isCompleted = this.isCompleted,
+        completedAt = this.completedAt,
+        linkedCheckId = this.linkedCheckId,
+        linkedInstallmentId = this.linkedInstallmentId,
+        category = this.category,
+        priority = this.priority.name
+    )
 }
