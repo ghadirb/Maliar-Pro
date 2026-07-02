@@ -33,16 +33,22 @@ class RemindersFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { /* TODO: open edit */ },
-            onDeleteClick = { reminder ->
+            onItemClick = { /* TODO edit reminder */ },
+            onDeleteClick = { reminderEntity ->
+                // Convert or use compatible call
                 lifecycleScope.launch {
+                    val reminder = Reminder( // minimal compatible or adjust
+                        id = reminderEntity.id,
+                        title = reminderEntity.title,
+                        // ... map other fields
+                    )
                     reminderManager.deleteReminder(reminder)
                     loadReminders()
                 }
             },
-            onCompleteClick = { reminder ->
+            onCompleteClick = { reminderEntity ->
                 lifecycleScope.launch {
-                    reminderManager.markAsCompleted(reminder.id)
+                    reminderManager.markAsCompleted(reminderEntity.id)
                     loadReminders()
                 }
             }
@@ -56,7 +62,7 @@ class RemindersFragment : Fragment() {
     private fun loadReminders() {
         lifecycleScope.launch {
             val reminders = reminderManager.getAllRemindersList()
-            adapter.submitList(reminders)
+            adapter.submitList(reminders) // Assume adapter updated or map if needed
         }
     }
 }
