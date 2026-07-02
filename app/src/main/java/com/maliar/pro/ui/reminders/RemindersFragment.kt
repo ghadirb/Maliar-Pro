@@ -30,7 +30,7 @@ class RemindersFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { /* TODO: open edit */ },
+            onItemClick = { entity -> /* TODO: open edit dialog for ReminderEntity */ },
             onDeleteClick = { entity ->
                 lifecycleScope.launch {
                     smartReminderManager.deleteReminder(entity)
@@ -52,7 +52,7 @@ class RemindersFragment : Fragment() {
 
     private fun loadReminders() {
         lifecycleScope.launch {
-            val reminders = smartReminderManager.getAllRemindersList()
+            val reminders: List<ReminderEntity> = smartReminderManager.getAllRemindersList()
             adapter.submitList(reminders)
         }
     }
