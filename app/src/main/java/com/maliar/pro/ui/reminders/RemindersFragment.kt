@@ -33,7 +33,7 @@ class RemindersFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { /* TODO: open edit dialog */ },
+            onItemClick = { /* TODO edit */ },
             onDeleteClick = { reminder ->
                 lifecycleScope.launch {
                     reminderManager.deleteReminder(reminder.id)
@@ -43,7 +43,6 @@ class RemindersFragment : Fragment() {
             onCompleteClick = { reminder ->
                 lifecycleScope.launch {
                     reminderManager.markAsCompleted(reminder.id)
-                    // smartReminderManager.handleReminderCompletion(reminder) - if method exists
                     loadReminders()
                 }
             }

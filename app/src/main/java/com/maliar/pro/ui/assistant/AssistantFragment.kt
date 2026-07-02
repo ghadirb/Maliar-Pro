@@ -18,6 +18,7 @@ import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.database.ReminderManager
 import com.maliar.pro.viewmodels.AssistantViewModel
 import com.maliar.pro.viewmodels.AssistantViewModelFactory
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 class AssistantFragment : Fragment() {
@@ -55,9 +56,11 @@ class AssistantFragment : Fragment() {
             }
         }
 
-        viewModel.chatMessages.observe(viewLifecycleOwner) { messages ->
-            chatAdapter.submitList(messages)
-            recyclerView.scrollToPosition(messages.size - 1)
+        lifecycleScope.launch {
+            viewModel.chatMessages.collect { messages ->
+                chatAdapter.submitList(messages)
+                recyclerView.scrollToPosition(messages.size - 1)
+            }
         }
 
         return view
