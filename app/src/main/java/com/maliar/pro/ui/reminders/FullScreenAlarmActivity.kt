@@ -2,6 +2,7 @@ package com.maliar.pro.ui.reminders
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
@@ -190,8 +191,8 @@ class FullScreenAlarmActivity : AppCompatActivity() {
     }
 
     companion object {
-        fun createIntent(context: Context, title: String, description: String): android.content.Intent {
-            return android.content.Intent(context, FullScreenAlarmActivity::class.java).apply {
+        fun createIntent(context: Context, title: String, description: String): Intent {
+            return Intent(context, FullScreenAlarmActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("reminder_title", title)
                 putExtra("reminder_description", description)
