@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
-import com.maliar.pro.database.ReminderEntity
+import com.maliar.pro.database.Reminder
 import com.maliar.pro.database.ReminderManager
 import com.maliar.pro.database.SmartReminderManager
 import kotlinx.coroutines.launch
@@ -33,10 +33,10 @@ class RemindersFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { /* TODO edit */ },
+            onItemClick = { /* TODO: open edit */ },
             onDeleteClick = { reminder ->
                 lifecycleScope.launch {
-                    reminderManager.deleteReminder(reminder.id)
+                    reminderManager.deleteReminder(reminder)
                     loadReminders()
                 }
             },
@@ -55,7 +55,7 @@ class RemindersFragment : Fragment() {
 
     private fun loadReminders() {
         lifecycleScope.launch {
-            val reminders = reminderManager.getAllRemindersList() ?: emptyList()
+            val reminders = reminderManager.getAllRemindersList()
             adapter.submitList(reminders)
         }
     }
