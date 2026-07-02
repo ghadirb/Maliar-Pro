@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
 import com.maliar.pro.database.Reminder
+import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.database.ReminderManager
 import com.maliar.pro.database.SmartReminderManager
 import kotlinx.coroutines.launch
@@ -33,22 +34,30 @@ class RemindersFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { /* TODO edit reminder */ },
-            onDeleteClick = { reminderEntity ->
-                // Convert or use compatible call
+            onItemClick = { /* TODO edit */ },
+            onDeleteClick = { entity ->
                 lifecycleScope.launch {
-                    val reminder = Reminder( // minimal compatible or adjust
-                        id = reminderEntity.id,
-                        title = reminderEntity.title,
-                        // ... map other fields
+                    val reminder = Reminder(
+                        id = entity.id,
+                        title = entity.title,
+                        description = entity.description ?: "",
+                        reminderTime = entity.reminderTime,
+                        isRecurring = entity.isRecurring,
+                        recurringType = entity.recurringType,
+                        isCompleted = entity.isCompleted,
+                        completedAt = entity.completedAt,
+                        linkedCheckId = entity.linkedCheckId,
+                        linkedInstallmentId = entity.linkedInstallmentId,
+                        category = entity.category ?: "",
+                        priority = entity.priority
                     )
                     reminderManager.deleteReminder(reminder)
                     loadReminders()
                 }
             },
-            onCompleteClick = { reminderEntity ->
+            onCompleteClick = { entity ->
                 lifecycleScope.launch {
-                    reminderManager.markAsCompleted(reminderEntity.id)
+                    reminderManager.markAsCompleted(entity.id)
                     loadReminders()
                 }
             }
@@ -62,7 +71,8 @@ class RemindersFragment : Fragment() {
     private fun loadReminders() {
         lifecycleScope.launch {
             val reminders = reminderManager.getAllRemindersList()
-            adapter.submitList(reminders) // Assume adapter updated or map if needed
+            // Map to ReminderEntity if adapter requires
+            adapter.submitList(reminders) // Adjust adapter if needed
         }
     }
 }
