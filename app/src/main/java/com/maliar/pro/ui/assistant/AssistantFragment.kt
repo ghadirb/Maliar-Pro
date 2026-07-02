@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
@@ -17,6 +18,7 @@ import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.database.ReminderManager
 import com.maliar.pro.viewmodels.AssistantViewModel
 import com.maliar.pro.viewmodels.AssistantViewModelFactory
+import kotlinx.coroutines.launch
 
 class AssistantFragment : Fragment() {
 
@@ -35,7 +37,6 @@ class AssistantFragment : Fragment() {
         val factory = AssistantViewModelFactory(accountingManager, reminderManager, financialManager)
         viewModel = ViewModelProvider(this, factory)[AssistantViewModel::class.java]
 
-        // Setup RecyclerView for chat
         val recyclerView: RecyclerView = view.findViewById(R.id.chatRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         chatAdapter = ChatAdapter()
@@ -47,12 +48,13 @@ class AssistantFragment : Fragment() {
         sendBtn.setOnClickListener {
             val message = input.text.toString().trim()
             if (message.isNotEmpty()) {
-                viewModel.sendMessage(message)
+                lifecycleScope.launch {
+                    viewModel.sendMessage(message)
+                }
                 input.text = null
             }
         }
 
-        // Observe chat messages
         viewModel.chatMessages.observe(viewLifecycleOwner) { messages ->
             chatAdapter.submitList(messages)
             recyclerView.scrollToPosition(messages.size - 1)

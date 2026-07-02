@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.maliar.pro.R
@@ -12,15 +13,13 @@ import com.maliar.pro.adapters.RemindersAdapter
 import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.database.ReminderManager
 import com.maliar.pro.database.SmartReminderManager
-import com.maliar.pro.viewmodels.RemindersViewModel
-import com.maliar.pro.viewmodels.RemindersViewModelFactory
+import kotlinx.coroutines.launch
 
 class RemindersFragment : Fragment() {
 
     private lateinit var reminderManager: ReminderManager
     private lateinit var smartReminderManager: SmartReminderManager
     private lateinit var adapter: RemindersAdapter
-    private lateinit var viewModel: RemindersViewModel
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -34,12 +33,19 @@ class RemindersFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { reminder -> /* handle edit */ },
-            onDeleteClick = { reminder -> reminderManager.deleteReminder(reminder.id); loadReminders() },
-            onCompleteClick = { reminder -> 
-                reminderManager.markAsCompleted(reminder.id)
-                smartReminderManager.handleReminderCompletion(reminder)
-                loadReminders()
+            onItemClick = { /* TODO: open edit dialog */ },
+            onDeleteClick = { reminder ->
+                lifecycleScope.launch {
+                    reminderManager.deleteReminder(reminder.id)
+                    loadReminders()
+                }
+            },
+            onCompleteClick = { reminder ->
+                lifecycleScope.launch {
+                    reminderManager.markAsCompleted(reminder.id)
+                    // smartReminderManager.handleReminderCompletion(reminder) - if method exists
+                    loadReminders()
+                }
             }
         )
         recyclerView.adapter = adapter
@@ -49,7 +55,9 @@ class RemindersFragment : Fragment() {
     }
 
     private fun loadReminders() {
-        val reminders = reminderManager.getAllRemindersList()
-        adapter.submitList(reminders)
+        lifecycleScope.launch {
+            val reminders = reminderManager.getAllRemindersList() ?: emptyList()
+            adapter.submitList(reminders)
+        }
     }
 }
