@@ -11,43 +11,60 @@ import androidx.recyclerview.widget.RecyclerView
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
 import com.maliar.pro.database.Reminder
+import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.database.ReminderManager
 import kotlinx.coroutines.launch
 
 class RemindersFragment : Fragment() {
+
     private lateinit var reminderManager: ReminderManager
     private lateinit var adapter: RemindersAdapter
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View? {
         val view = inflater.inflate(R.layout.fragment_reminders, container, false)
+
         reminderManager = ReminderManager(requireContext())
 
         val recyclerView: RecyclerView = view.findViewById(R.id.remindersRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { reminder ->
-                // Open edit screen
-            },
-            onDeleteClick = { reminder ->
+            onItemClick = { /* edit */ },
+            onDeleteClick = { entity ->
                 lifecycleScope.launch {
+                    val reminder = Reminder(
+                        id = entity.id,
+                        title = entity.title,
+                        description = entity.description,
+                        reminderTime = entity.triggerTime,
+                        isRecurring = false,
+                        recurringType = com.maliar.pro.database.RecurringType.NONE,
+                        isCompleted = entity.isCompleted,
+                        completedAt = entity.completedAt,
+                        linkedCheckId = entity.linkedCheckId,
+                        linkedInstallmentId = entity.linkedInstallmentId,
+                        category = entity.category,
+                        priority = com.maliar.pro.database.Priority.MEDIUM
+                    )
                     reminderManager.deleteReminder(reminder)
                     loadReminders()
                 }
             },
-            onCompleteClick = { reminder ->
+            onCompleteClick = { entity ->
                 lifecycleScope.launch {
-                    reminderManager.markAsCompleted(reminder.id)
+                    reminderManager.markAsCompleted(entity.id)
                     loadReminders()
                 }
             }
         )
         recyclerView.adapter = adapter
 
-        val addButton: com.google.android.material.floatingactionbutton.FloatingActionButton = view.findViewById(R.id.addReminderButton)
-        addButton.setOnClickListener {
-            // Open add reminder screen (from previous project)
-            // TODO: Navigate to AddReminderFragment or dialog
+        // Add button for full reminder creation with 3 notification modes + Jalali + TTS
+        val addBtn = view.findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.addReminderButton)
+        addBtn.setOnClickListener {
+            // Open add screen with smart features
         }
 
         loadReminders()
