@@ -8,6 +8,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
 import com.maliar.pro.database.ReminderEntity
@@ -30,7 +31,7 @@ class RemindersFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { entity -> /* TODO: open edit dialog for ReminderEntity */ },
+            onItemClick = { entity -> /* TODO: open edit */ },
             onDeleteClick = { entity ->
                 lifecycleScope.launch {
                     smartReminderManager.deleteReminder(entity)
@@ -45,6 +46,13 @@ class RemindersFragment : Fragment() {
             }
         )
         recyclerView.adapter = adapter
+
+        // Add FAB listener for new reminder
+        view.findViewById<FloatingActionButton>(R.id.fabAddReminder)?.setOnClickListener {
+            // TODO: Show add reminder dialog
+            // For now, log
+            android.util.Log.d("Reminders", "Add reminder clicked")
+        }
 
         loadReminders()
         return view
