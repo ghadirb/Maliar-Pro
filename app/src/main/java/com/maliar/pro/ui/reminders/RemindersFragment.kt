@@ -1,55 +1,55 @@
 package com.maliar.pro.ui.reminders
+
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
+import com.maliar.pro.database.ReminderEntity
+import com.maliar.pro.database.ReminderManager
 import com.maliar.pro.database.SmartReminderManager
-import com.maliar.pro.databinding.FragmentRemindersBinding
 import com.maliar.pro.viewmodels.RemindersViewModel
 import com.maliar.pro.viewmodels.RemindersViewModelFactory
-import kotlinx.coroutines.launch
 
 class RemindersFragment : Fragment() {
 
-    private var _binding: FragmentRemindersBinding? = null
-    private val binding get() = _binding!!
+    private lateinit var reminderManager: ReminderManager
+    private lateinit var smartReminderManager: SmartReminderManager
     private lateinit var adapter: RemindersAdapter
-    private val viewModel: RemindersViewModel by viewModels { 
-        RemindersViewModelFactory(SmartReminderManager(requireContext())) 
-    }
+    private lateinit var viewModel: RemindersViewModel
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = FragmentRemindersBinding.inflate(inflater, container, false)
-        return binding.root
-    }
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View? {
+        val view = inflater.inflate(R.layout.fragment_reminders, container, false)
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        setupRecyclerView()
-        observeViewModel()
-    }
+        reminderManager = ReminderManager(requireContext())
+        smartReminderManager = SmartReminderManager(requireContext())
 
-    private fun setupRecyclerView() {
-        adapter = RemindersAdapter() // Use default or adjust constructor
-        binding.remindersRecyclerView.layoutManager = LinearLayoutManager(requireContext())
-        binding.remindersRecyclerView.adapter = adapter
-    }
+        val recyclerView: RecyclerView = view.findViewById(R.id.remindersRecyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
-    private fun observeViewModel() {
-        lifecycleScope.launch {
-            viewModel.reminders.collect { reminders ->
-                adapter.submitList(reminders)
+        adapter = RemindersAdapter(
+            onItemClick = { reminder -> /* handle edit */ },
+            onDeleteClick = { reminder -> reminderManager.deleteReminder(reminder.id); loadReminders() },
+            onCompleteClick = { reminder -> 
+                reminderManager.markAsCompleted(reminder.id)
+                smartReminderManager.handleReminderCompletion(reminder)
+                loadReminders()
             }
-        }
+        )
+        recyclerView.adapter = adapter
+
+        loadReminders()
+        return view
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+    private fun loadReminders() {
+        val reminders = reminderManager.getAllRemindersList()
+        adapter.submitList(reminders)
     }
 }
