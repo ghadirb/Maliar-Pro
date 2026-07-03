@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -61,11 +62,11 @@ class AssistantFragment : Fragment() {
             }
         }
 
-        viewModel.chatMessages.observe(viewLifecycleOwner) { messages ->
+        viewModel.chatMessages.observe(viewLifecycleOwner, Observer { messages ->
             chatAdapter.submitList(messages)
             if (messages.isNotEmpty()) {
                 recyclerView.scrollToPosition(messages.size - 1)
             }
-        }
+        })
     }
 }
