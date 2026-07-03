@@ -11,12 +11,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
-import com.maliar.pro.database.ReminderEntity
+import com.maliar.pro.database.Reminder
+import com.maliar.pro.database.ReminderManager
 import com.maliar.pro.database.SmartReminderManager
 import kotlinx.coroutines.launch
 
 class RemindersFragment : Fragment() {
 
+    private lateinit var reminderManager: ReminderManager
     private lateinit var smartReminderManager: SmartReminderManager
     private lateinit var adapter: RemindersAdapter
 
@@ -25,32 +27,33 @@ class RemindersFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_reminders, container, false)
 
+        reminderManager = ReminderManager(requireContext())
         smartReminderManager = SmartReminderManager(requireContext())
 
         val recyclerView: RecyclerView = view.findViewById(R.id.remindersRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
         adapter = RemindersAdapter(
-            onItemClick = { entity -> /* TODO: open edit */ },
-            onDeleteClick = { entity ->
+            onItemClick = { /* TODO: open edit */ },
+            onDeleteClick = { reminder ->
                 lifecycleScope.launch {
-                    smartReminderManager.deleteReminder(entity)
+                    reminderManager.deleteReminder(reminder)
                     loadReminders()
                 }
             },
-            onCompleteClick = { entity ->
+            onCompleteClick = { reminder ->
                 lifecycleScope.launch {
-                    smartReminderManager.markAsCompleted(entity.id)
+                    reminderManager.markAsCompleted(reminder.id)
                     loadReminders()
                 }
             }
         )
         recyclerView.adapter = adapter
 
-        // FAB for add reminder
+        // FAB
         view.findViewById<FloatingActionButton>(R.id.addReminderFab).setOnClickListener {
-            // TODO: Show add reminder dialog
-            android.util.Log.d("Reminders", "Add reminder clicked - implement dialog")
+            // TODO: show add dialog
+            android.util.Log.d("RemindersFragment", "Add reminder FAB clicked")
         }
 
         loadReminders()
@@ -59,7 +62,7 @@ class RemindersFragment : Fragment() {
 
     private fun loadReminders() {
         lifecycleScope.launch {
-            val reminders: List<ReminderEntity> = smartReminderManager.getAllRemindersList()
+            val reminders = reminderManager.getAllRemindersList()
             adapter.submitList(reminders)
         }
     }
