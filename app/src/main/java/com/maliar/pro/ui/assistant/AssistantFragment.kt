@@ -23,7 +23,13 @@ class AssistantFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view = inflater.inflate(R.layout.fragment_assistant, container, false)
 
-        viewModel = ViewModelProvider(this)[AssistantViewModel::class.java]
+        // Use factory for AssistantViewModel (dependencies)
+        val factory = AssistantViewModelFactory(
+            AccountingManager(requireContext()),
+            ReminderManager(requireContext()),
+            FinancialStatusManager(requireContext())
+        )
+        viewModel = ViewModelProvider(this, factory)[AssistantViewModel::class.java]
 
         // Full GAPGPT integration with connection to other modules
         val recyclerView: RecyclerView = view.findViewById(R.id.chatRecyclerView)
@@ -44,7 +50,7 @@ class AssistantFragment : Fragment() {
             }
         }
 
-        // Observe chat messages (fixed)
+        // Fixed observe for chat messages
         viewModel.chatMessages.observe(viewLifecycleOwner) { messages ->
             chatAdapter.submitList(messages)
         }
