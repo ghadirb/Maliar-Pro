@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
@@ -54,9 +55,13 @@ class AssistantFragment : Fragment() {
             }
         }
 
-        // Fixed observe for chat messages
-        viewModel.chatMessages.observe(viewLifecycleOwner) { messages ->
-            chatAdapter.submitList(messages)
+        // Fixed StateFlow collect (instead of observe)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                viewModel.chatMessages.collect { messages ->
+                    chatAdapter.submitList(messages)
+                }
+            }
         }
 
         return view
