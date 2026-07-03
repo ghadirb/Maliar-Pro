@@ -61,11 +61,11 @@ class AssistantFragment : Fragment() {
             }
         }
 
-        viewModel.chatMessages.observe(viewLifecycleOwner, Observer { messages ->
+        viewModel.chatMessages.observe(viewLifecycleOwner) { messages ->
             chatAdapter.submitList(messages)
             if (messages.isNotEmpty()) {
                 recyclerView.scrollToPosition(messages.size - 1)
             }
-        })
+        }
     }
 }
