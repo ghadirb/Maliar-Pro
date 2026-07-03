@@ -14,6 +14,10 @@ import com.google.android.material.textfield.TextInputEditText
 import com.maliar.pro.R
 import com.maliar.pro.adapters.ChatAdapter
 import com.maliar.pro.viewmodels.AssistantViewModel
+import com.maliar.pro.viewmodels.AssistantViewModelFactory
+import com.maliar.pro.database.AccountingManager
+import com.maliar.pro.database.ReminderManager
+import com.maliar.pro.database.FinancialStatusManager
 import kotlinx.coroutines.launch
 
 class AssistantFragment : Fragment() {
