@@ -19,7 +19,9 @@ class MaliarProApplication : Application() {
         const val REMINDER_CHANNEL_NAME = "یادآوری‌ها"
         const val CALL_CHANNEL_ID = "call_channel"
         const val CALL_CHANNEL_NAME = "تماس‌ها"
-        
+        const val BACKGROUND_CHANNEL_ID = "background_channel"
+        const val BACKGROUND_CHANNEL_NAME = "فعالیت پس‌زمینه"
+
         lateinit var instance: MaliarProApplication
             private set
     }
@@ -29,6 +31,7 @@ class MaliarProApplication : Application() {
         instance = this
         createNotificationChannels()
         initializeDatabase()
+        startBackgroundService()
     }
 
     private fun createNotificationChannels() {
@@ -64,6 +67,19 @@ class MaliarProApplication : Application() {
                 description = "کانال تماس‌ها"
             }
             notificationManager.createNotificationChannel(callChannel)
+
+            // Background keep-alive channel - deliberately minimal importance so the
+            // persistent "app is running" notification never makes a sound/pops up,
+            // it just needs to exist to satisfy the foreground service requirement.
+            val backgroundChannel = NotificationChannel(
+                BACKGROUND_CHANNEL_ID,
+                BACKGROUND_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "نگه‌داشتن برنامه در پس‌زمینه برای یادآوری‌های هوشمند"
+                setShowBadge(false)
+            }
+            notificationManager.createNotificationChannel(backgroundChannel)
         }
     }
 
@@ -92,6 +108,21 @@ class MaliarProApplication : Application() {
             } catch (e: Exception) {
                 Log.e("MaliarProApplication", "❌ Error in auto-provisioning", e)
             }
+        }
+    }
+
+    /**
+     * Starts the background keep-alive foreground service so smart reminders and the
+     * assistant stay responsive even when the app UI isn't in the foreground. Wrapped in
+     * try/catch because starting a foreground service from Application.onCreate can throw
+     * on some OEM/Android versions if background-start restrictions apply; in that case the
+     * app still works, it just loses some background reliability instead of crashing.
+     */
+    private fun startBackgroundService() {
+        try {
+            com.maliar.pro.services.MaliarBackgroundService.start(this)
+        } catch (e: Exception) {
+            Log.w("MaliarProApplication", "⚠️ Could not start background service: ${e.message}")
         }
     }
 }
