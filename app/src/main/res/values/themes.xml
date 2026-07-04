@@ -17,4 +17,19 @@
         <item name="android:statusBarColor">#FF1A1A2E</item>
         <item name="android:navigationBarColor">#FF1A1A2E</item>
     </style>
+
+    <!--
+        The default android.app.TimePickerDialog uses colorAccent (teal #03DAC5) as its
+        header background with light/white numerals, which made the hour/minute numbers
+        hard to read. This theme forces a solid, high-contrast header (dark purple
+        background with white numerals) so the time is always clearly legible.
+    -->
+    <style name="Theme.MaliarPro.TimePickerDialog" parent="Theme.Material3.DayNight.Dialog">
+        <item name="colorAccent">@color/primary</item>
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorControlActivated">@color/primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:windowBackground">@color/background</item>
+    </style>
 </resources>

@@ -88,7 +88,7 @@ class AddReminderDialog(
         }
 
         timeButton.setOnClickListener {
-            TimePickerDialog(context, { _, h, min ->
+            TimePickerDialog(context, R.style.Theme_MaliarPro_TimePickerDialog, { _, h, min ->
                 hour = h; minute = min
                 refreshTimeButtonText()
             }, hour, minute, true).show()
