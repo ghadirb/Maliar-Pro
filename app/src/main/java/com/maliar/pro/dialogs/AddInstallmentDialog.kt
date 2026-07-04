@@ -2,17 +2,22 @@ package com.maliar.pro.dialogs
 
 import android.app.AlertDialog
 import android.content.Context
-import android.icu.util.IslamicCalendar
-import android.icu.util.ULocale
 import android.widget.Button
 import android.widget.EditText
 import com.maliar.pro.database.Installment
+import com.maliar.pro.ui.common.PersianDatePickerDialog
+import com.maliar.pro.utils.PersianCalendarHelper
 import com.maliar.pro.viewmodels.AccountingViewModel
-import java.util.Date
 
 class AddInstallmentDialog(private val context: Context, private val viewModel: AccountingViewModel) {
 
-    private var selectedStartDate: Long = System.currentTimeMillis()
+    private val today = PersianCalendarHelper.getCurrentJalaliDate()
+    private var selectedJalaliYear: Int = today.first
+    private var selectedJalaliMonth: Int = today.second
+    private var selectedJalaliDay: Int = today.third
+    private var selectedStartDate: Long = PersianCalendarHelper.jalaliToGregorianMillis(
+        selectedJalaliYear, selectedJalaliMonth, selectedJalaliDay
+    )
 
     fun show() {
         val builder = AlertDialog.Builder(context)
@@ -26,21 +31,26 @@ class AddInstallmentDialog(private val context: Context, private val viewModel: 
         val lenderInput = view.findViewById<EditText>(com.maliar.pro.R.id.lenderInput)
         val startDateButton = view.findViewById<Button>(com.maliar.pro.R.id.startDateButton)
 
-        val persianCalendar = IslamicCalendar.getInstance(ULocale.forLanguageTag("fa_IR"))
-        startDateButton.text = "${persianCalendar.get(IslamicCalendar.DAY_OF_MONTH)}/${persianCalendar.get(IslamicCalendar.MONTH) + 1}/${persianCalendar.get(IslamicCalendar.YEAR)}"
+        fun refreshDateButtonText() {
+            startDateButton.text = PersianCalendarHelper.formatJalali(
+                selectedJalaliYear, selectedJalaliMonth, selectedJalaliDay
+            )
+        }
+        refreshDateButtonText()
 
         startDateButton.setOnClickListener {
-            android.app.DatePickerDialog(
+            PersianDatePickerDialog(
                 context,
-                { _, year, month, day ->
-                    persianCalendar.set(year, month, day)
-                    selectedStartDate = persianCalendar.timeInMillis
-                    startDateButton.text = "$day/${month + 1}/$year"
-                },
-                persianCalendar.get(IslamicCalendar.YEAR),
-                persianCalendar.get(IslamicCalendar.MONTH),
-                persianCalendar.get(IslamicCalendar.DAY_OF_MONTH)
-            ).show()
+                initialYear = selectedJalaliYear,
+                initialMonth = selectedJalaliMonth,
+                initialDay = selectedJalaliDay
+            ) { year, month, day ->
+                selectedJalaliYear = year
+                selectedJalaliMonth = month
+                selectedJalaliDay = day
+                selectedStartDate = PersianCalendarHelper.jalaliToGregorianMillis(year, month, day)
+                refreshDateButtonText()
+            }.show()
         }
 
         builder.setView(view)
