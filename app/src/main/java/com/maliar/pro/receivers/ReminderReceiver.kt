@@ -33,7 +33,11 @@ class ReminderReceiver : BroadcastReceiver() {
             return
         }
 
-        if (useAlarm || alertType == AlertType.FULL_SCREEN.name || alertType == AlertType.SMART.name) {
+        // `useAlarm` already encodes the priority-aware decision made in
+        // SmartReminderManager (a SMART reminder only takes the full-screen path when its
+        // priority is HIGH). Rely on that flag - and FULL_SCREEN, which is always full
+        // screen - instead of re-forcing every SMART reminder into full screen here too.
+        if (useAlarm || alertType == AlertType.FULL_SCREEN.name) {
             // Open full screen alarm activity
             val alarmIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -45,8 +49,10 @@ class ReminderReceiver : BroadcastReceiver() {
             }
             context.startActivity(alarmIntent)
         } else {
-            // Show notification based on mode
-            showNotification(context, title, description, reminderId, notificationMode)
+            // Show notification based on mode. SMART reminders always get the actionable
+            // Done/Snooze buttons regardless of the global notification-mode setting -
+            // that's what makes them "smart" instead of a plain static notification.
+            showNotification(context, title, description, reminderId, notificationMode, alertType)
         }
     }
 
@@ -55,7 +61,8 @@ class ReminderReceiver : BroadcastReceiver() {
         title: String,
         message: String,
         reminderId: Long,
-        notificationMode: String
+        notificationMode: String,
+        alertType: String
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -83,8 +90,10 @@ class ReminderReceiver : BroadcastReceiver() {
             .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
 
-        // Add action buttons for "action" mode
-        if (notificationMode == "action") {
+        // Add action buttons for "action" mode, and always for SMART reminders (this is
+        // the actual "smart" behavior: instead of a plain notification the person can
+        // mark it done or snooze it directly, without opening the app).
+        if (notificationMode == "action" || alertType == AlertType.SMART.name) {
             val completeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
                 putExtra("reminder_id", reminderId)
                 putExtra("action", "complete")
