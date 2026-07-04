@@ -133,8 +133,14 @@ class SmartReminderManager(private val context: Context) {
             }
         }
 
+        // "Smart" alerts adapt to priority instead of always behaving exactly like a
+        // full-screen alarm: a HIGH priority smart reminder still needs the unmissable
+        // full-screen alarm, but MEDIUM/LOW priority smart reminders use a quieter,
+        // actionable notification (with Done/Snooze buttons) instead of taking over the
+        // whole screen every time. This is what actually makes "smart" different from
+        // "full screen" - previously they were treated identically.
         val useAlarm = reminder.alertType == AlertType.FULL_SCREEN.name ||
-                      reminder.alertType == AlertType.SMART.name
+                      (reminder.alertType == AlertType.SMART.name && reminder.priority == Priority.HIGH.name)
 
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra("reminder_id", reminder.id)
