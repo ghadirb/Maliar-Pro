@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.speech.tts.TextToSpeech
 import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
@@ -19,14 +20,17 @@ import com.maliar.pro.R
 import com.maliar.pro.database.AlertType
 import com.maliar.pro.database.Priority
 import com.maliar.pro.database.SmartReminderManager
+import com.maliar.pro.utils.AIHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class FullScreenAlarmActivity : AppCompatActivity() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var textToSpeech: TextToSpeech? = null
     private var reminderId: Long = -1
     private var isSmartAlarm = false
 
@@ -83,6 +87,38 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         if (isSmartAlarm) {
             findViewById<TextView>(R.id.alarmTypeHint).text = "یادآوری هوشمند"
             findViewById<TextView>(R.id.alarmTypeHint).visibility = View.VISIBLE
+            speakSmartReminder(title, description)
+        }
+    }
+
+    /**
+     * A "smart" reminder previously just showed the same static text as a normal one -
+     * no AI phrasing, no speech, despite being labeled "smart". This now asks the online
+     * AI model to turn the raw title/description into a short, natural spoken Persian
+     * sentence, then speaks it aloud with Android's built-in TextToSpeech engine. If no AI
+     * key is active or the network call fails, it falls back to just speaking the title and
+     * description directly - the alarm never depends on the network to be usable.
+     */
+    private fun speakSmartReminder(title: String, description: String) {
+        textToSpeech = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                val result = textToSpeech?.setLanguage(Locale("fa", "IR"))
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    textToSpeech?.setLanguage(Locale.US)
+                }
+                textToSpeech?.setSpeechRate(0.95f)
+
+                CoroutineScope(Dispatchers.Main).launch {
+                    val fallback = if (description.isBlank()) "یادآوری: $title" else "یادآوری: $title. $description"
+                    val naturalText = AIHelper.generateText(
+                        this@FullScreenAlarmActivity,
+                        systemPrompt = "یک جمله کوتاه، طبیعی و محاوره‌ای فارسی برای یادآوری صوتی بساز. فقط همان یک جمله را بنویس، بدون هیچ توضیح یا علامت اضافه.",
+                        userPrompt = "عنوان یادآوری: $title" + if (description.isNotBlank()) "\nتوضیحات: $description" else ""
+                    )
+                    val textToSay = naturalText?.takeIf { it.isNotBlank() } ?: fallback
+                    textToSpeech?.speak(textToSay, TextToSpeech.QUEUE_FLUSH, null, "smart_reminder")
+                }
+            }
         }
     }
 
@@ -174,6 +210,14 @@ class FullScreenAlarmActivity : AppCompatActivity() {
             wakeLock = null
         } catch (e: Exception) {
             android.util.Log.e("FullScreenAlarm", "Error releasing wake lock", e)
+        }
+
+        try {
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+            textToSpeech = null
+        } catch (e: Exception) {
+            android.util.Log.e("FullScreenAlarm", "Error shutting down TTS", e)
         }
 
         val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
