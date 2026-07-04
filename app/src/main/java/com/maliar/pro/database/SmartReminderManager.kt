@@ -234,7 +234,25 @@ class SmartReminderManager(private val context: Context) {
     }
 
     // Utility Methods
+    /**
+     * Returns the next occurrence of a recurring reminder that is strictly after "now".
+     * The previous version only advanced by a single cycle (e.g. +1 day), so a DAILY
+     * reminder that hadn't fired in 3 days (app closed, phone off, etc.) would still land
+     * in the past and re-fire immediately/incorrectly. This now keeps stepping forward
+     * until the result is actually in the future.
+     */
     fun calculateNextTriggerTime(currentTime: Long, pattern: RepeatPattern, customDays: List<Int> = emptyList()): Long {
+        if (pattern == RepeatPattern.ONCE) return currentTime
+        var next = advanceOnce(currentTime, pattern, customDays)
+        var guard = 0
+        while (next <= System.currentTimeMillis() && guard < 1000) {
+            next = advanceOnce(next, pattern, customDays)
+            guard += 1
+        }
+        return next
+    }
+
+    private fun advanceOnce(currentTime: Long, pattern: RepeatPattern, customDays: List<Int>): Long {
         val calendar = Calendar.getInstance()
         calendar.timeInMillis = currentTime
 
