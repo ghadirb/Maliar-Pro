@@ -27,8 +27,34 @@ class MainActivity : AppCompatActivity() {
             if (!granted) {
                 // The user denied it; notifications simply won't show. We don't force it.
             }
+            requestAssistantActionPermissions()
+        }
+
+    /**
+     * The assistant's "call so-and-so" command and the notification action buttons need
+     * CALL_PHONE / READ_CONTACTS at runtime (declaring them in the manifest alone does
+     * nothing on Android 6+). Without this, VoiceCallHelper.makeCall() throws a
+     * SecurityException every single time and the assistant silently "does nothing" when
+     * asked to call someone - which is exactly the symptom being reported.
+     */
+    private val assistantPermissionsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             checkExactAlarmPermission()
         }
+
+    private fun requestAssistantActionPermissions() {
+        val needed = listOf(
+            android.Manifest.permission.CALL_PHONE,
+            android.Manifest.permission.READ_CONTACTS
+        ).filter {
+            ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (needed.isNotEmpty()) {
+            assistantPermissionsLauncher.launch(needed.toTypedArray())
+        } else {
+            checkExactAlarmPermission()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,7 +91,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
         }
-        checkExactAlarmPermission()
+        requestAssistantActionPermissions()
     }
 
     private fun checkExactAlarmPermission() {

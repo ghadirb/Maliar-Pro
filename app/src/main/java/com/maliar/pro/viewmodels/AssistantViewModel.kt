@@ -448,9 +448,13 @@ class AssistantViewModel(
                         contactName.contains(it.name, ignoreCase = true)
                     }
                     if (matched != null && !matched.phoneNumber.isNullOrEmpty()) {
-                        val success = VoiceCallHelper.makeCall(appContext, matched.phoneNumber)
-                        return if (success) "📞 در حال برقراری تماس با ${matched.name}..."
-                        else "❌ خطا در برقراری تماس"
+                        return when (VoiceCallHelper.makeCallWithResult(appContext, matched.phoneNumber)) {
+                            VoiceCallHelper.CallResult.CALLED_DIRECTLY -> "📞 در حال برقراری تماس با ${matched.name}..."
+                            VoiceCallHelper.CallResult.OPENED_DIALER_NO_PERMISSION ->
+                                "📲 مجوز تماس مستقیم داده نشده، برای همین صفحه‌ی شماره‌گیر با شماره‌ی ${matched.name} باز شد؛ فقط کافیه دکمه‌ی تماس را بزنید.\n" +
+                                "برای اینکه بعداً دستیار خودش مستقیم تماس بگیرد، از تنظیمات گوشی → برنامه‌ها → مالیار پرو → مجوزها، «تماس تلفنی» را فعال کنید."
+                            VoiceCallHelper.CallResult.FAILED -> "❌ خطا در برقراری تماس"
+                        }
                     } else {
                         val allNames = contacts.joinToString("، ") { it.name }
                         return "⚠️ مخاطب '$contactName' پیدا نشد. مخاطبین شما: $allNames"
