@@ -7,6 +7,7 @@ import com.maliar.pro.database.ReminderManager
 import com.maliar.pro.database.FinancialStatusManager
 
 class AssistantViewModelFactory(
+    private val appContext: android.content.Context,
     private val accountingManager: AccountingManager,
     private val reminderManager: ReminderManager,
     private val financialManager: FinancialStatusManager
@@ -14,7 +15,7 @@ class AssistantViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AssistantViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return AssistantViewModel(accountingManager, reminderManager, financialManager) as T
+            return AssistantViewModel(appContext, accountingManager, reminderManager, financialManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

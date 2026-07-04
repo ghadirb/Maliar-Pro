@@ -30,6 +30,7 @@ class AssistantFragment : Fragment() {
 
         // Use factory for AssistantViewModel (dependencies)
         val factory = AssistantViewModelFactory(
+            requireContext().applicationContext,
             AccountingManager(requireContext()),
             ReminderManager(requireContext()),
             FinancialStatusManager(requireContext())

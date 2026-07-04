@@ -30,6 +30,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class AssistantViewModel(
+    private val appContext: android.content.Context,
     private val accountingManager: AccountingManager,
     private val reminderManager: ReminderManager,
     private val financialManager: FinancialStatusManager
@@ -45,20 +46,34 @@ class AssistantViewModel(
         viewModelScope.launch {
             _isProcessing.value = true
             _chatMessages.value = _chatMessages.value + ChatMessage(System.currentTimeMillis().toString(), message, true)
-            
+
             // Try online AI with priority: GAPGPT -> Liara -> local processing
             val response = try {
-                val gapgptResponse = callGapgptAI(message)
-                if (gapgptResponse != null) gapgptResponse
-                else {
-                    val liaraResponse = callLiaraAI(message)
-                    if (liaraResponse != null) liaraResponse
-                    else processCommand(message)
+                var keys = getActiveKeys()
+                if (keys.isEmpty()) {
+                    // Keys may not have finished auto-provisioning yet (it runs in the
+                    // background from Application.onCreate); try once more before giving up
+                    // so a slow network doesn't silently look like "the AI doesn't work".
+                    com.maliar.pro.utils.AutoProvisioningManager.autoProvision(appContext)
+                    keys = getActiveKeys()
+                }
+
+                if (keys.isEmpty()) {
+                    "⚠️ هیچ کلید API فعالی پیدا نشد، برای همین دستیار آنلاین در دسترس نیست.\n" +
+                        "لطفاً اتصال اینترنت را بررسی کنید یا از بخش تنظیمات → کلیدهای هوش مصنوعی، یک کلید معتبر اضافه کنید.\n\n" +
+                        processCommand(message)
+                } else {
+                    val gapgptResponse = callGapgptAI(message)
+                    if (gapgptResponse != null) gapgptResponse
+                    else {
+                        val liaraResponse = callLiaraAI(message)
+                        liaraResponse ?: ("⚠️ اتصال به سرویس‌های هوش مصنوعی آنلاین برقرار نشد (شبکه یا کلید نامعتبر است).\n\n" + processCommand(message))
+                    }
                 }
             } catch (e: Exception) {
-                processCommand(message)
+                "⚠️ خطا در ارتباط با دستیار آنلاین: ${e.message}\n\n" + processCommand(message)
             }
-            
+
             _chatMessages.value = _chatMessages.value + ChatMessage((System.currentTimeMillis() + 1).toString(), response, false)
             _isProcessing.value = false
         }
@@ -66,7 +81,7 @@ class AssistantViewModel(
 
     private suspend fun getActiveKeys(): List<Pair<String, String>> = withContext(Dispatchers.IO) {
         try {
-            val prefs = PreferencesManager(androidAppContext)
+            val prefs = PreferencesManager(appContext)
             val keys = prefs.getAPIKeys()
             keys.filter { it.isActive }.map { 
                 val baseUrl = it.baseUrl ?: when (it.provider) {
@@ -236,14 +251,14 @@ class AssistantViewModel(
                 .substringAfter("call").trim()
             if (contactName.isNotEmpty()) {
                 try {
-                    val contactManager = ContactManager(androidAppContext)
+                    val contactManager = ContactManager(appContext)
                     val contacts = contactManager.getAllContactsList()
                     val matched = contacts.firstOrNull { 
                         it.name.contains(contactName, ignoreCase = true) || 
                         contactName.contains(it.name, ignoreCase = true)
                     }
                     if (matched != null && !matched.phoneNumber.isNullOrEmpty()) {
-                        val success = VoiceCallHelper.makeCall(androidAppContext, matched.phoneNumber)
+                        val success = VoiceCallHelper.makeCall(appContext, matched.phoneNumber)
                         return if (success) "📞 در حال برقراری تماس با ${matched.name}..."
                         else "❌ خطا در برقراری تماس"
                     } else {
@@ -266,11 +281,4 @@ class AssistantViewModel(
         }
     }
 
-    companion object {
-        private lateinit var androidAppContext: android.content.Context
-        
-        fun init(context: android.content.Context) {
-            androidAppContext = context.applicationContext
-        }
-    }
 }
