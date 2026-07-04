@@ -231,6 +231,29 @@ class AssistantViewModel(
         title = title.replace("و نیم", "").trim(' ', ',', '،', ':')
         if (title.isBlank()) title = "یادآوری"
 
+        // If the reminder mentions calling someone ("با علی تماس بگیرم"), try to match it
+        // against the app's own Contacts so the "action" notification mode can offer a
+        // real one-tap call button - not just a text reminder that says to call someone.
+        var matchedContactName = ""
+        var matchedContactPhone = ""
+        val callMention = Regex("با\\s+([\\p{L}\\s]{2,20}?)\\s*تماس").find(message)
+            ?: Regex("([\\p{L}\\s]{2,20}?)\\s*(?:رو|را)?\\s*(?:صدا بزن|زنگ بزن)").find(message)
+        if (callMention != null) {
+            val nameGuess = callMention.groupValues[1].trim()
+            if (nameGuess.isNotBlank()) {
+                try {
+                    val contacts = ContactManager(appContext).getAllContactsList()
+                    val matched = contacts.firstOrNull {
+                        it.name.contains(nameGuess, ignoreCase = true) || nameGuess.contains(it.name, ignoreCase = true)
+                    }
+                    if (matched != null) {
+                        matchedContactName = matched.name
+                        matchedContactPhone = matched.phoneNumber
+                    }
+                } catch (e: Exception) { /* no contact match, ignore */ }
+            }
+        }
+
         val reminder = com.maliar.pro.database.ReminderEntity(
             title = title,
             description = "",
@@ -239,7 +262,9 @@ class AssistantViewModel(
             alertType = com.maliar.pro.database.AlertType.NOTIFICATION.name,
             triggerTime = cal.timeInMillis,
             repeatPattern = com.maliar.pro.database.RepeatPattern.ONCE.name,
-            category = "دستیار"
+            category = "دستیار",
+            contactName = matchedContactName,
+            contactPhoneNumber = matchedContactPhone
         )
         val savedId = smartReminderManager.addReminder(reminder)
 
@@ -249,7 +274,10 @@ class AssistantViewModel(
             cal.get(java.util.Calendar.MINUTE)
         )
         return if (savedId > 0) {
-            "✅ یادآوری «$title» برای ساعت $timeStr ثبت و زمان‌بندی شد (شناسه #$savedId)."
+            val contactNote = if (matchedContactPhone.isNotBlank())
+                "\n📞 در حالت نوتیفیکیشن «با اکشن»، دکمه تماس مستقیم با $matchedContactName هم نمایش داده می‌شود."
+            else ""
+            "✅ یادآوری «$title» برای ساعت $timeStr ثبت و زمان‌بندی شد (شناسه #$savedId).$contactNote"
         } else {
             "❌ ذخیره‌سازی یادآوری با خطا مواجه شد، لطفاً دوباره تلاش کنید."
         }
@@ -324,8 +352,15 @@ class AssistantViewModel(
             val uncashedChecks = accountingManager.getUncashedChecks()
             val activeInstallments = accountingManager.getActiveInstallments()
 
+            // Pull data from the "Financial Status" tab too (assets, debts, goals) - not
+            // just accounting/reminders - so an analysis/summary request the user makes in
+            // the assistant tab can actually see across all tabs instead of only two of them.
+            val totalAssets = financialManager.getTotalAssets()
+            val totalDebts = financialManager.getTotalUnpaidDebts()
+            val activeGoals = financialManager.getActiveGoals()
+
             val systemPrompt = """
-                شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید.
+                شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
                 اطلاعات کاربر:
                 - تراز کل: ${String.format("%,.0f", balance)} تومان
                 - کل درآمد: ${String.format("%,.0f", totalIncome)} تومان
@@ -335,8 +370,11 @@ class AssistantViewModel(
                 - یادآوری‌های فعال: ${activeReminders.size} عدد
                 - چک‌های وصول نشده: ${uncashedChecks.size} عدد
                 - اقساط فعال: ${activeInstallments.size} عدد
+                - کل دارایی‌ها (وضعیت مالی): ${String.format("%,.0f", totalAssets)} تومان
+                - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${String.format("%,.0f", totalDebts)} تومان
+                - اهداف مالی فعال: ${activeGoals.size} عدد${if (activeGoals.isNotEmpty()) " (" + activeGoals.joinToString("، ") { it.title } + ")" else ""}
                 
-                شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید.
+                شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید.
                 لطفاً به زبان فارسی پاسخ دهید.
             """.trimIndent()
 
@@ -393,12 +431,37 @@ class AssistantViewModel(
             connection.connectTimeout = 30000
             connection.readTimeout = 30000
 
+            // Same cross-tab context as the GAPGPT path, so Liara answers are equally
+            // aware of accounting, reminders, and financial-status data instead of
+            // falling back to a context-free generic prompt.
+            val balance = accountingManager.getBalance()
+            val totalIncome = accountingManager.getTotalIncome()
+            val totalExpense = accountingManager.getTotalExpense()
+            val activeReminders = reminderManager.getActiveRemindersList()
+            val totalAssets = financialManager.getTotalAssets()
+            val totalDebts = financialManager.getTotalUnpaidDebts()
+            val activeGoals = financialManager.getActiveGoals()
+
+            val systemPrompt = """
+                شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
+                اطلاعات کاربر:
+                - تراز کل: ${String.format("%,.0f", balance)} تومان
+                - کل درآمد: ${String.format("%,.0f", totalIncome)} تومان
+                - کل هزینه: ${String.format("%,.0f", totalExpense)} تومان
+                - یادآوری‌های فعال: ${activeReminders.size} عدد
+                - کل دارایی‌ها (وضعیت مالی): ${String.format("%,.0f", totalAssets)} تومان
+                - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${String.format("%,.0f", totalDebts)} تومان
+                - اهداف مالی فعال: ${activeGoals.size} عدد
+
+                لطفاً به زبان فارسی پاسخ دهید.
+            """.trimIndent()
+
             val requestBody = JSONObject().apply {
                 put("model", "openai/gpt-4o-mini")
                 put("messages", JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "system")
-                        put("content", "شما یک دستیار هوشمند مالی و شخصی به نام مالیار هستید. به فارسی پاسخ دهید.")
+                        put("content", systemPrompt)
                     })
                     put(JSONObject().apply {
                         put("role", "user")

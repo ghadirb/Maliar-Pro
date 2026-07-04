@@ -24,6 +24,8 @@ class ReminderReceiver : BroadcastReceiver() {
         val alertType = intent.getStringExtra("alert_type") ?: AlertType.NOTIFICATION.name
         val useAlarm = intent.getBooleanExtra("use_alarm", false)
         val priority = intent.getStringExtra("reminder_priority") ?: "MEDIUM"
+        val contactName = intent.getStringExtra("contact_name") ?: ""
+        val contactPhone = intent.getStringExtra("contact_phone") ?: ""
 
         val prefs = PreferencesManager(context)
         val notificationMode = prefs.getNotificationMode()
@@ -52,7 +54,7 @@ class ReminderReceiver : BroadcastReceiver() {
             // Show notification based on mode. SMART reminders always get the actionable
             // Done/Snooze buttons regardless of the global notification-mode setting -
             // that's what makes them "smart" instead of a plain static notification.
-            showNotification(context, title, description, reminderId, notificationMode, alertType)
+            showNotification(context, title, description, reminderId, notificationMode, alertType, contactName, contactPhone)
         }
     }
 
@@ -62,7 +64,9 @@ class ReminderReceiver : BroadcastReceiver() {
         message: String,
         reminderId: Long,
         notificationMode: String,
-        alertType: String
+        alertType: String,
+        contactName: String = "",
+        contactPhone: String = ""
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -117,6 +121,25 @@ class ReminderReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             builder.addAction(R.drawable.ic_snooze, "⏰ ۱۰ دقیقه بعد", snoozePendingIntent)
+
+            // "با اکشن" mode's whole point is running a real command from the notification,
+            // not just done/snooze. If a contact was attached to this reminder, offer a
+            // direct call button that dials that exact contact via ReminderActionReceiver.
+            if (contactPhone.isNotBlank()) {
+                val callIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+                    putExtra("reminder_id", reminderId)
+                    putExtra("action", "call")
+                    putExtra("phone_number", contactPhone)
+                }
+                val callPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    reminderId.toInt() + 3000,
+                    callIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                val label = if (contactName.isNotBlank()) "📞 تماس با $contactName" else "📞 تماس"
+                builder.addAction(R.drawable.ic_notification, label, callPendingIntent)
+            }
         }
 
         notificationManager.notify(reminderId.toInt(), builder.build())

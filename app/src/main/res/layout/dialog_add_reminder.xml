@@ -167,6 +167,20 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="مخاطب برای تماس (اختیاری - در حالت نوتیفیکیشن «با اکشن» دکمه تماس اضافه می‌شود):"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/reminderContactButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="انتخاب مخاطب" />
+
     </LinearLayout>
 
 </ScrollView>

@@ -11,6 +11,8 @@ import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
 import com.maliar.pro.R
 import com.maliar.pro.database.AlertType
+import com.maliar.pro.database.Contact
+import com.maliar.pro.database.ContactManager
 import com.maliar.pro.database.Priority
 import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.database.ReminderType
@@ -61,6 +63,40 @@ class AddReminderDialog(
         val priorityChipGroup = view.findViewById<ChipGroup>(R.id.priorityChipGroup)
         val alertTypeChipGroup = view.findViewById<ChipGroup>(R.id.alertTypeChipGroup)
         val repeatPatternSpinner = view.findViewById<Spinner>(R.id.repeatPatternSpinner)
+        val contactButton = view.findViewById<Button>(R.id.reminderContactButton)
+
+        var selectedContact: Contact? = null
+        fun refreshContactButtonText() {
+            contactButton.text = selectedContact?.let { "مخاطب: ${it.name}" } ?: "انتخاب مخاطب"
+        }
+        refreshContactButtonText()
+
+        contactButton.setOnClickListener {
+            CoroutineScope(Dispatchers.Main).launch {
+                val contacts = ContactManager(context).getAllContactsList()
+                if (contacts.isEmpty()) {
+                    AlertDialog.Builder(context)
+                        .setTitle("مخاطبی وجود ندارد")
+                        .setMessage("ابتدا از بخش «مخاطبین» یک مخاطب اضافه کنید.")
+                        .setPositiveButton("باشه", null)
+                        .show()
+                    return@launch
+                }
+                val names = contacts.map { "${it.name} (${it.phoneNumber})" }.toTypedArray()
+                AlertDialog.Builder(context)
+                    .setTitle("انتخاب مخاطب برای تماس")
+                    .setItems(names) { _, which ->
+                        selectedContact = contacts[which]
+                        refreshContactButtonText()
+                    }
+                    .setNeutralButton("حذف انتخاب") { _, _ ->
+                        selectedContact = null
+                        refreshContactButtonText()
+                    }
+                    .setNegativeButton("لغو", null)
+                    .show()
+            }
+        }
 
         val categories = listOf("عمومی", "مالی", "کاری", "شخصی", "سلامت", "خانواده")
         categorySpinner.adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, categories)
@@ -133,7 +169,9 @@ class AddReminderDialog(
                     alertType = alertType.name,
                     triggerTime = cal.timeInMillis,
                     repeatPattern = repeatPattern.name,
-                    category = category
+                    category = category,
+                    contactName = selectedContact?.name.orEmpty(),
+                    contactPhoneNumber = selectedContact?.phoneNumber.orEmpty()
                 )
 
                 CoroutineScope(Dispatchers.Main).launch {

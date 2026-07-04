@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import com.maliar.pro.database.SmartReminderManager
+import com.maliar.pro.utils.VoiceCallHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,6 +17,16 @@ class ReminderActionReceiver : BroadcastReceiver() {
         val action = intent.getStringExtra("action") ?: return
 
         if (reminderId < 0) return
+
+        // "call" runs immediately on the receiving thread (no DB access needed) so the
+        // dialer/call intent fires the moment the notification button is tapped.
+        if (action == "call") {
+            val phoneNumber = intent.getStringExtra("phone_number").orEmpty()
+            if (phoneNumber.isNotBlank()) {
+                VoiceCallHelper.makeCallWithResult(context, phoneNumber)
+            }
+            return
+        }
 
         val manager = SmartReminderManager(context)
 

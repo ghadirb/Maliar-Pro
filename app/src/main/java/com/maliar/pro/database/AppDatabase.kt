@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
     entities = [Contact::class, Income::class, Expense::class, Check::class, Installment::class, Reminder::class, 
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
                ReminderEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
