@@ -42,10 +42,30 @@ class AssistantViewModel(
 
     data class ChatMessage(val id: String, val text: String, val isUser: Boolean)
 
+    private val smartReminderManager by lazy { com.maliar.pro.database.SmartReminderManager(appContext) }
+
     fun sendMessage(message: String) {
         viewModelScope.launch {
             _isProcessing.value = true
             _chatMessages.value = _chatMessages.value + ChatMessage(System.currentTimeMillis().toString(), message, true)
+
+            // Deterministic local execution FIRST: if this message is a recognizable
+            // accounting or reminder command, actually perform it against the real
+            // database/AlarmManager right here. Previously the AI model would just
+            // *claim* in its chat reply that it "recorded the income", because the
+            // online chat model has no way to call app functions - it was only ever
+            // describing data already in the system prompt, never writing anything.
+            val localActionResult = try {
+                tryExecuteAccountingCommand(message) ?: tryExecuteReminderCommand(message)
+            } catch (e: Exception) {
+                null
+            }
+
+            if (localActionResult != null) {
+                _chatMessages.value = _chatMessages.value + ChatMessage((System.currentTimeMillis() + 1).toString(), localActionResult, false)
+                _isProcessing.value = false
+                return@launch
+            }
 
             // Try online AI with priority: GAPGPT -> Liara -> local processing
             val response = try {
@@ -77,6 +97,113 @@ class AssistantViewModel(
             _chatMessages.value = _chatMessages.value + ChatMessage((System.currentTimeMillis() + 1).toString(), response, false)
             _isProcessing.value = false
         }
+    }
+
+    /** Converts Persian/Arabic-Indic digits in a string to plain ASCII digits. */
+    private fun normalizeDigits(text: String): String {
+        val persian = "۰۱۲۳۴۵۶۷۸۹"
+        val arabic = "٠١٢٣٤٥٦٧٨٩"
+        var result = text
+        persian.forEachIndexed { i, ch -> result = result.replace(ch, ('0' + i)) }
+        arabic.forEachIndexed { i, ch -> result = result.replace(ch, ('0' + i)) }
+        return result
+    }
+
+    /** Parses amounts like "500 هزار", "2 میلیون", "500000", "5,000,000 تومان". */
+    private fun parsePersianAmount(text: String): Double? {
+        val normalized = normalizeDigits(text)
+        val regex = Regex("([0-9][0-9,.]*)\\s*(میلیون|هزار)?")
+        val match = regex.findAll(normalized).firstOrNull { it.groupValues[1].isNotBlank() } ?: return null
+        var amount = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: return null
+        when (match.groupValues[2]) {
+            "هزار" -> amount *= 1000
+            "میلیون" -> amount *= 1_000_000
+        }
+        return amount
+    }
+
+    /**
+     * Detects an income/expense recording command and, if found, actually writes it to
+     * the accounting database and returns a confirmation with the real updated balance.
+     * Returns null (no side effect) if the message isn't a recognizable command, so the
+     * caller can fall through to normal AI chat / queries.
+     */
+    private suspend fun tryExecuteAccountingCommand(message: String): String? {
+        val amount = parsePersianAmount(message) ?: return null
+        if (amount <= 0) return null
+
+        val incomeKeywords = listOf("درآمد", "حقوق", "دریافت کردم", "دریافتی", "واریز شد", "واریز کردم", "فروش")
+        val expenseKeywords = listOf("هزینه", "خرج کردم", "خرج شد", "پرداخت کردم", "خریدم", "خرید کردم", "پرداختی")
+
+        val isIncome = incomeKeywords.any { message.contains(it) }
+        val isExpense = expenseKeywords.any { message.contains(it) }
+
+        // Ambiguous (matches both, or neither) - don't guess, let it fall through
+        if (isIncome == isExpense) return null
+
+        val description = message.trim()
+        val formattedAmount = String.format("%,.0f", amount)
+
+        return if (isIncome) {
+            accountingManager.addIncome(Income(amount = amount, description = description, date = Date().time))
+            val newBalance = accountingManager.getBalance()
+            "✅ مبلغ $formattedAmount تومان به‌عنوان درآمد در حسابداری ثبت شد.\n💰 موجودی جدید: ${String.format("%,.0f", newBalance)} تومان"
+        } else {
+            accountingManager.addExpense(Expense(amount = amount, description = description, date = Date().time))
+            val newBalance = accountingManager.getBalance()
+            "✅ مبلغ $formattedAmount تومان به‌عنوان هزینه در حسابداری ثبت شد.\n💰 موجودی جدید: ${String.format("%,.0f", newBalance)} تومان"
+        }
+    }
+
+    /**
+     * Detects a natural-language reminder request ("یادم بنداز فردا ساعت ۵ ...") and, if the
+     * day/time can be parsed, actually schedules it with SmartReminderManager (real AlarmManager
+     * alarm, not just a chat reply). Returns null if this doesn't look like a reminder request
+     * or the time couldn't be confidently parsed.
+     */
+    private suspend fun tryExecuteReminderCommand(message: String): String? {
+        val reminderTriggers = listOf("یادم بنداز", "یادآوری کن", "بهم یادآوری کن", "یاداوری کن")
+        if (reminderTriggers.none { message.contains(it) }) return null
+
+        val normalized = normalizeDigits(message)
+        val hourMatch = Regex("ساعت\\s*([0-9]{1,2})(?::([0-9]{2}))?").find(normalized) ?: return null
+        var hour = hourMatch.groupValues[1].toIntOrNull() ?: return null
+        var minute = hourMatch.groupValues[2].toIntOrNull() ?: 0
+        if (normalized.contains("و نیم")) minute = 30
+        if (hour !in 0..23) return null
+
+        val cal = java.util.Calendar.getInstance()
+        when {
+            message.contains("پس فردا") || message.contains("پس‌فردا") -> cal.add(java.util.Calendar.DAY_OF_MONTH, 2)
+            message.contains("فردا") -> cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+            // "امروز" or no day keyword: keep today, but if that time already passed, assume tomorrow
+        }
+        cal.set(java.util.Calendar.HOUR_OF_DAY, hour)
+        cal.set(java.util.Calendar.MINUTE, minute)
+        cal.set(java.util.Calendar.SECOND, 0)
+        if (cal.timeInMillis <= System.currentTimeMillis()) {
+            cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+        }
+
+        var title = message
+        (reminderTriggers + listOf("امروز", "فردا", "پس فردا", "پس‌فردا")).forEach { title = title.replace(it, "") }
+        title = title.replace(hourMatch.value, "").replace("و نیم", "").trim(' ', ',', '،', ':')
+        if (title.isBlank()) title = "یادآوری"
+
+        val reminder = com.maliar.pro.database.ReminderEntity(
+            title = title,
+            description = "",
+            reminderType = com.maliar.pro.database.ReminderType.SIMPLE.name,
+            priority = com.maliar.pro.database.Priority.MEDIUM.name,
+            alertType = com.maliar.pro.database.AlertType.NOTIFICATION.name,
+            triggerTime = cal.timeInMillis,
+            repeatPattern = com.maliar.pro.database.RepeatPattern.ONCE.name,
+            category = "دستیار"
+        )
+        smartReminderManager.addReminder(reminder)
+
+        val timeStr = String.format("%02d:%02d", hour, minute)
+        return "✅ یادآوری «$title» برای ساعت $timeStr ثبت و زمان‌بندی شد."
     }
 
     private suspend fun getActiveKeys(): List<Pair<String, String>> = withContext(Dispatchers.IO) {
