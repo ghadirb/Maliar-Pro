@@ -162,32 +162,73 @@ class AssistantViewModel(
      * or the time couldn't be confidently parsed.
      */
     private suspend fun tryExecuteReminderCommand(message: String): String? {
-        val reminderTriggers = listOf("یادم بنداز", "یادآوری کن", "بهم یادآوری کن", "یاداوری کن")
+        val reminderTriggers = listOf(
+            "یادم بنداز", "یادآوری کن", "بهم یادآوری کن", "یاداوری کن",
+            "یادآوری بذار", "یادآوری بگذار", "یه یادآوری", "یک یادآوری",
+            "برام یادآوری", "بهم بگو"
+        )
         if (reminderTriggers.none { message.contains(it) }) return null
 
         val normalized = normalizeDigits(message)
-        val hourMatch = Regex("ساعت\\s*([0-9]{1,2})(?::([0-9]{2}))?").find(normalized) ?: return null
-        var hour = hourMatch.groupValues[1].toIntOrNull() ?: return null
-        var minute = hourMatch.groupValues[2].toIntOrNull() ?: 0
-        if (normalized.contains("و نیم")) minute = 30
-        if (hour !in 0..23) return null
+
+        // 1) Absolute time: "ساعت 5", "ساعت 5:30"
+        val hourMatch = Regex("ساعت\\s*([0-9]{1,2})(?::([0-9]{2}))?").find(normalized)
+        // 2) Relative time: "نیم ساعت دیگه", "20 دقیقه دیگه", "2 ساعت دیگه/بعد"
+        val relMinutesMatch = Regex("([0-9]{1,3})\\s*دقیقه\\s*(دیگه|دیگر|بعد)").find(normalized)
+        val relHoursMatch = Regex("([0-9]{1,2})\\s*ساعت\\s*(دیگه|دیگر|بعد)").find(normalized)
+        val halfHourRelative = Regex("نیم\\s*ساعت\\s*(دیگه|دیگر|بعد)").containsMatchIn(normalized)
 
         val cal = java.util.Calendar.getInstance()
+        var matchedSpan: String? = null
+
         when {
-            message.contains("پس فردا") || message.contains("پس‌فردا") -> cal.add(java.util.Calendar.DAY_OF_MONTH, 2)
-            message.contains("فردا") -> cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
-            // "امروز" or no day keyword: keep today, but if that time already passed, assume tomorrow
-        }
-        cal.set(java.util.Calendar.HOUR_OF_DAY, hour)
-        cal.set(java.util.Calendar.MINUTE, minute)
-        cal.set(java.util.Calendar.SECOND, 0)
-        if (cal.timeInMillis <= System.currentTimeMillis()) {
-            cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+            hourMatch != null -> {
+                var hour = hourMatch.groupValues[1].toIntOrNull() ?: return clarifyReminder(message)
+                var minute = hourMatch.groupValues[2].toIntOrNull() ?: 0
+                if (normalized.contains("و نیم")) minute = 30
+                if (hour !in 0..23) return clarifyReminder(message)
+
+                when {
+                    message.contains("پس فردا") || message.contains("پس‌فردا") -> cal.add(java.util.Calendar.DAY_OF_MONTH, 2)
+                    message.contains("فردا") -> cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                    // "امروز" or no day keyword: keep today, but if that time already passed, assume tomorrow
+                }
+                cal.set(java.util.Calendar.HOUR_OF_DAY, hour)
+                cal.set(java.util.Calendar.MINUTE, minute)
+                cal.set(java.util.Calendar.SECOND, 0)
+                if (cal.timeInMillis <= System.currentTimeMillis()) {
+                    cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                }
+                matchedSpan = hourMatch.value
+            }
+            relMinutesMatch != null -> {
+                val mins = relMinutesMatch.groupValues[1].toIntOrNull() ?: return clarifyReminder(message)
+                cal.add(java.util.Calendar.MINUTE, mins)
+                matchedSpan = relMinutesMatch.value
+            }
+            halfHourRelative -> {
+                cal.add(java.util.Calendar.MINUTE, 30)
+                matchedSpan = Regex("نیم\\s*ساعت\\s*(دیگه|دیگر|بعد)").find(normalized)?.value
+            }
+            relHoursMatch != null -> {
+                val hrs = relHoursMatch.groupValues[1].toIntOrNull() ?: return clarifyReminder(message)
+                cal.add(java.util.Calendar.HOUR_OF_DAY, hrs)
+                matchedSpan = relHoursMatch.value
+            }
+            else -> {
+                // A reminder was clearly requested, but no time could be understood.
+                // Don't silently fall through to the AI chat reply here, since it would
+                // just describe the reminder in text without anything actually being
+                // saved/scheduled - which is exactly the "writes it but doesn't really
+                // register it" problem. Ask for a clear time instead.
+                return clarifyReminder(message)
+            }
         }
 
         var title = message
         (reminderTriggers + listOf("امروز", "فردا", "پس فردا", "پس‌فردا")).forEach { title = title.replace(it, "") }
-        title = title.replace(hourMatch.value, "").replace("و نیم", "").trim(' ', ',', '،', ':')
+        matchedSpan?.let { title = title.replace(it, "") }
+        title = title.replace("و نیم", "").trim(' ', ',', '،', ':')
         if (title.isBlank()) title = "یادآوری"
 
         val reminder = com.maliar.pro.database.ReminderEntity(
@@ -200,10 +241,32 @@ class AssistantViewModel(
             repeatPattern = com.maliar.pro.database.RepeatPattern.ONCE.name,
             category = "دستیار"
         )
-        smartReminderManager.addReminder(reminder)
+        val savedId = smartReminderManager.addReminder(reminder)
 
-        val timeStr = String.format("%02d:%02d", hour, minute)
-        return "✅ یادآوری «$title» برای ساعت $timeStr ثبت و زمان‌بندی شد."
+        val timeStr = String.format(
+            "%02d:%02d",
+            cal.get(java.util.Calendar.HOUR_OF_DAY),
+            cal.get(java.util.Calendar.MINUTE)
+        )
+        return if (savedId > 0) {
+            "✅ یادآوری «$title» برای ساعت $timeStr ثبت و زمان‌بندی شد (شناسه #$savedId)."
+        } else {
+            "❌ ذخیره‌سازی یادآوری با خطا مواجه شد، لطفاً دوباره تلاش کنید."
+        }
+    }
+
+    /**
+     * Returned when a reminder was clearly requested but the time couldn't be confidently
+     * parsed, so nothing was saved. Being explicit about this (instead of quietly falling
+     * through to a generic AI reply that might *sound* like it registered something) is
+     * what prevents the "assistant writes a reply but nothing was actually saved" issue.
+     */
+    private fun clarifyReminder(message: String): String {
+        return "⚠️ متوجه شدم می‌خواهید یادآوری تنظیم کنید، اما نتوانستم زمان دقیق آن را تشخیص دهم.\n" +
+            "لطفاً با یکی از این فرمت‌ها دوباره بنویسید:\n" +
+            "• «یادم بنداز فردا ساعت 5 قرص بخورم»\n" +
+            "• «یادآوری کن نیم ساعت دیگه با علی تماس بگیرم»\n" +
+            "• «یادآوری کن 20 دقیقه دیگه ...»"
     }
 
     private suspend fun getActiveKeys(): List<Pair<String, String>> = withContext(Dispatchers.IO) {
