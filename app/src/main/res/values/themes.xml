@@ -23,6 +23,11 @@
         header background with light/white numerals, which made the hour/minute numbers
         hard to read. This theme forces a solid, high-contrast header (dark purple
         background with white numerals) so the time is always clearly legible.
+
+        Deliberately does NOT override android:windowBackground here (a previous version
+        did) - that override was clipping the dialog's own bounds on some devices/screen
+        sizes, which pushed the OK/Cancel button row below the visible dialog area
+        entirely, making the picker impossible to confirm without a hardware back button.
     -->
     <style name="Theme.MaliarPro.TimePickerDialog" parent="Theme.Material3.DayNight.Dialog">
         <item name="colorAccent">@color/primary</item>
@@ -30,6 +35,31 @@
         <item name="colorControlActivated">@color/primary</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
-        <item name="android:windowBackground">@color/background</item>
+        <item name="buttonBarPositiveButtonStyle">@style/MaliarPro.TimePickerDialog.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/MaliarPro.TimePickerDialog.Button</item>
+    </style>
+
+    <!-- Explicit, unmistakably visible OK/Cancel buttons - bold primary-colored text on
+         a plain background, so they can't blend into anything else regardless of theme. -->
+    <style name="MaliarPro.TimePickerDialog.Button" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/primary</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+
+    <!--
+        Assist-chip's default checked/unchecked contrast was too subtle for people to
+        tell what's selected at a glance (both priority and alert-type chips looked
+        almost identical either way). This forces an unmistakable solid purple fill +
+        white bold text when selected vs. a light tint + dark text when not.
+    -->
+    <style name="MaliarPro.Chip.Selectable" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/chip_background_selector</item>
+        <item name="android:textColor">@color/chip_text_selector</item>
+        <item name="chipStrokeColor">@color/chip_stroke_selector</item>
+        <item name="chipStrokeWidth">1.5dp</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="android:textStyle">bold</item>
     </style>
 </resources>

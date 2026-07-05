@@ -108,13 +108,85 @@ class SmartReminderTtsService : Service() {
             }
             val textToSay = naturalText?.takeIf { it.isNotBlank() } ?: fallback
             Log.d(TAG, "Speaking text: $textToSay")
-            initTtsAndSpeak(textToSay)
+
+            // Prefer GAPGPT's cloud TTS: it actually speaks Persian regardless of whether
+            // this device has a Persian voice pack installed locally (most don't - that
+            // was the real reason spoken reminders were silent before). Only fall back to
+            // the device's built-in TextToSpeech (which itself falls back further to a
+            // plain alarm tone if Persian isn't available) when there's no active GAPGPT
+            // key or the network call fails for any reason.
+            val cloudAudio = try {
+                AIHelper.synthesizeSpeech(this@SmartReminderTtsService, textToSay)
+            } catch (e: Exception) {
+                Log.e(TAG, "synthesizeSpeech threw", e)
+                null
+            }
+
+            if (cloudAudio != null) {
+                Log.d(TAG, "Using GAPGPT cloud TTS audio file: ${cloudAudio.absolutePath}")
+                pendingSpeechFile = cloudAudio
+                pendingSpeechText = textToSay
+                requestAlarmAudioFocus()
+                logVolumeState()
+                playCloudAudioOnce(cloudAudio)
+            } else {
+                Log.w(TAG, "Cloud TTS unavailable (no active GAPGPT key or request failed) - " +
+                    "falling back to on-device TextToSpeech")
+                initTtsAndSpeak(textToSay)
+            }
         }
 
         return START_STICKY
     }
 
     private var audioFocusRequest: AudioFocusRequest? = null
+    private var cloudAudioPlayer: android.media.MediaPlayer? = null
+    private var pendingSpeechFile: java.io.File? = null
+    private var pendingSpeechText: String = "یادآوری"
+
+    /** Plays a GAPGPT-generated speech file on the ALARM stream, repeating on completion. */
+    private fun playCloudAudioOnce(file: java.io.File) {
+        if (currentReminderId == -1L) return
+        if (repeatCount >= MAX_REPEATS) {
+            Log.d(TAG, "Reached MAX_REPEATS (cloud audio), stopping")
+            stopSelfCompletely()
+            return
+        }
+        repeatCount++
+        Log.d(TAG, "playCloudAudioOnce #$repeatCount")
+        try {
+            cloudAudioPlayer?.release()
+            cloudAudioPlayer = android.media.MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                setDataSource(file.absolutePath)
+                setOnCompletionListener {
+                    Log.d(TAG, "Cloud audio playback completed")
+                    handler.postDelayed({
+                        if (currentReminderId != -1L) playCloudAudioOnce(file)
+                    }, REPEAT_INTERVAL_MS)
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.e(TAG, "Cloud audio MediaPlayer error what=$what extra=$extra")
+                    handler.postDelayed({
+                        if (currentReminderId != -1L) playCloudAudioOnce(file)
+                    }, REPEAT_INTERVAL_MS)
+                    true
+                }
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "playCloudAudioOnce failed, falling back to device TTS", e)
+            // If even a prepared file fails to play (corrupt download, codec issue, etc.),
+            // fall back to on-device TTS for this attempt rather than going silent.
+            initTtsAndSpeak(pendingSpeechText)
+        }
+    }
 
     private fun initTtsAndSpeak(text: String) {
         try {
@@ -172,7 +244,35 @@ class SmartReminderTtsService : Service() {
 
                     requestAlarmAudioFocus()
                     logVolumeState()
-                    speakOnce(text)
+
+                    // The most likely reason nothing audible happens even though speak()
+                    // reports success: the device has no installed Persian voice, so
+                    // Persian text gets silently "spoken" by an English voice that can't
+                    // render it - producing a near-instant no-op (the ~0.3-0.7s onStart→
+                    // onDone gaps that show up in logcat for a full sentence are the
+                    // tell). A tone is completely language-independent, so it always
+                    // works as a real fallback signal instead of trusting a voice that
+                    // might not exist on this device.
+                    val persianAvailability = try {
+                        tts?.isLanguageAvailable(Locale("fa", "IR"))
+                    } catch (e: Exception) {
+                        null
+                    }
+                    val persianOk = persianAvailability == TextToSpeech.LANG_AVAILABLE ||
+                        persianAvailability == TextToSpeech.LANG_COUNTRY_AVAILABLE ||
+                        persianAvailability == TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE
+                    Log.d(TAG, "Persian isLanguageAvailable=$persianAvailability -> persianOk=$persianOk")
+
+                    playAlertTone()
+                    if (persianOk) {
+                        speakOnce(text)
+                    } else {
+                        Log.w(TAG, "⚠️ No Persian voice installed on this device - repeating an alert tone " +
+                            "instead of trying to speak Persian text with an unsupported voice (which " +
+                            "would be silent/unintelligible). Install a Persian voice under device " +
+                            "Settings > Language > Text-to-speech to get spoken reminders.")
+                        toneOnce()
+                    }
                 } else {
                     Log.e(TAG, "TextToSpeech init failed with status=$status")
                 }
@@ -236,6 +336,57 @@ class SmartReminderTtsService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "logVolumeState threw", e)
         }
+    }
+
+    private var tonePlayer: android.media.MediaPlayer? = null
+
+    /**
+     * Plays the device's actual alarm tone on the ALARM stream. This is completely
+     * language-independent, so unlike TTS it works reliably even when no Persian voice is
+     * installed - it's the safety net that guarantees the person is alerted to *something*
+     * even in the worst case where speech fails entirely.
+     */
+    private fun playAlertTone() {
+        try {
+            tonePlayer?.release()
+            val uri = android.media.RingtoneManager.getActualDefaultRingtoneUri(
+                this, android.media.RingtoneManager.TYPE_ALARM
+            ) ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+
+            tonePlayer = android.media.MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setDataSource(this@SmartReminderTtsService, uri)
+                isLooping = false
+                setOnCompletionListener { mp -> try { mp.release() } catch (e: Exception) {} }
+                prepare()
+                start()
+            }
+            Log.d(TAG, "playAlertTone: started (uri=$uri)")
+        } catch (e: Exception) {
+            Log.e(TAG, "playAlertTone failed", e)
+        }
+    }
+
+    /** Repeat loop used only when Persian TTS isn't available - tone instead of speech. */
+    private fun toneOnce() {
+        if (currentReminderId == -1L) return
+        if (repeatCount >= MAX_REPEATS) {
+            Log.d(TAG, "Reached MAX_REPEATS (tone fallback), stopping")
+            stopSelfCompletely()
+            return
+        }
+        repeatCount++
+        Log.d(TAG, "toneOnce #$repeatCount (Persian voice unavailable fallback)")
+        logVolumeState()
+        playAlertTone()
+        handler.postDelayed({
+            if (currentReminderId != -1L) toneOnce()
+        }, REPEAT_INTERVAL_MS)
     }
 
     private fun speakOnce(text: String) {
@@ -353,6 +504,22 @@ class SmartReminderTtsService : Service() {
             Log.w(TAG, "Error stopping/shutting down TTS (safe to ignore)", e)
         }
         tts = null
+        try {
+            cloudAudioPlayer?.stop()
+            cloudAudioPlayer?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping cloud audio player (safe to ignore)", e)
+        }
+        cloudAudioPlayer = null
+        pendingSpeechFile?.delete()
+        pendingSpeechFile = null
+        try {
+            tonePlayer?.stop()
+            tonePlayer?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping tone player (safe to ignore)", e)
+        }
+        tonePlayer = null
         repeatCount = 0
         try {
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager

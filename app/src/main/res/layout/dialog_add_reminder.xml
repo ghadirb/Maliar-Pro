@@ -86,7 +86,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipLowPriority"
-                style="@style/Widget.Material3.Chip.Assist"
+                style="@style/MaliarPro.Chip.Selectable"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="کم"
@@ -94,7 +94,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipMediumPriority"
-                style="@style/Widget.Material3.Chip.Assist"
+                style="@style/MaliarPro.Chip.Selectable"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="متوسط"
@@ -103,7 +103,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipHighPriority"
-                style="@style/Widget.Material3.Chip.Assist"
+                style="@style/MaliarPro.Chip.Selectable"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="زیاد"
@@ -128,7 +128,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipAlertNotification"
-                style="@style/Widget.Material3.Chip.Assist"
+                style="@style/MaliarPro.Chip.Selectable"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="نوتیفیکیشن"
@@ -137,7 +137,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipAlertFullScreen"
-                style="@style/Widget.Material3.Chip.Assist"
+                style="@style/MaliarPro.Chip.Selectable"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="تمام صفحه"
@@ -145,7 +145,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipAlertSmart"
-                style="@style/Widget.Material3.Chip.Assist"
+                style="@style/MaliarPro.Chip.Selectable"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="هوشمند"

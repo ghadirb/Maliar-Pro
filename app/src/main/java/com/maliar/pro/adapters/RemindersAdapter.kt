@@ -33,12 +33,26 @@ class RemindersAdapter(
             binding.descriptionText.text = reminder.description
             binding.timeText.text = formatTime(reminder.triggerTime)
             binding.categoryText.text = reminder.category
-            
+
+            // Previously this badge only ever changed color while its text stayed the
+            // fixed placeholder word "اولویت" - so the actual chosen priority (کم/متوسط/
+            // زیاد) was never visible on the list, only inferable from a color swatch.
             val prio = reminder.priority
-            when {
-                prio.contains("HIGH", ignoreCase = true) || prio == "HIGH" -> binding.priorityBadge.setBackgroundColor(0xFFFF6B6B.toInt())
-                prio.contains("MEDIUM", ignoreCase = true) || prio == "MEDIUM" -> binding.priorityBadge.setBackgroundColor(0xFFFFD93D.toInt())
-                else -> binding.priorityBadge.setBackgroundColor(0xFF6BCB77.toInt())
+            val (priorityLabel, priorityColor) = when {
+                prio.contains("HIGH", ignoreCase = true) -> "زیاد" to 0xFFFF6B6B.toInt()
+                prio.contains("LOW", ignoreCase = true) -> "کم" to 0xFF6BCB77.toInt()
+                else -> "متوسط" to 0xFFFFD93D.toInt()
+            }
+            binding.priorityBadge.text = priorityLabel
+            binding.priorityBadge.setBackgroundColor(priorityColor)
+
+            // The alert-type chosen when creating/editing the reminder (نوتیفیکیشن/تمام
+            // صفحه/هوشمند) previously wasn't shown anywhere on the list at all.
+            val alertType = reminder.alertType
+            binding.alertTypeBadge.text = when {
+                alertType.contains("FULL_SCREEN", ignoreCase = true) -> "📱 تمام صفحه"
+                alertType.contains("SMART", ignoreCase = true) -> "🧠 هوشمند"
+                else -> "🔔 نوتیفیکیشن"
             }
 
             if (reminder.isCompleted) {

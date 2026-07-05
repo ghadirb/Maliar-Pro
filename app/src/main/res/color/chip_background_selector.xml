@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Selected chip: solid, unmistakable purple fill -->
+    <item android:color="@color/primary" android:state_checked="true" />
+    <!-- Unselected: light tint, clearly different from the selected fill -->
+    <item android:color="#F0EAFB" />
+</selector>

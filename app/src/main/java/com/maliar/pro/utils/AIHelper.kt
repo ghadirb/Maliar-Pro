@@ -82,6 +82,69 @@ object AIHelper {
         }
 
     /**
+     * Synthesizes Persian speech via GAPGPT's cloud TTS instead of the device's built-in
+     * TextToSpeech engine - this is what actually lets smart reminders speak Persian
+     * reliably on any device, regardless of whether that device has a Persian voice pack
+     * installed locally (most don't, which was the real reason spoken reminders were
+     * silent even though everything else - audio routing, volume, permissions - was
+     * correct).
+     *
+     * Tries "gpt-4o-mini-tts" first (better quality/more natural Persian per GAPGPT's own
+     * docs), and only falls back to "tts-1" if that specific model/request fails - so a
+     * temporary problem with one model doesn't make reminders silent when the other would
+     * have worked. Returns null (never throws) if no GAPGPT key is active or if both
+     * models fail, so callers must always have a non-cloud fallback (e.g. device TTS or a
+     * plain alarm tone) ready.
+     */
+    suspend fun synthesizeSpeech(context: android.content.Context, text: String): java.io.File? =
+        withContext(Dispatchers.IO) {
+            val prefs = PreferencesManager(context)
+            val gapgptKey = prefs.getAPIKeys().firstOrNull {
+                it.isActive && it.provider == com.maliar.pro.models.AIProvider.GAPGPT
+            } ?: return@withContext null
+
+            synthesizeWithModel(context, gapgptKey.key, text, "gpt-4o-mini-tts")
+                ?: synthesizeWithModel(context, gapgptKey.key, text, "tts-1")
+        }
+
+    private fun synthesizeWithModel(
+        context: android.content.Context,
+        apiKey: String,
+        text: String,
+        model: String
+    ): java.io.File? {
+        return try {
+            val url = URL("https://api.gapgpt.app/v1/audio/speech")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.connectTimeout = 15000
+            connection.readTimeout = 20000
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+
+            val body = JSONObject().apply {
+                put("model", model)
+                put("voice", "alloy")
+                put("input", text)
+            }
+            OutputStreamWriter(connection.outputStream).use { it.write(body.toString()) }
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val outFile = java.io.File(context.cacheDir, "reminder_tts_${System.currentTimeMillis()}.mp3")
+                connection.inputStream.use { input ->
+                    outFile.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (outFile.length() > 0) outFile else null
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
      * Sends a short prompt to whichever active AI key is available and returns the
      * generated text, or null if there is no active key or the call fails for any reason.
      * Callers should always have a non-AI fallback ready.
