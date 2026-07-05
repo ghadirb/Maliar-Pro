@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.core.app.NotificationManagerCompat
 import com.maliar.pro.database.SmartReminderManager
 import com.maliar.pro.utils.VoiceCallHelper
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,17 @@ class ReminderActionReceiver : BroadcastReceiver() {
             }
             return
         }
+
+        // Any real action taken on a reminder (done/snooze/dismiss) must actually remove
+        // the notification banner from the status bar - setAutoCancel(true) only clears a
+        // notification when its *main body* is tapped, never when an action button is
+        // tapped, so without this explicit cancel() the notification used to just sit
+        // there forever no matter which button was pressed.
+        val notificationManager = NotificationManagerCompat.from(context)
+        notificationManager.cancel(reminderId.toInt())
+        // A smart reminder's speaking loop posts its own separate notification (a
+        // different ID, offset by 90000) - clear that one too so nothing lingers.
+        notificationManager.cancel(90000 + reminderId.toInt())
 
         // Any real action taken on a smart reminder (done/snooze/dismiss) means the person
         // has responded - stop the repeating TTS voice immediately regardless of which
