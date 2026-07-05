@@ -6,11 +6,15 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.maliar.pro.MaliarProApplication
@@ -110,6 +114,8 @@ class SmartReminderTtsService : Service() {
         return START_STICKY
     }
 
+    private var audioFocusRequest: AudioFocusRequest? = null
+
     private fun initTtsAndSpeak(text: String) {
         try {
             tts = TextToSpeech(this) { status ->
@@ -127,12 +133,45 @@ class SmartReminderTtsService : Service() {
                     // happening. Routing through the ALARM stream instead means it's
                     // audible as long as the alarm volume isn't muted - the same stream
                     // the full-screen alarm sound already uses.
-                    tts?.setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build()
-                    )
+                    val audioAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                    tts?.setAudioAttributes(audioAttributes)
+
+                    // Belt-and-suspenders: setAudioAttributes() is the modern, documented
+                    // way to route TTS output, but some OEM TTS engine implementations
+                    // (observed in practice on several devices) silently ignore it and
+                    // only honor the legacy Bundle param below - so both are set to the
+                    // same stream. This is exactly the gap between "correct per current
+                    // API docs" and "actually works on every real device".
+                    ttsSpeakParams = Bundle().apply {
+                        putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_ALARM)
+                        putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+                    }
+
+                    // Without an UtteranceProgressListener there is no way to know whether
+                    // speak() actually produced audio, was silently dropped by the engine,
+                    // or errored - the previous version had no listener at all, so every
+                    // failure mode looked identical to success in logcat.
+                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            Log.d(TAG, "TTS onStart utteranceId=$utteranceId")
+                        }
+                        override fun onDone(utteranceId: String?) {
+                            Log.d(TAG, "TTS onDone utteranceId=$utteranceId")
+                        }
+                        @Deprecated("Deprecated in Java")
+                        override fun onError(utteranceId: String?) {
+                            Log.e(TAG, "TTS onError (no code) utteranceId=$utteranceId")
+                        }
+                        override fun onError(utteranceId: String?, errorCode: Int) {
+                            Log.e(TAG, "TTS onError utteranceId=$utteranceId errorCode=$errorCode")
+                        }
+                    })
+
+                    requestAlarmAudioFocus()
+                    logVolumeState()
                     speakOnce(text)
                 } else {
                     Log.e(TAG, "TextToSpeech init failed with status=$status")
@@ -140,6 +179,62 @@ class SmartReminderTtsService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "initTtsAndSpeak threw", e)
+        }
+    }
+
+    private var ttsSpeakParams: Bundle? = null
+
+    /**
+     * Requests audio focus on the ALARM stream before speaking. Without this, some
+     * devices/OEM audio policies can duck or suppress a new audio stream that never
+     * explicitly asked for focus, even if the stream itself isn't muted.
+     */
+    private fun requestAlarmAudioFocus() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val attrs = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(attrs)
+                    .build()
+                audioFocusRequest = request
+                val result = audioManager.requestAudioFocus(request)
+                Log.d(TAG, "requestAudioFocus result=$result")
+            } else {
+                @Suppress("DEPRECATION")
+                val result = audioManager.requestAudioFocus(
+                    null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                )
+                Log.d(TAG, "requestAudioFocus (legacy) result=$result")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "requestAlarmAudioFocus threw", e)
+        }
+    }
+
+    /**
+     * Logs the actual ALARM and MUSIC stream volumes at speak time. If ALARM volume is 0
+     * here, that - not the code - is definitively the reason no sound is heard, even
+     * though the person may believe "all phone sounds are up" (ring/media/alarm/
+     * notification are independent sliders on Android; raising one doesn't raise others).
+     */
+    private fun logVolumeState() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val alarmVol = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+            val alarmMax = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            val musicVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val ringerMode = audioManager.ringerMode
+            Log.d(TAG, "Volume check: ALARM=$alarmVol/$alarmMax, MUSIC=$musicVol, ringerMode=$ringerMode (0=silent,1=vibrate,2=normal)")
+            if (alarmVol == 0) {
+                Log.w(TAG, "⚠️ ALARM stream volume is 0 - this is almost certainly why nothing is heard. " +
+                    "Alarm volume is a separate slider from Ring/Media in Android Settings > Sound.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "logVolumeState threw", e)
         }
     }
 
@@ -152,8 +247,10 @@ class SmartReminderTtsService : Service() {
         }
         repeatCount++
         Log.d(TAG, "speakOnce #$repeatCount")
+        logVolumeState()
         try {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "smart_reminder_$currentReminderId")
+            val result = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, ttsSpeakParams, "smart_reminder_${currentReminderId}_$repeatCount")
+            Log.d(TAG, "speak() returned=$result (0=SUCCESS, -1=ERROR)")
         } catch (e: Exception) {
             Log.e(TAG, "tts.speak() threw", e)
         }
@@ -257,6 +354,15 @@ class SmartReminderTtsService : Service() {
         }
         tts = null
         repeatCount = 0
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioFocusRequest?.let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) audioManager.abandonAudioFocusRequest(it)
+            }
+            audioFocusRequest = null
+        } catch (e: Exception) {
+            Log.w(TAG, "Error abandoning audio focus (safe to ignore)", e)
+        }
     }
 
     private fun stopSelfCompletely() {
