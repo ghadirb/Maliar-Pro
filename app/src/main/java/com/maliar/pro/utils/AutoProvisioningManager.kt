@@ -109,7 +109,8 @@ object AutoProvisioningManager {
                 }
                 key.copy(
                     isActive = true,
-                    baseUrl = key.baseUrl ?: defaultBase
+                    baseUrl = key.baseUrl ?: defaultBase,
+                    isAutoProvisioned = true
                 )
             }
 

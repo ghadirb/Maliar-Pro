@@ -43,6 +43,9 @@ object AIHelper {
                 val gapgptKey = prefs.getAPIKeys().firstOrNull {
                     it.isActive && it.provider == com.maliar.pro.models.AIProvider.GAPGPT
                 } ?: return@withContext null
+                if (gapgptKey.isAutoProvisioned && !com.maliar.pro.utils.SubscriptionManager.canUseAi(context)) {
+                    return@withContext null
+                }
 
                 val boundary = "----MaliarProBoundary${System.currentTimeMillis()}"
                 val url = URL("https://api.gapgpt.app/v1/audio/transcriptions")
@@ -71,6 +74,7 @@ object AIHelper {
                 }
 
                 if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                    if (gapgptKey.isAutoProvisioned) com.maliar.pro.utils.SubscriptionManager.recordAiUsage(context)
                     val response = connection.inputStream.bufferedReader().use { it.readText() }
                     JSONObject(response).optString("text").trim().takeIf { it.isNotBlank() }
                 } else {
@@ -102,9 +106,16 @@ object AIHelper {
             val gapgptKey = prefs.getAPIKeys().firstOrNull {
                 it.isActive && it.provider == com.maliar.pro.models.AIProvider.GAPGPT
             } ?: return@withContext null
+            if (gapgptKey.isAutoProvisioned && !com.maliar.pro.utils.SubscriptionManager.canUseAi(context)) {
+                return@withContext null
+            }
 
-            synthesizeWithModel(context, gapgptKey.key, text, "gpt-4o-mini-tts")
+            val result = synthesizeWithModel(context, gapgptKey.key, text, "gpt-4o-mini-tts")
                 ?: synthesizeWithModel(context, gapgptKey.key, text, "tts-1")
+            if (result != null && gapgptKey.isAutoProvisioned) {
+                com.maliar.pro.utils.SubscriptionManager.recordAiUsage(context)
+            }
+            result
         }
 
     private fun synthesizeWithModel(
@@ -161,6 +172,10 @@ object AIHelper {
                     ?: active.firstOrNull { it.provider == com.maliar.pro.models.AIProvider.LIARA }
                     ?: active.first()
 
+                if (key.isAutoProvisioned && !com.maliar.pro.utils.SubscriptionManager.canUseAi(context)) {
+                    return@withContext null
+                }
+
                 val baseUrl = baseUrlFor(key.provider, key.baseUrl)
                 val model = modelFor(baseUrl)
 
@@ -192,6 +207,7 @@ object AIHelper {
                 OutputStreamWriter(connection.outputStream).use { it.write(requestBody.toString()) }
 
                 if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                    if (key.isAutoProvisioned) com.maliar.pro.utils.SubscriptionManager.recordAiUsage(context)
                     val response = connection.inputStream.bufferedReader().use { it.readText() }
                     val json = JSONObject(response)
                     json.getJSONArray("choices")

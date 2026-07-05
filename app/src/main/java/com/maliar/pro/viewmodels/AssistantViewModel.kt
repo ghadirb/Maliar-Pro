@@ -78,6 +78,11 @@ class AssistantViewModel(
 
             // Try online AI with priority: GAPGPT -> Liara -> local processing
             val response = try {
+                if (!com.maliar.pro.utils.SubscriptionManager.canUseAi(appContext)) {
+                    // Only the shared/free key is metered (see SubscriptionManager) - anyone
+                    // with their own key or an active premium subscription never lands here.
+                    com.maliar.pro.utils.SubscriptionManager.upgradeMessage(appContext)
+                } else {
                 var keys = getActiveKeys()
                 if (keys.isEmpty()) {
                     // Keys may not have finished auto-provisioning yet (it runs in the
@@ -93,11 +98,17 @@ class AssistantViewModel(
                         processCommand(message)
                 } else {
                     val gapgptResponse = callGapgptAI(message)
-                    if (gapgptResponse != null) gapgptResponse
+                    val aiReply = if (gapgptResponse != null) gapgptResponse
                     else {
                         val liaraResponse = callLiaraAI(message)
                         liaraResponse ?: ("⚠️ اتصال به سرویس‌های هوش مصنوعی آنلاین برقرار نشد (شبکه یا کلید نامعتبر است).\n\n" + processCommand(message))
                     }
+                    // Only meters usage of the shared/free key - SubscriptionManager itself
+                    // no-ops this for premium/personal-key users, so it's safe to call
+                    // unconditionally on every attempt that reaches this branch.
+                    com.maliar.pro.utils.SubscriptionManager.recordAiUsage(appContext)
+                    aiReply
+                }
                 }
             } catch (e: Exception) {
                 "⚠️ خطا در ارتباط با دستیار آنلاین: ${e.message}\n\n" + processCommand(message)

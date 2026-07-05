@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="اشتراک پریمیوم"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:text="در حال بررسی وضعیت اشتراک..."
+            android:textSize="14sp"
+            android:textColor="#616161" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✅ همیشه رایگان"
+                    android:textStyle="bold"
+                    android:textSize="15sp"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="یادآوری‌ها، هشدار تمام‌صفحه، تقویم شمسی، حسابداری، مخاطبین و پشتیبان‌گیری — بدون نیاز به اشتراک."
+                    android:textSize="13sp"
+                    android:textColor="#616161" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            app:cardBackgroundColor="#FFF8E1"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⭐ پریمیوم"
+                    android:textStyle="bold"
+                    android:textSize="15sp"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:text="استفاده‌ی نامحدود از دستیار هوشمند (چت، صوت، یادآوری هوشمند گفتاری) بدون سقف روزانه."
+                    android:textSize="13sp"
+                    android:textColor="#616161" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/monthlyPlanButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="اشتراک ماهانه" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/yearlyPlanButton"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="اشتراک سالانه (صرفه‌جویی بیشتر)" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="یا به‌جای اشتراک، از تنظیمات → کلیدهای هوش مصنوعی، کلید شخصی خودتان را اضافه کنید تا کاملاً رایگان و بدون محدودیت از دستیار استفاده کنید."
+            android:textSize="12sp"
+            android:textColor="#9E9E9E" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/refreshStatusButton"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="بازبینی وضعیت اشتراک" />
+
+    </LinearLayout>
+
+</ScrollView>

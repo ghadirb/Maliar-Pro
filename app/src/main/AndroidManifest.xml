@@ -57,6 +57,13 @@
             android:exported="false"
             android:theme="@style/Theme.MaliarPro" />
 
+        <!-- Subscription / premium upgrade screen -->
+        <activity
+            android:name=".ui.profile.SubscriptionActivity"
+            android:exported="false"
+            android:label="اشتراک پریمیوم"
+            android:theme="@style/Theme.MaliarPro" />
+
         <!-- Full Screen Alarm Activity -->
         <activity
             android:name=".ui.reminders.FullScreenAlarmActivity"

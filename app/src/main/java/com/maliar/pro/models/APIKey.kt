@@ -13,7 +13,15 @@ data class APIKey(
     val baseUrl: String? = null,
     
     @SerializedName("isActive")
-    val isActive: Boolean = false
+    val isActive: Boolean = false,
+
+    // True only for keys fetched automatically by AutoProvisioningManager (the shared,
+    // free pool this app pays for). False (the default) means the person typed this key
+    // in themselves in "کلیدهای هوش مصنوعی", so it's their own account/their own cost -
+    // SubscriptionManager uses this to grant unlimited AI usage to anyone using their own
+    // key, since none of that usage costs the app owner anything.
+    @SerializedName("isAutoProvisioned")
+    val isAutoProvisioned: Boolean = false
 )
 
 enum class AIProvider {

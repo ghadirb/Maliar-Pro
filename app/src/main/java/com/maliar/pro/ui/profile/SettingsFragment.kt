@@ -49,9 +49,38 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        setupSubscriptionSetting()
         setupNotificationSettings()
         setupBackgroundServiceSetting()
         setupBackupSettings()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Coming back from SubscriptionActivity after a payment - reflect the new status
+        // right away instead of showing the stale one from before the person left.
+        renderSubscriptionStatus()
+    }
+
+    private fun setupSubscriptionSetting() {
+        renderSubscriptionStatus()
+        binding.manageSubscriptionButton.setOnClickListener {
+            startActivity(Intent(requireContext(), com.maliar.pro.ui.profile.SubscriptionActivity::class.java))
+        }
+    }
+
+    private fun renderSubscriptionStatus() {
+        val context = requireContext()
+        val premiumLabel = com.maliar.pro.utils.SubscriptionManager.premiumExpiryLabel(context)
+        binding.subscriptionStatusText.text = when {
+            premiumLabel != null -> premiumLabel
+            com.maliar.pro.utils.SubscriptionManager.hasPersonalKey(context) ->
+                "شما از کلید هوش مصنوعی شخصی خودتان استفاده می‌کنید - بدون محدودیت روزانه."
+            else -> {
+                val remaining = com.maliar.pro.utils.SubscriptionManager.remainingFreeToday(context)
+                "امروز $remaining از ${com.maliar.pro.utils.SubscriptionManager.FREE_DAILY_AI_LIMIT} پیام رایگان باقی مانده"
+            }
+        }
     }
 
     /**

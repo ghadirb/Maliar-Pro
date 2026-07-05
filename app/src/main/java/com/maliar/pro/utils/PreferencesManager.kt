@@ -20,6 +20,13 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_BACKUP_URI = "last_backup_uri"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
+
+        // --- Subscription / entitlement ---
+        private const val KEY_DEVICE_ID = "device_id"
+        private const val KEY_PREMIUM_UNTIL = "premium_until"
+        private const val KEY_LAST_SUBSCRIPTION_CHECK = "last_subscription_check"
+        private const val KEY_DAILY_AI_COUNT = "daily_ai_count"
+        private const val KEY_DAILY_AI_COUNT_DATE = "daily_ai_count_date"
     }
 
     fun saveAPIKeys(keys: List<APIKey>) {
@@ -98,5 +105,45 @@ class PreferencesManager(context: Context) {
 
     fun setLastSeenAnnouncementId(id: String) {
         prefs.edit().putString(KEY_LAST_SEEN_ANNOUNCEMENT_ID, id).apply()
+    }
+
+    // --- Subscription / entitlement ---
+
+    /** A stable random ID for this install, generated once and reused - sent to the
+     *  backend so it can tell this device apart from others without needing a full
+     *  login/account system. */
+    fun getOrCreateDeviceId(): String {
+        val existing = prefs.getString(KEY_DEVICE_ID, null)
+        if (!existing.isNullOrBlank()) return existing
+        val fresh = java.util.UUID.randomUUID().toString()
+        prefs.edit().putString(KEY_DEVICE_ID, fresh).apply()
+        return fresh
+    }
+
+    /** Epoch millis when the premium subscription expires; 0 means never subscribed. */
+    fun getPremiumUntil(): Long = prefs.getLong(KEY_PREMIUM_UNTIL, 0L)
+
+    fun setPremiumUntil(epochMillis: Long) {
+        prefs.edit().putLong(KEY_PREMIUM_UNTIL, epochMillis).apply()
+    }
+
+    fun getLastSubscriptionCheck(): Long = prefs.getLong(KEY_LAST_SUBSCRIPTION_CHECK, 0L)
+
+    fun setLastSubscriptionCheck(epochMillis: Long) {
+        prefs.edit().putLong(KEY_LAST_SUBSCRIPTION_CHECK, epochMillis).apply()
+    }
+
+    /** Today's free-tier AI usage count and the date it belongs to (yyyy-MM-dd), so
+     *  SubscriptionManager can reset the counter the moment the date rolls over without
+     *  needing a background job. */
+    fun getDailyAiCount(): Int = prefs.getInt(KEY_DAILY_AI_COUNT, 0)
+
+    fun getDailyAiCountDate(): String? = prefs.getString(KEY_DAILY_AI_COUNT_DATE, null)
+
+    fun setDailyAiCount(count: Int, date: String) {
+        prefs.edit()
+            .putInt(KEY_DAILY_AI_COUNT, count)
+            .putString(KEY_DAILY_AI_COUNT_DATE, date)
+            .apply()
     }
 }

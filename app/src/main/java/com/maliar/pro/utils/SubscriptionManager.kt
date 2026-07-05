@@ -1,0 +1,164 @@
+package com.maliar.pro.utils
+
+import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/**
+ * Decides whether the person is allowed to make an AI-backed request right now, and talks
+ * to the (separately deployed) payment backend to activate/refresh a premium subscription.
+ *
+ * The model: everything that doesn't cost the app owner money (reminders, calendar,
+ * accounting, the full-screen alarm, etc.) is always free and unlimited. Only calls that
+ * use the *shared, auto-provisioned* AI key (see APIKey.isAutoProvisioned) are metered,
+ * because that's the only usage the app owner actually pays for. Anyone who added their
+ * own personal AI key, or who is on an active premium subscription, is unlimited.
+ *
+ * IMPORTANT (TODO for the app owner): set [BACKEND_BASE_URL] to your deployed backend's
+ * real URL (see the /server folder for a ready-to-deploy Node.js project) once you've
+ * registered a Zarinpal merchant account and deployed it, e.g. to Liara.
+ */
+object SubscriptionManager {
+
+    // TODO: replace with your real deployed backend URL, e.g. "https://maliar-billing.liara.run"
+    const val BACKEND_BASE_URL = "https://CHANGE-ME.liara.run"
+
+    const val FREE_DAILY_AI_LIMIT = 15
+
+    enum class Plan(val apiValue: String, val days: Int, val label: String) {
+        MONTHLY("monthly", 30, "اشتراک ماهانه"),
+        YEARLY("yearly", 365, "اشتراک سالانه")
+    }
+
+    private fun todayKey(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    fun isPremium(context: Context): Boolean {
+        val prefs = PreferencesManager(context)
+        return prefs.getPremiumUntil() > System.currentTimeMillis()
+    }
+
+    /** True if the person has added at least one active AI key themselves (not the
+     *  shared/free one this app auto-provisions) - their own usage, their own cost. */
+    fun hasPersonalKey(context: Context): Boolean {
+        return PreferencesManager(context).getAPIKeys().any { it.isActive && !it.isAutoProvisioned }
+    }
+
+    /** Remaining free shared-key AI calls for today (resets automatically at midnight). */
+    fun remainingFreeToday(context: Context): Int {
+        val prefs = PreferencesManager(context)
+        val today = todayKey()
+        val used = if (prefs.getDailyAiCountDate() == today) prefs.getDailyAiCount() else 0
+        return (FREE_DAILY_AI_LIMIT - used).coerceAtLeast(0)
+    }
+
+    /** Call this BEFORE making a shared-key AI request. Personal keys and active premium
+     *  subscriptions always return true without touching the daily counter at all. */
+    fun canUseAi(context: Context): Boolean {
+        if (isPremium(context)) return true
+        if (hasPersonalKey(context)) return true
+        return remainingFreeToday(context) > 0
+    }
+
+    /** Call this AFTER a successful shared-key AI request so the daily counter reflects
+     *  real usage. Safe to call even when premium/personal - it becomes a no-op then. */
+    fun recordAiUsage(context: Context) {
+        if (isPremium(context) || hasPersonalKey(context)) return
+        val prefs = PreferencesManager(context)
+        val today = todayKey()
+        val current = if (prefs.getDailyAiCountDate() == today) prefs.getDailyAiCount() else 0
+        prefs.setDailyAiCount(current + 1, today)
+    }
+
+    /** A short Persian message explaining why the AI is unavailable right now, meant to be
+     *  shown directly in the chat/assistant UI in place of an actual AI reply. */
+    fun upgradeMessage(context: Context): String {
+        return "⚠️ سقف رایگان روزانه ($FREE_DAILY_AI_LIMIT پیام) شما تمام شده است.\n" +
+            "برای ادامه‌ی استفاده از دستیار هوشمند امروز، می‌توانید:\n" +
+            "• فردا دوباره امتحان کنید (سقف رایگان هر روز از نو شروع می‌شود)\n" +
+            "• از تنظیمات → کلیدهای هوش مصنوعی، کلید شخصی خودتان را اضافه کنید (نامحدود و رایگان از طرف ما)\n" +
+            "• یا با ارتقا به اشتراک پریمیوم، محدودیت روزانه را کاملاً بردارید"
+    }
+
+    /**
+     * Asks the backend for this device's current subscription status and updates the
+     * local cache. Safe to call often (e.g. app open, subscription screen open) - if the
+     * network call fails for any reason, the previously cached value is left untouched so
+     * the person doesn't lose premium access just because of a bad connection.
+     */
+    suspend fun refreshFromServer(context: Context): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val deviceId = PreferencesManager(context).getOrCreateDeviceId()
+            val url = URL("$BACKEND_BASE_URL/subscription/status?deviceId=$deviceId")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 12000
+            connection.readTimeout = 12000
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(body)
+                val premiumUntil = json.optLong("premiumUntil", 0L)
+                val prefs = PreferencesManager(context)
+                prefs.setPremiumUntil(premiumUntil)
+                prefs.setLastSubscriptionCheck(System.currentTimeMillis())
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SubscriptionManager", "refreshFromServer failed: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Asks the backend to start a Zarinpal payment for [plan] and returns the payment page
+     * URL to open in a browser, or null if the request failed. The backend is responsible
+     * for the actual Zarinpal PaymentRequest.json/PaymentVerification.json calls and for
+     * activating the subscription once Zarinpal confirms payment - see /server/README-fa.md.
+     */
+    suspend fun requestPayment(context: Context, plan: Plan): String? = withContext(Dispatchers.IO) {
+        try {
+            val deviceId = PreferencesManager(context).getOrCreateDeviceId()
+            val url = URL("$BACKEND_BASE_URL/payment/request")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+
+            val body = JSONObject().apply {
+                put("deviceId", deviceId)
+                put("plan", plan.apiValue)
+            }
+            OutputStreamWriter(connection.outputStream).use { it.write(body.toString()) }
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                JSONObject(response).optString("paymentUrl").takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SubscriptionManager", "requestPayment failed: ${e.message}")
+            null
+        }
+    }
+
+    /** Human-readable Persian label for the premium expiry, or null if not premium. */
+    fun premiumExpiryLabel(context: Context): String? {
+        val until = PreferencesManager(context).getPremiumUntil()
+        if (until <= System.currentTimeMillis()) return null
+        val formatted = SimpleDateFormat("yyyy/MM/dd", Locale.US).format(Date(until))
+        return "اشتراک پریمیوم شما تا $formatted فعال است"
+    }
+}
