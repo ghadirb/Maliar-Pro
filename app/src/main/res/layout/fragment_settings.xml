@@ -63,6 +63,37 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/backgroundServiceSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="نگه‌داشتن برنامه در پس‌زمینه" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="یک نوتیفیکیشن بی‌صدا و ثابت نشان می‌دهد، اما یادآوری‌های هوشمند و دستیار را قابل‌اعتمادتر می‌کند. خاموش کردن این گزینه، آن نوتیفیکیشن را کاملاً حذف می‌کند ولی ممکن است در بعضی گوشی‌ها یادآوری‌ها با کمی تأخیر برسند."
+                    android:textSize="12sp"
+                    android:textColor="#757575" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
     </LinearLayout>
 
 </ScrollView>

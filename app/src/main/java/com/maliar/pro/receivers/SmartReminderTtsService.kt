@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -16,6 +17,7 @@ import com.maliar.pro.MaliarProApplication
 import com.maliar.pro.R
 import com.maliar.pro.ui.reminders.FullScreenAlarmActivity
 import com.maliar.pro.utils.AIHelper
+import com.maliar.pro.utils.PreferencesManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -118,6 +120,19 @@ class SmartReminderTtsService : Service() {
                         tts?.setLanguage(Locale.US)
                     }
                     tts?.setSpeechRate(0.95f)
+                    // TextToSpeech defaults to the MUSIC/media stream. If the person has
+                    // their media volume turned down or muted (very common - it's a
+                    // different slider than ringer/alarm volume), speak() succeeds with
+                    // no error but is completely silent, which is exactly what was
+                    // happening. Routing through the ALARM stream instead means it's
+                    // audible as long as the alarm volume isn't muted - the same stream
+                    // the full-screen alarm sound already uses.
+                    tts?.setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                    )
                     speakOnce(text)
                 } else {
                     Log.e(TAG, "TextToSpeech init failed with status=$status")
@@ -147,7 +162,22 @@ class SmartReminderTtsService : Service() {
         }, REPEAT_INTERVAL_MS)
     }
 
+    /**
+     * Builds the notification that accompanies the spoken reminder. Honors the same
+     * notificationMode setting (بدون/ساده/با اکشن) from Settings that plain reminders use,
+     * so switching that setting has a real, visible effect here too - it previously always
+     * showed the same fixed "با اکشن"-style banner no matter what was selected. In every
+     * mode the notification is swipeable (not "ongoing") and swiping it away stops the
+     * voice loop via deleteIntent, since Android doesn't allow a foreground service to have
+     * literally no notification at all - this is the closest equivalent to "close/exit".
+     */
     private fun buildNotification(reminderId: Long, title: String): Notification {
+        val notificationMode = try {
+            PreferencesManager(this).getNotificationMode()
+        } catch (e: Exception) {
+            "action"
+        }
+
         val fullScreenIntent = Intent(this, FullScreenAlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("reminder_id", reminderId)
@@ -168,18 +198,52 @@ class SmartReminderTtsService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        return NotificationCompat.Builder(this, MaliarProApplication.REMINDER_CHANNEL_ID)
+        // Swiping the notification away should behave like tapping "انجام شد" - it stops
+        // the voice loop and marks the reminder handled, rather than leaving it silently
+        // running with nothing visible.
+        val dismissIntent = Intent(this, ReminderActionReceiver::class.java).apply {
+            putExtra("reminder_id", reminderId)
+            putExtra("action", "dismiss")
+        }
+        val dismissPendingIntent = PendingIntent.getBroadcast(
+            this, reminderId.toInt() + 9500, dismissIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val builder = NotificationCompat.Builder(this, MaliarProApplication.REMINDER_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("🔔 $title")
-            .setContentText("در حال پخش صوتی یادآوری… برای توقف «انجام شد» را بزنید")
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setOngoing(true)
+            .setOngoing(false)
             .setAutoCancel(false)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setDeleteIntent(dismissPendingIntent)
             .setContentIntent(fullScreenPendingIntent)
-            .addAction(R.drawable.ic_check, "✅ انجام شد", donePendingIntent)
-            .build()
+
+        when (notificationMode) {
+            "none" -> {
+                // Android requires *some* notification to keep a foreground service
+                // alive, so this can't be fully invisible - but it's as quiet and
+                // unobtrusive as possible: low priority, no sound/heads-up, no buttons.
+                // The spoken voice itself is unaffected and still plays either way.
+                builder.setContentText("یادآوری هوشمند در حال پخش صوتی است")
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            }
+            "simple" -> {
+                builder.setContentText("در حال پخش صوتی یادآوری… برای بستن، نوتیفیکیشن را کنار بزنید")
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(NotificationCompat.CATEGORY_ALARM)
+                    .setFullScreenIntent(fullScreenPendingIntent, true)
+            }
+            else -> { // "action"
+                builder.setContentText("در حال پخش صوتی یادآوری… برای توقف «انجام شد» را بزنید")
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .setCategory(NotificationCompat.CATEGORY_ALARM)
+                    .setFullScreenIntent(fullScreenPendingIntent, true)
+                    .addAction(R.drawable.ic_check, "✅ انجام شد", donePendingIntent)
+            }
+        }
+
+        return builder.build()
     }
 
     private fun stopSpeakingLoop() {

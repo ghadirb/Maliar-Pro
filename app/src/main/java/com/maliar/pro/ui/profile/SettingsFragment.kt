@@ -28,6 +28,29 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupNotificationSettings()
+        setupBackgroundServiceSetting()
+    }
+
+    /**
+     * The persistent, silent "مالیار پرو در حال اجراست" notification (MaliarBackgroundService)
+     * used to always start automatically with zero way to turn it off - it exists purely to
+     * make smart reminders/the assistant more reliable in the background, not something the
+     * app strictly needs to function. This lets the person turn it off entirely if they'd
+     * rather never see it, accepting a small reliability trade-off on some phones.
+     */
+    private fun setupBackgroundServiceSetting() {
+        binding.backgroundServiceSwitch.isChecked = prefs.isBackgroundServiceEnabled()
+
+        binding.backgroundServiceSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setBackgroundServiceEnabled(isChecked)
+            if (isChecked) {
+                com.maliar.pro.services.MaliarBackgroundService.start(requireContext())
+                Toast.makeText(requireContext(), "برنامه در پس‌زمینه فعال ماند", Toast.LENGTH_SHORT).show()
+            } else {
+                com.maliar.pro.services.MaliarBackgroundService.stop(requireContext())
+                Toast.makeText(requireContext(), "نوتیفیکیشن پس‌زمینه حذف شد", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupNotificationSettings() {

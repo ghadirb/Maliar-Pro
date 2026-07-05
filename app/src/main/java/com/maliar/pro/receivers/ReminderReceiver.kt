@@ -22,12 +22,11 @@ import com.maliar.pro.utils.PreferencesManager
  * 1. alertType decides *what kind of alarm this is* (a plain reminder, a full-screen
  *    alarm, or a "smart" spoken reminder) - this is chosen per-reminder and is NOT
  *    affected by the global notification-mode setting.
- * 2. notificationMode (none / action, from Settings) decides *whether the plain
- *    notification for a NOTIFICATION-type reminder shows at all* - "بدون نوتیفیکیشن"
- *    suppresses it completely, "با نوتیفیکیشن" always shows the full notification with
- *    its action buttons (انجام شد / تعویق / تماس). There's no middle "buttonless" option
- *    anymore - if it shows, it's actionable. It no longer gets silently overridden for
- *    any alertType, so switching the setting always has a visible, real effect.
+ * 2. notificationMode (none / simple / action, from Settings) decides *how the plain
+ *    notification for a NOTIFICATION-type reminder looks*: "بدون نوتیفیکیشن" suppresses
+ *    it completely, "ساده" shows a plain banner with no buttons, "با اکشن" adds the
+ *    انجام‌شد/تعویق/تماس buttons. Each of the three now genuinely looks/behaves
+ *    differently - they don't just collapse into "shows vs. doesn't show".
  */
 class ReminderReceiver : BroadcastReceiver() {
 
@@ -50,11 +49,12 @@ class ReminderReceiver : BroadcastReceiver() {
             }
             else -> {
                 val prefs = PreferencesManager(context)
-                if (prefs.getNotificationMode() == "none") {
+                val notificationMode = prefs.getNotificationMode()
+                if (notificationMode == "none") {
                     // The whole point of this mode: no notification UI at all.
                     return
                 }
-                showPlainNotification(context, title, description, reminderId, contactName, contactPhone)
+                showPlainNotification(context, title, description, reminderId, notificationMode, contactName, contactPhone)
             }
         }
     }
@@ -106,6 +106,7 @@ class ReminderReceiver : BroadcastReceiver() {
         title: String,
         message: String,
         reminderId: Long,
+        notificationMode: String,
         contactName: String,
         contactPhone: String
     ) {
@@ -125,52 +126,69 @@ class ReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        // Swiping the notification away should still mark it handled instead of leaving
+        // the reminder's alarm state dangling with nothing telling the app it was seen.
+        val dismissIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            putExtra("reminder_id", reminderId)
+            putExtra("action", "dismiss")
+        }
+        val dismissPendingIntent = PendingIntent.getBroadcast(
+            context, reminderId.toInt() + 4000, dismissIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         val builder = NotificationCompat.Builder(context, MaliarProApplication.REMINDER_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setDeleteIntent(dismissPendingIntent)
             .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
 
-        // Reaching this function at all already means notificationMode != "none", so the
-        // "با نوتیفیکیشن" mode always gets real, actionable buttons - not just a tap target.
-        val completeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-            putExtra("reminder_id", reminderId)
-            putExtra("action", "complete")
-        }
-        val completePendingIntent = PendingIntent.getBroadcast(
-            context, reminderId.toInt() + 1000, completeIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        builder.addAction(R.drawable.ic_check, "✅ انجام شد", completePendingIntent)
+        if (notificationMode == "action") {
+            builder.setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-            putExtra("reminder_id", reminderId)
-            putExtra("action", "snooze")
-        }
-        val snoozePendingIntent = PendingIntent.getBroadcast(
-            context, reminderId.toInt() + 2000, snoozeIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        builder.addAction(R.drawable.ic_snooze, "⏰ ۱۰ دقیقه بعد", snoozePendingIntent)
-
-        // If a contact was attached to this reminder, offer a direct one-tap call button
-        // that dials that exact contact.
-        if (contactPhone.isNotBlank()) {
-            val callIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            val completeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
                 putExtra("reminder_id", reminderId)
-                putExtra("action", "call")
-                putExtra("phone_number", contactPhone)
+                putExtra("action", "complete")
             }
-            val callPendingIntent = PendingIntent.getBroadcast(
-                context, reminderId.toInt() + 3000, callIntent,
+            val completePendingIntent = PendingIntent.getBroadcast(
+                context, reminderId.toInt() + 1000, completeIntent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
-            val label = if (contactName.isNotBlank()) "📞 تماس با $contactName" else "📞 تماس"
-            builder.addAction(R.drawable.ic_notification, label, callPendingIntent)
+            builder.addAction(R.drawable.ic_check, "✅ انجام شد", completePendingIntent)
+
+            val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+                putExtra("reminder_id", reminderId)
+                putExtra("action", "snooze")
+            }
+            val snoozePendingIntent = PendingIntent.getBroadcast(
+                context, reminderId.toInt() + 2000, snoozeIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            builder.addAction(R.drawable.ic_snooze, "⏰ ۱۰ دقیقه بعد", snoozePendingIntent)
+
+            // If a contact was attached to this reminder, offer a direct one-tap call
+            // button that dials that exact contact.
+            if (contactPhone.isNotBlank()) {
+                val callIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+                    putExtra("reminder_id", reminderId)
+                    putExtra("action", "call")
+                    putExtra("phone_number", contactPhone)
+                }
+                val callPendingIntent = PendingIntent.getBroadcast(
+                    context, reminderId.toInt() + 3000, callIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                val label = if (contactName.isNotBlank()) "📞 تماس با $contactName" else "📞 تماس"
+                builder.addAction(R.drawable.ic_notification, label, callPendingIntent)
+            }
+        } else {
+            // "ساده" (simple): just the title/text above, tap to open - deliberately no
+            // buttons at all, and a plain priority so it doesn't behave like an alarm.
+            builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
         }
 
         notificationManager.notify(reminderId.toInt(), builder.build())

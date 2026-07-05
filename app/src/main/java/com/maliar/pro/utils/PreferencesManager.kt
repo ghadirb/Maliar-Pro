@@ -16,6 +16,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_API_KEYS = "api_keys"
         private const val KEY_AUTO_PROVISIONING = "auto_provisioning"
         private const val KEY_NOTIFICATION_MODE = "notification_mode"
+        private const val KEY_BACKGROUND_SERVICE_ENABLED = "background_service_enabled"
     }
 
     fun saveAPIKeys(keys: List<APIKey>) {
@@ -55,5 +56,20 @@ class PreferencesManager(context: Context) {
         // and anyone with "simple" saved from before also lands on the real notification.
         val stored = prefs.getString(KEY_NOTIFICATION_MODE, "action") ?: "action"
         return if (stored == "none") "none" else "action"
+    }
+
+    /**
+     * Whether MaliarBackgroundService (the persistent, silent "app is running"
+     * notification) is allowed to run. Defaults to true because it measurably helps smart
+     * reminders fire reliably on aggressive OEMs - but AlarmManager-scheduled alarms still
+     * work without it (just somewhat less reliably on some devices), so it's safe for the
+     * person to turn off if they'd rather not see that notification at all.
+     */
+    fun isBackgroundServiceEnabled(): Boolean {
+        return prefs.getBoolean(KEY_BACKGROUND_SERVICE_ENABLED, true)
+    }
+
+    fun setBackgroundServiceEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BACKGROUND_SERVICE_ENABLED, enabled).apply()
     }
 }
