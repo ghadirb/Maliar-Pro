@@ -60,12 +60,21 @@ class ReminderReceiver : BroadcastReceiver() {
     }
 
     /**
-     * A reliable full-screen alarm: uses NotificationCompat.setFullScreenIntent instead of
-     * calling context.startActivity() directly from the receiver. Directly starting an
-     * Activity from a background BroadcastReceiver is blocked on modern Android unless the
-     * app is already in the foreground - which is exactly why this used to only work when
-     * the person tapped a plain notification first. A full-screen-intent notification is
-     * the sanctioned bypass real alarm-clock apps use.
+     * A reliable full-screen alarm has to handle two very different situations:
+     *
+     * - App already open (an Activity is visible): a BroadcastReceiver CAN start an
+     *   Activity directly here with no restriction at all, since the process already has
+     *   a visible window - going through a notification first (and waiting for a tap)
+     *   was pure unnecessary delay in this case, not a platform requirement.
+     * - App in the background: directly calling startActivity() here would be silently
+     *   blocked by Android's background-activity-launch restriction, so
+     *   NotificationCompat.setFullScreenIntent is used instead - the sanctioned bypass
+     *   real alarm-clock apps rely on. Android itself auto-promotes this straight to the
+     *   full-screen Activity *when the device is locked*; if the phone happens to be
+     *   unlocked but the app isn't open, Android intentionally only shows a heads-up
+     *   notification instead of taking over the screen - this is a deliberate platform
+     *   restriction (since Android 10) that no regular third-party app can bypass, to
+     *   stop apps from hijacking the screen while someone is actively using their phone.
      */
     private fun showFullScreenIntentNotification(
         context: Context,
@@ -73,8 +82,6 @@ class ReminderReceiver : BroadcastReceiver() {
         title: String,
         description: String
     ) {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
         val alarmIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("reminder_id", reminderId)
@@ -82,6 +89,13 @@ class ReminderReceiver : BroadcastReceiver() {
             putExtra("reminder_description", description)
             putExtra("alert_type", AlertType.FULL_SCREEN.name)
         }
+
+        if (MaliarProApplication.isAppInForeground()) {
+            context.startActivity(alarmIntent)
+            return
+        }
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val fullScreenPendingIntent = PendingIntent.getActivity(
             context, reminderId.toInt(), alarmIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT

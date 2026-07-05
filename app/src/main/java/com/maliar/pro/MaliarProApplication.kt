@@ -1,14 +1,17 @@
 package com.maliar.pro
 
+import android.app.Activity
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import android.os.Bundle
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 
 class MaliarProApplication : Application() {
 
@@ -24,6 +27,14 @@ class MaliarProApplication : Application() {
 
         lateinit var instance: MaliarProApplication
             private set
+
+        // Tracks whether any Activity of this app is currently started/visible. A
+        // BroadcastReceiver can't just call startActivity() and expect it to appear
+        // instantly on modern Android *unless* the app already has a visible window -
+        // this is exactly that check, used by ReminderReceiver to skip the notification
+        // detour and jump straight to the full-screen alarm while the app is open.
+        private val startedActivityCount = AtomicInteger(0)
+        fun isAppInForeground(): Boolean = startedActivityCount.get() > 0
     }
 
     override fun onCreate() {
@@ -32,6 +43,15 @@ class MaliarProApplication : Application() {
         createNotificationChannels()
         initializeDatabase()
         startBackgroundService()
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: Activity) { startedActivityCount.incrementAndGet() }
+            override fun onActivityStopped(activity: Activity) { startedActivityCount.decrementAndGet() }
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
     }
 
     private fun createNotificationChannels() {

@@ -10,10 +10,14 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.OvershootInterpolator
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.card.MaterialCardView
 import com.maliar.pro.R
 import com.maliar.pro.database.AlertType
 import com.maliar.pro.database.SmartReminderManager
@@ -65,17 +69,11 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         // Vibrate
         vibrate()
 
-        findViewById<View>(R.id.dismissButton).setOnClickListener {
-            dismissAlarm()
-        }
-
-        findViewById<View>(R.id.snoozeButton).setOnClickListener {
-            snoozeAlarm()
-        }
-
         findViewById<View>(R.id.completeButton).setOnClickListener {
             completeReminder()
         }
+
+        setupSlideGesture()
 
         // The spoken "smart reminder" voice is driven by SmartReminderTtsService, started
         // directly from ReminderReceiver the instant the alarm fires - not from here - so
@@ -127,6 +125,68 @@ class FullScreenAlarmActivity : AppCompatActivity() {
             vibrator.vibrate(longArrayOf(0, 500, 500, 500), 0)
         }
     }
+
+    /**
+     * A phone-call-style slide gesture instead of separate تعویق/توقف buttons: drag the
+     * handle to the physical right edge of the screen to stop the alarm, or to the left
+     * edge to snooze it. Deliberately uses raw screen-left/right (not RTL start/end) since
+     * a drag gesture has to match where the user's finger actually is on screen, regardless
+     * of the app's Persian RTL layout direction.
+     */
+    private fun setupSlideGesture() {
+        val track = findViewById<FrameLayout>(R.id.slideTrack)
+        val handle = findViewById<MaterialCardView>(R.id.slideHandle)
+
+        var maxDrag = 0f
+        var downRawX = 0f
+        var startTranslation = 0f
+
+        track.post {
+            maxDrag = (track.width - handle.width) / 2f - dp(12f)
+        }
+
+        handle.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX
+                    startTranslation = view.translationX
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val delta = event.rawX - downRawX
+                    val target = (startTranslation + delta).coerceIn(-maxDrag, maxDrag)
+                    view.translationX = target
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val threshold = maxDrag * 0.62f
+                    when {
+                        maxDrag <= 0f -> view.animate().translationX(0f).setDuration(150).start()
+                        view.translationX >= threshold -> finishSlide(view, maxDrag) { dismissAlarm() }
+                        view.translationX <= -threshold -> finishSlide(view, -maxDrag) { snoozeAlarm() }
+                        else -> view.animate()
+                            .translationX(0f)
+                            .setInterpolator(OvershootInterpolator())
+                            .setDuration(220)
+                            .start()
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    /** Slides the handle the rest of the way to the edge, then runs [onArrived]. */
+    private fun finishSlide(view: View, target: Float, onArrived: () -> Unit) {
+        view.animate()
+            .translationX(target)
+            .setDuration(120)
+            .withEndAction { onArrived() }
+            .start()
+    }
+
+    private fun dp(value: Float): Float = value * resources.displayMetrics.density
 
     private fun dismissAlarm() {
         stopAlarm()
