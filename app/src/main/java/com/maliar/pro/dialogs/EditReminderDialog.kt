@@ -1,7 +1,6 @@
 package com.maliar.pro.dialogs
 
 import android.app.AlertDialog
-import android.app.TimePickerDialog
 import android.content.Context
 import android.view.LayoutInflater
 import android.widget.ArrayAdapter
@@ -145,10 +144,10 @@ class EditReminderDialog(
         }
 
         timeButton.setOnClickListener {
-            TimePickerDialog(context, R.style.Theme_MaliarPro_TimePickerDialog, { _, h, min ->
+            com.maliar.pro.ui.common.MaliarTimePickerDialog.show(context, hour, minute) { h, min ->
                 hour = h; minute = min
                 refreshTimeButtonText()
-            }, hour, minute, true).show()
+            }
         }
 
         AlertDialog.Builder(context)

@@ -17,6 +17,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_AUTO_PROVISIONING = "auto_provisioning"
         private const val KEY_NOTIFICATION_MODE = "notification_mode"
         private const val KEY_BACKGROUND_SERVICE_ENABLED = "background_service_enabled"
+        private const val KEY_LAST_BACKUP_URI = "last_backup_uri"
+        private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
     }
 
     fun saveAPIKeys(keys: List<APIKey>) {
@@ -72,4 +74,20 @@ class PreferencesManager(context: Context) {
     fun setBackgroundServiceEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BACKGROUND_SERVICE_ENABLED, enabled).apply()
     }
+
+    // --- Backup & restore ---
+
+    /** The last SAF location (device storage OR a provider like Google Drive) the person
+     *  backed up to - kept so automatic daily backups can reuse it without asking again. */
+    fun setLastBackupUri(uri: String?) {
+        prefs.edit().putString(KEY_LAST_BACKUP_URI, uri).apply()
+    }
+
+    fun getLastBackupUri(): String? = prefs.getString(KEY_LAST_BACKUP_URI, null)
+
+    fun setAutoBackupEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_BACKUP_ENABLED, enabled).apply()
+    }
+
+    fun isAutoBackupEnabled(): Boolean = prefs.getBoolean(KEY_AUTO_BACKUP_ENABLED, false)
 }
