@@ -11,7 +11,9 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Balance Card -->
+        <!-- Professional monthly dashboard: total balance + this month's income, expense,
+             uncashed checks and active installments in one place, instead of the old
+             single "تراز کل" number - so the whole month's picture is visible at a glance. -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -42,6 +44,125 @@
                     android:textColor="@android:color/white"
                     android:textSize="28sp"
                     android:textStyle="bold" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="12dp"
+                    android:background="#33FFFFFF" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="خلاصه این ماه"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="درآمد ماه"
+                            android:textColor="#DFFFFFFF"
+                            android:textSize="12sp" />
+                        <TextView
+                            android:id="@+id/monthlyIncomeAmount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0 تومان"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="هزینه ماه"
+                            android:textColor="#DFFFFFFF"
+                            android:textSize="12sp" />
+                        <TextView
+                            android:id="@+id/monthlyExpenseAmount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0 تومان"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="چک‌های وصول‌نشده"
+                            android:textColor="#DFFFFFFF"
+                            android:textSize="12sp" />
+                        <TextView
+                            android:id="@+id/monthlyChecksSummary"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0 چک · 0 تومان"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="اقساط فعال"
+                            android:textColor="#DFFFFFFF"
+                            android:textSize="12sp" />
+                        <TextView
+                            android:id="@+id/monthlyInstallmentsSummary"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0 قسط · 0 تومان"
+                            android:textColor="@android:color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                </LinearLayout>
 
             </LinearLayout>
 

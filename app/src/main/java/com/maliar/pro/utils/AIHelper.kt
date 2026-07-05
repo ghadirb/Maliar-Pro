@@ -32,6 +32,56 @@ object AIHelper {
     }
 
     /**
+     * Transcribes a short audio file (recorded for the voice-command notification feature)
+     * using GAPGPT's Whisper endpoint. Returns null if there's no active GAPGPT key or the
+     * request fails for any reason - callers must handle that as "couldn't understand".
+     */
+    suspend fun transcribeAudio(context: android.content.Context, audioFile: java.io.File): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val prefs = PreferencesManager(context)
+                val gapgptKey = prefs.getAPIKeys().firstOrNull {
+                    it.isActive && it.provider == com.maliar.pro.models.AIProvider.GAPGPT
+                } ?: return@withContext null
+
+                val boundary = "----MaliarProBoundary${System.currentTimeMillis()}"
+                val url = URL("https://api.gapgpt.app/v1/audio/transcriptions")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.doOutput = true
+                connection.connectTimeout = 20000
+                connection.readTimeout = 30000
+                connection.setRequestProperty("Authorization", "Bearer ${gapgptKey.key}")
+                connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+
+                connection.outputStream.use { out ->
+                    fun writeField(name: String, value: String) {
+                        out.write("--$boundary\r\n".toByteArray())
+                        out.write("Content-Disposition: form-data; name=\"$name\"\r\n\r\n".toByteArray())
+                        out.write("$value\r\n".toByteArray())
+                    }
+                    writeField("model", "whisper-1")
+                    out.write("--$boundary\r\n".toByteArray())
+                    out.write(
+                        "Content-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\n".toByteArray()
+                    )
+                    out.write("Content-Type: audio/mp4\r\n\r\n".toByteArray())
+                    audioFile.inputStream().use { it.copyTo(out) }
+                    out.write("\r\n--$boundary--\r\n".toByteArray())
+                }
+
+                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    JSONObject(response).optString("text").trim().takeIf { it.isNotBlank() }
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+    /**
      * Sends a short prompt to whichever active AI key is available and returns the
      * generated text, or null if there is no active key or the call fails for any reason.
      * Callers should always have a non-AI fallback ready.

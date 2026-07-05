@@ -77,6 +77,9 @@ class AccountingFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        // Card totals: all-time totals, reactive to Room - updates immediately regardless
+        // of whether the write came from this screen's own dialogs or from somewhere else
+        // entirely (e.g. the assistant tab actually saving an income/expense).
         lifecycleScope.launch {
             viewModel.totalIncome.collect { income ->
                 binding.incomeAmount.text = formatCurrency(income)
@@ -93,23 +96,49 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
+            viewModel.checkList.collect { list ->
+                binding.checksCount.text = "${list.size} چک"
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.installmentList.collect { list ->
+                binding.installmentsCount.text = "${list.size} قسط"
+            }
+        }
+
+        // Professional monthly dashboard header
+        lifecycleScope.launch {
             viewModel.monthlyIncome.collect { income ->
-                binding.incomeAmount.text = "${formatCurrency(income)} (این ماه)"
+                binding.monthlyIncomeAmount.text = formatCurrency(income)
             }
         }
         lifecycleScope.launch {
             viewModel.monthlyExpense.collect { expense ->
-                binding.expenseAmount.text = "${formatCurrency(expense)} (این ماه)"
+                binding.monthlyExpenseAmount.text = formatCurrency(expense)
             }
         }
         lifecycleScope.launch {
             viewModel.uncashedChecksCount.collect { count ->
-                binding.checksCount.text = "$count چک"
+                val total = viewModel.uncashedChecksTotal.value
+                binding.monthlyChecksSummary.text = "$count چک · ${formatCurrency(total)}"
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.uncashedChecksTotal.collect { total ->
+                val count = viewModel.uncashedChecksCount.value
+                binding.monthlyChecksSummary.text = "$count چک · ${formatCurrency(total)}"
             }
         }
         lifecycleScope.launch {
             viewModel.activeInstallmentsCount.collect { count ->
-                binding.installmentsCount.text = "$count قسط"
+                val total = viewModel.activeInstallmentsMonthlyTotal.value
+                binding.monthlyInstallmentsSummary.text = "$count قسط · ${formatCurrency(total)}"
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.activeInstallmentsMonthlyTotal.collect { total ->
+                val count = viewModel.activeInstallmentsCount.value
+                binding.monthlyInstallmentsSummary.text = "$count قسط · ${formatCurrency(total)}"
             }
         }
     }

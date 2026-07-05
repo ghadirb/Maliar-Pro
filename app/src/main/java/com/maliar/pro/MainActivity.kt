@@ -45,7 +45,10 @@ class MainActivity : AppCompatActivity() {
     private fun requestAssistantActionPermissions() {
         val needed = listOf(
             android.Manifest.permission.CALL_PHONE,
-            android.Manifest.permission.READ_CONTACTS
+            android.Manifest.permission.READ_CONTACTS,
+            // Needed for the assistant's voice-command notification and for smart
+            // reminders' spoken "انجام شد" voice-response detection.
+            android.Manifest.permission.RECORD_AUDIO
         ).filter {
             ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
         }

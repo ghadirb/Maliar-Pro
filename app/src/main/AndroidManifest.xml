@@ -50,6 +50,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Records a short voice command (e.g. "به علی زنگ بزن"), transcribes it, and
+             after a plain confirmation dialog places a real call to the matched contact.
+             Launched from the persistent background notification's action button. -->
+        <activity
+            android:name=".ui.assistant.VoiceCommandActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MaliarPro" />
+
         <!-- Full Screen Alarm Activity -->
         <activity
             android:name=".ui.reminders.FullScreenAlarmActivity"

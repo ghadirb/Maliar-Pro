@@ -6,10 +6,14 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.NotificationCompat
 import com.maliar.pro.MaliarProApplication
 import com.maliar.pro.R
@@ -29,15 +33,21 @@ import java.util.Locale
  * The spoken phrase repeats every REPEAT_INTERVAL_MS until the person taps "انجام شد"
  * (done) - on the notification itself or inside the full-screen screen - up to a
  * MAX_REPEATS safety cap so a forgotten reminder doesn't loop forever.
+ *
+ * After each spoken phrase, it also briefly listens (voice recognition) for a natural
+ * spoken response like "انجام شد", "خوردم" or "بیدار شدم" - so the person can dismiss the
+ * reminder just by answering it out loud, without touching the phone at all.
  */
 class SmartReminderTtsService : Service() {
 
     private var tts: TextToSpeech? = null
+    private var speechRecognizer: SpeechRecognizer? = null
     private val handler = Handler(Looper.getMainLooper())
     private var repeatCount = 0
     private var speakJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
     private var currentReminderId: Long = -1
+    private var currentTitle: String = ""
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -62,6 +72,7 @@ class SmartReminderTtsService : Service() {
             stopSpeakingLoop()
         }
         currentReminderId = reminderId
+        currentTitle = title
         repeatCount = 0
 
         startForeground(NOTIFICATION_ID_BASE + reminderId.toInt(), buildNotification(reminderId, title))
@@ -93,7 +104,23 @@ class SmartReminderTtsService : Service() {
                     tts?.setLanguage(Locale.US)
                 }
                 tts?.setSpeechRate(0.95f)
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onError(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) {
+                        // TTS callbacks fire on a non-main thread; SpeechRecognizer needs
+                        // the main looper.
+                        handler.post {
+                            if (currentReminderId != -1L) listenForVoiceResponse(text)
+                        }
+                    }
+                })
                 speakOnce(text)
+            } else {
+                // No TTS engine/voice available on this device - the notification (with
+                // its "انجام شد" button) is still showing, so the reminder isn't silently
+                // lost, it just can't be spoken aloud.
+                stopSelfIfMaxRepeats()
             }
         }
     }
@@ -105,10 +132,94 @@ class SmartReminderTtsService : Service() {
             return
         }
         repeatCount++
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "smart_reminder_$currentReminderId")
+        val params = Bundle()
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "smart_reminder_$currentReminderId")
+    }
+
+    /**
+     * Listens briefly for a natural spoken response ("انجام شد", "خوردم", "بیدار شدم", ...).
+     * If nothing recognizable comes back within the timeout, falls back to the normal
+     * repeat-after-a-pause behavior so the reminder still repeats reliably even on
+     * devices/situations where voice recognition isn't available (no mic access, no
+     * internet for on-device recognizer, etc.).
+     */
+    private fun listenForVoiceResponse(spokenText: String) {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            scheduleNextRepeat(spokenText)
+            return
+        }
+        try {
+            speechRecognizer?.destroy()
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+                setRecognitionListener(object : android.speech.RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {}
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {}
+                    override fun onError(error: Int) {
+                        scheduleNextRepeat(spokenText)
+                    }
+                    override fun onResults(results: Bundle?) {
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        if (matches != null && matches.any { isDoneResponse(it) }) {
+                            handleVoiceConfirmed()
+                        } else {
+                            scheduleNextRepeat(spokenText)
+                        }
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+            }
+            val recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1200)
+            }
+            speechRecognizer?.startListening(recognizerIntent)
+            // Safety timeout in case the recognizer never calls back at all on some OEMs.
+            handler.postDelayed({
+                if (currentReminderId != -1L) scheduleNextRepeat(spokenText)
+            }, LISTEN_TIMEOUT_MS)
+        } catch (e: Exception) {
+            scheduleNextRepeat(spokenText)
+        }
+    }
+
+    private fun isDoneResponse(text: String): Boolean {
+        val normalized = text.trim()
+        return DONE_PHRASES.any { normalized.contains(it) }
+    }
+
+    private fun handleVoiceConfirmed() {
+        handler.removeCallbacksAndMessages(null)
+        val reminderId = currentReminderId
+        if (reminderId > 0) {
+            // Route through the same broadcast the "انجام شد" notification button uses,
+            // so completion logic stays in exactly one place.
+            val intent = Intent(this, ReminderActionReceiver::class.java).apply {
+                putExtra("reminder_id", reminderId)
+                putExtra("action", "complete")
+            }
+            sendBroadcast(intent)
+        }
+        stopSelfCompletely()
+    }
+
+    private fun scheduleNextRepeat(previousText: String) {
+        if (repeatCount >= MAX_REPEATS) {
+            stopSelfCompletely()
+            return
+        }
         handler.postDelayed({
-            if (currentReminderId != -1L) speakOnce(text)
+            if (currentReminderId != -1L) speakOnce(previousText)
         }, REPEAT_INTERVAL_MS)
+    }
+
+    private fun stopSelfIfMaxRepeats() {
+        if (repeatCount >= MAX_REPEATS) stopSelfCompletely()
     }
 
     private fun buildNotification(reminderId: Long, title: String): Notification {
@@ -135,7 +246,7 @@ class SmartReminderTtsService : Service() {
         return NotificationCompat.Builder(this, MaliarProApplication.REMINDER_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("🔔 $title")
-            .setContentText("در حال پخش صوتی یادآوری… برای توقف «انجام شد» را بزنید")
+            .setContentText("در حال پخش صوتی یادآوری… بگویید «انجام شد» یا دکمه را بزنید")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setOngoing(true)
@@ -149,6 +260,13 @@ class SmartReminderTtsService : Service() {
     private fun stopSpeakingLoop() {
         handler.removeCallbacksAndMessages(null)
         speakJob?.cancel()
+        try {
+            speechRecognizer?.stopListening()
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            // best-effort cleanup only
+        }
+        speechRecognizer = null
         try {
             tts?.stop()
             tts?.shutdown()
@@ -175,7 +293,15 @@ class SmartReminderTtsService : Service() {
     companion object {
         private const val NOTIFICATION_ID_BASE = 90000
         private const val REPEAT_INTERVAL_MS = 15000L
+        private const val LISTEN_TIMEOUT_MS = 6000L
         private const val MAX_REPEATS = 8
+
+        /** Natural Persian phrases that mean "I got it, stop reminding me". */
+        private val DONE_PHRASES = listOf(
+            "انجام شد", "انجام دادم", "انجامش دادم", "خوردم", "خوردمش",
+            "بیدار شدم", "بیدارم", "باشه", "قبول", "تمام", "شد دیگه",
+            "متوجه شدم", "فهمیدم", "اوکی", "او کی"
+        )
 
         @Volatile
         private var runningInstance: SmartReminderTtsService? = null

@@ -7,179 +7,132 @@ import com.maliar.pro.database.Check
 import com.maliar.pro.database.Expense
 import com.maliar.pro.database.Income
 import com.maliar.pro.database.Installment
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
+/**
+ * All numbers on this screen are now derived reactively from Room's Flow<List<...>>
+ * queries instead of one-shot suspend loads that only refreshed when *this* ViewModel's
+ * own add/update/delete functions were called.
+ *
+ * That one-shot pattern was the real reason the accounting dashboard looked like it
+ * "didn't register" things the assistant tab saved: AssistantViewModel writes directly
+ * through the same AccountingManager/Room database (a different ViewModel instance), so
+ * the row really was being inserted - but nothing ever told *this* screen's StateFlows to
+ * reload, so the header numbers stayed stale until the fragment was destroyed and
+ * recreated. Deriving every total from the live Flow means ANY writer (this screen, the
+ * assistant, a dialog, anything) shows up immediately, everywhere.
+ */
 class AccountingViewModel(private val accountingManager: AccountingManager) : ViewModel() {
 
-    private val _totalIncome = MutableStateFlow(0.0)
-    val totalIncome: StateFlow<Double> = _totalIncome.asStateFlow()
-
-    private val _totalExpense = MutableStateFlow(0.0)
-    val totalExpense: StateFlow<Double> = _totalExpense.asStateFlow()
-
-    private val _balance = MutableStateFlow(0.0)
-    val balance: StateFlow<Double> = _balance.asStateFlow()
-
-    private val _uncashedChecksCount = MutableStateFlow(0)
-    val uncashedChecksCount: StateFlow<Int> = _uncashedChecksCount.asStateFlow()
-
-    private val _activeInstallmentsCount = MutableStateFlow(0)
-    val activeInstallmentsCount: StateFlow<Int> = _activeInstallmentsCount.asStateFlow()
-
-    private val _monthlyIncome = MutableStateFlow(0.0)
-    val monthlyIncome: StateFlow<Double> = _monthlyIncome.asStateFlow()
-
-    private val _monthlyExpense = MutableStateFlow(0.0)
-    val monthlyExpense: StateFlow<Double> = _monthlyExpense.asStateFlow()
-
-    private val _incomeList = MutableStateFlow(emptyList<com.maliar.pro.database.Income>())
-    val incomeList: StateFlow<List<com.maliar.pro.database.Income>> = _incomeList.asStateFlow()
-
-    private val _expenseList = MutableStateFlow(emptyList<com.maliar.pro.database.Expense>())
-    val expenseList: StateFlow<List<com.maliar.pro.database.Expense>> = _expenseList.asStateFlow()
-
-    private val _checkList = MutableStateFlow(emptyList<com.maliar.pro.database.Check>())
-    val checkList: StateFlow<List<com.maliar.pro.database.Check>> = _checkList.asStateFlow()
-
-    private val _installmentList = MutableStateFlow(emptyList<com.maliar.pro.database.Installment>())
-    val installmentList: StateFlow<List<com.maliar.pro.database.Installment>> = _installmentList.asStateFlow()
-
-    init {
-        loadStats()
-        loadIncomeList()
-        loadExpenseList()
-        loadCheckList()
-        loadInstallmentList()
+    private fun isThisMonth(timestamp: Long): Boolean {
+        val startOfMonth = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return timestamp >= startOfMonth
     }
 
-    private fun loadIncomeList() {
-        viewModelScope.launch {
-            accountingManager.getAllIncomes().collect { _incomeList.value = it }
-        }
+    val incomeList: kotlinx.coroutines.flow.StateFlow<List<Income>> =
+        accountingManager.getAllIncomes().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val expenseList: kotlinx.coroutines.flow.StateFlow<List<Expense>> =
+        accountingManager.getAllExpenses().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val checkList: kotlinx.coroutines.flow.StateFlow<List<Check>> =
+        accountingManager.getAllChecks().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val installmentList: kotlinx.coroutines.flow.StateFlow<List<Installment>> =
+        accountingManager.getAllInstallments().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalIncome = incomeList.map { list -> list.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val totalExpense = expenseList.map { list -> list.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val balance = combine(totalIncome, totalExpense) { inc, exp -> inc - exp }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val monthlyIncome = incomeList.map { list -> list.filter { isThisMonth(it.date) }.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val monthlyExpense = expenseList.map { list -> list.filter { isThisMonth(it.date) }.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val monthlyBalance = combine(monthlyIncome, monthlyExpense) { inc, exp -> inc - exp }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val uncashedChecksTotal = checkList.map { list -> list.filter { !it.isCashed }.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val dueSoonChecksCount = checkList.map { list ->
+        val weekAhead = System.currentTimeMillis() + 7L * 24 * 60 * 60 * 1000
+        list.count { !it.isCashed && it.dueDate in 0..weekAhead }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val activeInstallmentsCount = installmentList.map { list -> list.count { it.paidInstallments < it.totalInstallments } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val activeInstallmentsMonthlyTotal = installmentList.map { list ->
+        list.filter { it.paidInstallments < it.totalInstallments }.sumOf { it.installmentAmount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    fun deleteIncome(income: Income) {
+        viewModelScope.launch { accountingManager.deleteIncome(income) }
     }
 
-    private fun loadExpenseList() {
-        viewModelScope.launch {
-            accountingManager.getAllExpenses().collect { _expenseList.value = it }
-        }
+    fun deleteExpense(expense: Expense) {
+        viewModelScope.launch { accountingManager.deleteExpense(expense) }
     }
 
-    private fun loadCheckList() {
-        viewModelScope.launch {
-            accountingManager.getAllChecks().collect { _checkList.value = it }
-        }
+    fun deleteCheck(check: Check) {
+        viewModelScope.launch { accountingManager.deleteCheck(check) }
     }
 
-    private fun loadInstallmentList() {
-        viewModelScope.launch {
-            accountingManager.getAllInstallments().collect { _installmentList.value = it }
-        }
+    fun deleteInstallment(installment: Installment) {
+        viewModelScope.launch { accountingManager.deleteInstallment(installment) }
     }
 
-    fun deleteIncome(income: com.maliar.pro.database.Income) {
-        viewModelScope.launch {
-            accountingManager.deleteIncome(income)
-            loadStats()
-        }
+    fun updateIncome(income: Income) {
+        viewModelScope.launch { accountingManager.updateIncome(income) }
     }
 
-    fun deleteExpense(expense: com.maliar.pro.database.Expense) {
-        viewModelScope.launch {
-            accountingManager.deleteExpense(expense)
-            loadStats()
-        }
+    fun updateExpense(expense: Expense) {
+        viewModelScope.launch { accountingManager.updateExpense(expense) }
     }
 
-    fun deleteCheck(check: com.maliar.pro.database.Check) {
-        viewModelScope.launch {
-            accountingManager.deleteCheck(check)
-            loadStats()
-        }
+    fun updateCheck(check: Check) {
+        viewModelScope.launch { accountingManager.updateCheck(check) }
     }
 
-    fun deleteInstallment(installment: com.maliar.pro.database.Installment) {
-        viewModelScope.launch {
-            accountingManager.deleteInstallment(installment)
-            loadStats()
-        }
-    }
-
-    fun updateIncome(income: com.maliar.pro.database.Income) {
-        viewModelScope.launch {
-            accountingManager.updateIncome(income)
-            loadStats()
-        }
-    }
-
-    fun updateExpense(expense: com.maliar.pro.database.Expense) {
-        viewModelScope.launch {
-            accountingManager.updateExpense(expense)
-            loadStats()
-        }
-    }
-
-    fun updateCheck(check: com.maliar.pro.database.Check) {
-        viewModelScope.launch {
-            accountingManager.updateCheck(check)
-            loadStats()
-        }
-    }
-
-    fun updateInstallment(installment: com.maliar.pro.database.Installment) {
-        viewModelScope.launch {
-            accountingManager.updateInstallment(installment)
-            loadStats()
-        }
-    }
-
-    fun loadStats() {
-        viewModelScope.launch {
-            val income = accountingManager.getTotalIncome()
-            val expense = accountingManager.getTotalExpense()
-            val bal = accountingManager.getBalance()
-            val checks = accountingManager.getUncashedChecks()
-            val installments = accountingManager.getActiveInstallments()
-            val monthlyInc = accountingManager.getMonthlyIncome()
-            val monthlyExp = accountingManager.getMonthlyExpense()
-
-            _totalIncome.value = income
-            _totalExpense.value = expense
-            _balance.value = bal
-            _uncashedChecksCount.value = checks.size
-            _activeInstallmentsCount.value = installments.size
-            _monthlyIncome.value = monthlyInc
-            _monthlyExpense.value = monthlyExp
-        }
+    fun updateInstallment(installment: Installment) {
+        viewModelScope.launch { accountingManager.updateInstallment(installment) }
     }
 
     fun addIncome(income: Income) {
-        viewModelScope.launch {
-            accountingManager.addIncome(income)
-            loadStats()
-        }
+        viewModelScope.launch { accountingManager.addIncome(income) }
     }
 
     fun addExpense(expense: Expense) {
-        viewModelScope.launch {
-            accountingManager.addExpense(expense)
-            loadStats()
-        }
+        viewModelScope.launch { accountingManager.addExpense(expense) }
     }
 
     fun addCheck(check: Check) {
-        viewModelScope.launch {
-            accountingManager.addCheck(check)
-            loadStats()
-        }
+        viewModelScope.launch { accountingManager.addCheck(check) }
     }
 
     fun addInstallment(installment: Installment) {
-        viewModelScope.launch {
-            accountingManager.addInstallment(installment)
-            loadStats()
-        }
+        viewModelScope.launch { accountingManager.addInstallment(installment) }
     }
 }
