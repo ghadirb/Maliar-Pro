@@ -23,6 +23,12 @@
          alive to keep smart reminders / assistant features responsive in the background. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <!-- Lets a smart-reminder alarm launch its full-screen activity immediately when it
+         fires, even if the app is in the background - the same mechanism real alarm-clock
+         and incoming-call apps use to bypass the background-activity-start restriction. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:name=".MaliarProApplication"
@@ -83,6 +89,13 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps smart reminders and the assistant responsive in the background" />
         </service>
+
+        <!-- Speaks a smart reminder aloud (TTS) the instant its alarm fires, and repeats
+             it until the person marks it done - see SmartReminderTtsService for details. -->
+        <service
+            android:name=".receivers.SmartReminderTtsService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
     </application>
 

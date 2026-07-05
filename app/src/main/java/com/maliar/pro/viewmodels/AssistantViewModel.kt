@@ -56,7 +56,9 @@ class AssistantViewModel(
             // online chat model has no way to call app functions - it was only ever
             // describing data already in the system prompt, never writing anything.
             val localActionResult = try {
-                tryExecuteAccountingCommand(message) ?: tryExecuteReminderCommand(message)
+                tryExecuteAccountingCommand(message)
+                    ?: tryExecuteReminderCommand(message)
+                    ?: tryExecuteFinancialStatusCommand(message)
             } catch (e: Exception) {
                 null
             }
@@ -152,6 +154,52 @@ class AssistantViewModel(
             accountingManager.addExpense(Expense(amount = amount, description = description, date = Date().time))
             val newBalance = accountingManager.getBalance()
             "✅ مبلغ $formattedAmount تومان به‌عنوان هزینه در حسابداری ثبت شد.\n💰 موجودی جدید: ${String.format("%,.0f", newBalance)} تومان"
+        }
+    }
+
+    /**
+     * Detects a "وضعیت مالی" (Financial Status tab) command - adding an asset, a debt, or a
+     * financial goal - and actually writes it via FinancialStatusManager. Without this, a
+     * request like "یک دارایی ۵۰ میلیونی ثبت کن" had no matching handler at all and silently
+     * fell through to the online chat model, which would just *say* "ثبت شد" in its reply
+     * without anything real being saved - exactly the "writes a reply but nothing shows up
+     * in the other tab" symptom.
+     */
+    private suspend fun tryExecuteFinancialStatusCommand(message: String): String? {
+        val amount = parsePersianAmount(message) ?: return null
+        if (amount <= 0) return null
+
+        val assetKeywords = listOf("دارایی")
+        val debtKeywords = listOf("بدهی", "بدهکارم", "بدهکار شدم", "بدهکار هستم")
+        val goalKeywords = listOf("هدف مالی", "هدف پس‌انداز", "هدف پس انداز", "هدف")
+
+        val isAsset = assetKeywords.any { message.contains(it) }
+        val isDebt = debtKeywords.any { message.contains(it) }
+        val isGoal = goalKeywords.any { message.contains(it) }
+
+        // Ambiguous or no match at all - don't guess, let it fall through.
+        val matchCount = listOf(isAsset, isDebt, isGoal).count { it }
+        if (matchCount != 1) return null
+
+        val title = message.trim()
+        val formattedAmount = String.format("%,.0f", amount)
+
+        return when {
+            isAsset -> {
+                financialManager.addAsset(title, amount)
+                val total = financialManager.getTotalAssets()
+                "✅ دارایی به مبلغ $formattedAmount تومان در «وضعیت مالی» ثبت شد.\n📊 کل دارایی‌ها اکنون: ${String.format("%,.0f", total)} تومان"
+            }
+            isDebt -> {
+                financialManager.addDebt(title, amount)
+                val total = financialManager.getTotalUnpaidDebts()
+                "✅ بدهی به مبلغ $formattedAmount تومان در «وضعیت مالی» ثبت شد.\n📊 کل بدهی‌های پرداخت‌نشده اکنون: ${String.format("%,.0f", total)} تومان"
+            }
+            isGoal -> {
+                financialManager.addFinancialGoal(title, amount)
+                "✅ هدف مالی «$title» با مبلغ هدف $formattedAmount تومان در «وضعیت مالی» ثبت شد."
+            }
+            else -> null
         }
     }
 
@@ -254,12 +302,20 @@ class AssistantViewModel(
             }
         }
 
+        // If the person explicitly asked for a "smart" reminder, schedule it as one so it
+        // gets the spoken TTS treatment instead of a plain notification.
+        val requestedAlertType = if (message.contains("هوشمند")) {
+            com.maliar.pro.database.AlertType.SMART.name
+        } else {
+            com.maliar.pro.database.AlertType.NOTIFICATION.name
+        }
+
         val reminder = com.maliar.pro.database.ReminderEntity(
             title = title,
             description = "",
             reminderType = com.maliar.pro.database.ReminderType.SIMPLE.name,
             priority = com.maliar.pro.database.Priority.MEDIUM.name,
-            alertType = com.maliar.pro.database.AlertType.NOTIFICATION.name,
+            alertType = requestedAlertType,
             triggerTime = cal.timeInMillis,
             repeatPattern = com.maliar.pro.database.RepeatPattern.ONCE.name,
             category = "دستیار",

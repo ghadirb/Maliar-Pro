@@ -28,6 +28,13 @@ class ReminderActionReceiver : BroadcastReceiver() {
             return
         }
 
+        // Any real action taken on a smart reminder (done/snooze/dismiss) means the person
+        // has responded - stop the repeating TTS voice immediately regardless of which
+        // action they picked.
+        if (action == "complete" || action == "snooze" || action == "dismiss") {
+            SmartReminderTtsService.stop(reminderId)
+        }
+
         val manager = SmartReminderManager(context)
 
         CoroutineScope(Dispatchers.IO).launch {
