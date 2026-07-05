@@ -52,16 +52,10 @@
                         android:text="بدون نوتیفیکیشن" />
 
                     <RadioButton
-                        android:id="@+id/simpleNotification"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ساده (فقط نمایش)" />
-
-                    <RadioButton
                         android:id="@+id/actionNotification"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="با اکشن (دکمه انجام/تعویق)" />
+                        android:text="با نوتیفیکیشن (دکمه‌های انجام شد / تعویق / تماس)" />
 
                 </RadioGroup>
 

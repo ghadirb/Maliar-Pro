@@ -22,10 +22,12 @@ import com.maliar.pro.utils.PreferencesManager
  * 1. alertType decides *what kind of alarm this is* (a plain reminder, a full-screen
  *    alarm, or a "smart" spoken reminder) - this is chosen per-reminder and is NOT
  *    affected by the global notification-mode setting.
- * 2. notificationMode (none / simple / action, from Settings) decides *how the plain
- *    notification for a NOTIFICATION-type reminder looks* - whether it shows at all,
- *    and whether it has action buttons. It no longer gets silently overridden for any
- *    alertType, so switching the setting always has a visible, real effect.
+ * 2. notificationMode (none / action, from Settings) decides *whether the plain
+ *    notification for a NOTIFICATION-type reminder shows at all* - "بدون نوتیفیکیشن"
+ *    suppresses it completely, "با نوتیفیکیشن" always shows the full notification with
+ *    its action buttons (انجام شد / تعویق / تماس). There's no middle "buttonless" option
+ *    anymore - if it shows, it's actionable. It no longer gets silently overridden for
+ *    any alertType, so switching the setting always has a visible, real effect.
  */
 class ReminderReceiver : BroadcastReceiver() {
 
@@ -48,12 +50,11 @@ class ReminderReceiver : BroadcastReceiver() {
             }
             else -> {
                 val prefs = PreferencesManager(context)
-                val notificationMode = prefs.getNotificationMode()
-                if (notificationMode == "none") {
+                if (prefs.getNotificationMode() == "none") {
                     // The whole point of this mode: no notification UI at all.
                     return
                 }
-                showPlainNotification(context, title, description, reminderId, notificationMode, contactName, contactPhone)
+                showPlainNotification(context, title, description, reminderId, contactName, contactPhone)
             }
         }
     }
@@ -105,7 +106,6 @@ class ReminderReceiver : BroadcastReceiver() {
         title: String,
         message: String,
         reminderId: Long,
-        notificationMode: String,
         contactName: String,
         contactPhone: String
     ) {
@@ -135,46 +135,43 @@ class ReminderReceiver : BroadcastReceiver() {
             .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
 
-        // "با اکشن" (action) mode: real buttons, not just a tap-to-open notification.
-        if (notificationMode == "action") {
-            val completeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-                putExtra("reminder_id", reminderId)
-                putExtra("action", "complete")
-            }
-            val completePendingIntent = PendingIntent.getBroadcast(
-                context, reminderId.toInt() + 1000, completeIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            builder.addAction(R.drawable.ic_check, "✅ انجام شد", completePendingIntent)
-
-            val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-                putExtra("reminder_id", reminderId)
-                putExtra("action", "snooze")
-            }
-            val snoozePendingIntent = PendingIntent.getBroadcast(
-                context, reminderId.toInt() + 2000, snoozeIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            builder.addAction(R.drawable.ic_snooze, "⏰ ۱۰ دقیقه بعد", snoozePendingIntent)
-
-            // The whole point of "با اکشن" mode is running a real command from the
-            // notification - if a contact was attached to this reminder, offer a direct
-            // one-tap call button that dials that exact contact.
-            if (contactPhone.isNotBlank()) {
-                val callIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-                    putExtra("reminder_id", reminderId)
-                    putExtra("action", "call")
-                    putExtra("phone_number", contactPhone)
-                }
-                val callPendingIntent = PendingIntent.getBroadcast(
-                    context, reminderId.toInt() + 3000, callIntent,
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                )
-                val label = if (contactName.isNotBlank()) "📞 تماس با $contactName" else "📞 تماس"
-                builder.addAction(R.drawable.ic_notification, label, callPendingIntent)
-            }
+        // Reaching this function at all already means notificationMode != "none", so the
+        // "با نوتیفیکیشن" mode always gets real, actionable buttons - not just a tap target.
+        val completeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            putExtra("reminder_id", reminderId)
+            putExtra("action", "complete")
         }
-        // "ساده" (simple) mode: just the title/text above, tap to open - no buttons at all.
+        val completePendingIntent = PendingIntent.getBroadcast(
+            context, reminderId.toInt() + 1000, completeIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        builder.addAction(R.drawable.ic_check, "✅ انجام شد", completePendingIntent)
+
+        val snoozeIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            putExtra("reminder_id", reminderId)
+            putExtra("action", "snooze")
+        }
+        val snoozePendingIntent = PendingIntent.getBroadcast(
+            context, reminderId.toInt() + 2000, snoozeIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        builder.addAction(R.drawable.ic_snooze, "⏰ ۱۰ دقیقه بعد", snoozePendingIntent)
+
+        // If a contact was attached to this reminder, offer a direct one-tap call button
+        // that dials that exact contact.
+        if (contactPhone.isNotBlank()) {
+            val callIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+                putExtra("reminder_id", reminderId)
+                putExtra("action", "call")
+                putExtra("phone_number", contactPhone)
+            }
+            val callPendingIntent = PendingIntent.getBroadcast(
+                context, reminderId.toInt() + 3000, callIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val label = if (contactName.isNotBlank()) "📞 تماس با $contactName" else "📞 تماس"
+            builder.addAction(R.drawable.ic_notification, label, callPendingIntent)
+        }
 
         notificationManager.notify(reminderId.toInt(), builder.build())
     }

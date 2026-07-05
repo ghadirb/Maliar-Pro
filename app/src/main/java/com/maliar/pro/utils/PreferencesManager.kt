@@ -50,6 +50,10 @@ class PreferencesManager(context: Context) {
     }
 
     fun getNotificationMode(): String {
-        return prefs.getString(KEY_NOTIFICATION_MODE, "simple") ?: "simple"
+        // Only "none" and "action" exist now (the old middle "simple" option was removed
+        // from Settings) - default to notifications on for anyone without a saved value yet,
+        // and anyone with "simple" saved from before also lands on the real notification.
+        val stored = prefs.getString(KEY_NOTIFICATION_MODE, "action") ?: "action"
+        return if (stored == "none") "none" else "action"
     }
 }

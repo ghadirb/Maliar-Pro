@@ -104,6 +104,40 @@ class SmartReminderTtsService : Service() {
                     tts?.setLanguage(Locale.US)
                 }
                 tts?.setSpeechRate(0.95f)
+                // CRITICAL: without this, TTS plays on the default (media/notification)
+                // stream, which is silent on most phones whenever ringer volume is turned
+                // down or the device is on vibrate/silent - exactly why the notification
+                // and its "beep" (from the voice-response listener starting up) were
+                // audible but the actual spoken sentence never was. USAGE_ALARM plays on
+                // the alarm volume, the same one real alarm clocks use, which most people
+                // keep up and which bypasses silent/vibrate mode.
+                val attributes = android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                tts?.setAudioAttributes(attributes)
+
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                audioManager.requestAudioFocus(
+                    null,
+                    android.media.AudioManager.STREAM_ALARM,
+                    android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                )
+                // If the person has the alarm stream muted/very low, force it up enough to
+                // actually be heard - a reminder that plays at inaudible volume is
+                // functionally the same as one that never played at all.
+                val maxAlarmVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
+                val currentAlarmVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+                if (currentAlarmVolume < maxAlarmVolume / 2) {
+                    try {
+                        audioManager.setStreamVolume(
+                            android.media.AudioManager.STREAM_ALARM,
+                            maxAlarmVolume * 2 / 3,
+                            0
+                        )
+                    } catch (e: Exception) { /* some OEMs restrict this; best effort only */ }
+                }
+
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onError(utteranceId: String?) {}

@@ -60,6 +60,13 @@ class AssistantViewModel(
                     ?: tryExecuteReminderCommand(message)
                     ?: tryExecuteFinancialStatusCommand(message)
             } catch (e: Exception) {
+                // Swallowing this silently used to mean any real bug here (a DB error, a
+                // threading issue, anything) looked identical to "not a command" - the
+                // message would fall through to the online chat model, which would then
+                // describe success in a reply while nothing was actually written anywhere.
+                // Logging it doesn't change the fallback behavior, but makes that failure
+                // mode visible in logcat instead of invisible.
+                android.util.Log.e("AssistantVM", "Local command execution failed for: $message", e)
                 null
             }
 
@@ -115,13 +122,57 @@ class AssistantViewModel(
     private fun parsePersianAmount(text: String): Double? {
         val normalized = normalizeDigits(text)
         val regex = Regex("([0-9][0-9,.]*)\\s*(میلیون|هزار)?")
-        val match = regex.findAll(normalized).firstOrNull { it.groupValues[1].isNotBlank() } ?: return null
-        var amount = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: return null
-        when (match.groupValues[2]) {
-            "هزار" -> amount *= 1000
-            "میلیون" -> amount *= 1_000_000
+        val match = regex.findAll(normalized).firstOrNull { it.groupValues[1].isNotBlank() }
+        if (match != null) {
+            val digitAmount = match.groupValues[1].replace(",", "").toDoubleOrNull()
+            if (digitAmount != null) {
+                return when (match.groupValues[2]) {
+                    "هزار" -> digitAmount * 1000
+                    "میلیون" -> digitAmount * 1_000_000
+                    else -> digitAmount
+                }
+            }
         }
-        return amount
+        // No digits in the message at all - a dictated voice command very often comes
+        // through with the amount spoken as words ("پنجاه هزار تومان") rather than digits,
+        // and that used to mean the amount silently failed to parse, the local accounting
+        // handler returned null, and the online chat model took over and just *claimed*
+        // the amount was recorded without anything real being saved.
+        return parsePersianWordAmount(text)
+    }
+
+    /**
+     * Parses a Persian number spelled out in words, e.g. "پنجاه هزار", "دویست و ده هزار",
+     * "دو میلیون و پانصد هزار", "نیم میلیون". Stops at the first word that isn't part of a
+     * number so it doesn't accidentally pick up unrelated numbers later in the sentence.
+     */
+    private fun parsePersianWordAmount(text: String): Double? {
+        val tokens = text.replace("،", " ").split(Regex("\\s+")).filter { it.isNotBlank() }
+        var total = 0.0
+        var current = 0.0
+        var matchedAny = false
+        for (token in tokens) {
+            when {
+                token == "و" -> continue
+                token == "نیم" -> {
+                    current = 0.5
+                    matchedAny = true
+                }
+                PERSIAN_NUMBER_WORDS.containsKey(token) -> {
+                    current += PERSIAN_NUMBER_WORDS.getValue(token)
+                    matchedAny = true
+                }
+                PERSIAN_NUMBER_MULTIPLIERS.containsKey(token) -> {
+                    val multiplier = PERSIAN_NUMBER_MULTIPLIERS.getValue(token)
+                    total += (if (current == 0.0) 1.0 else current) * multiplier
+                    current = 0.0
+                    matchedAny = true
+                }
+                matchedAny -> break
+            }
+        }
+        total += current
+        return if (matchedAny && total > 0) total else null
     }
 
     /**
@@ -131,17 +182,29 @@ class AssistantViewModel(
      * caller can fall through to normal AI chat / queries.
      */
     private suspend fun tryExecuteAccountingCommand(message: String): String? {
-        val amount = parsePersianAmount(message) ?: return null
-        if (amount <= 0) return null
-
         val incomeKeywords = listOf("درآمد", "حقوق", "دریافت کردم", "دریافتی", "واریز شد", "واریز کردم", "فروش")
         val expenseKeywords = listOf("هزینه", "خرج کردم", "خرج شد", "پرداخت کردم", "خریدم", "خرید کردم", "پرداختی")
 
         val isIncome = incomeKeywords.any { message.contains(it) }
         val isExpense = expenseKeywords.any { message.contains(it) }
 
-        // Ambiguous (matches both, or neither) - don't guess, let it fall through
+        // Ambiguous (matches both, or neither) - this doesn't look like a single, clear
+        // accounting command, so let it fall through to normal AI chat / queries.
         if (isIncome == isExpense) return null
+
+        val amount = parsePersianAmount(message)
+        if (amount == null || amount <= 0) {
+            // We're confident this IS an accounting command (a clear income/expense
+            // keyword matched) but couldn't read a numeric amount from it. Stopping here
+            // with an explicit ask - instead of returning null and letting the online chat
+            // model take over - is what prevents the "دستیار گفت ثبت شد ولی در حسابداری
+            // چیزی ثبت نشده بود" symptom: the chat model has no way to actually write to
+            // the database, so if it answers at all here it can only ever be describing a
+            // record that was never really saved.
+            val kind = if (isIncome) "درآمد" else "هزینه"
+            return "⚠️ متوجه شدم می‌خواهید یک $kind ثبت کنید، اما مبلغ آن را متوجه نشدم.\n" +
+                "لطفاً مبلغ را واضح‌تر بگویید، مثلاً «۵۰ هزار تومان $kind» یا «پانصد هزار تومان $kind»."
+        }
 
         val description = message.trim()
         val formattedAmount = String.format("%,.0f", amount)
@@ -594,4 +657,22 @@ class AssistantViewModel(
         }
     }
 
+    companion object {
+        /** Persian number words used by [parsePersianWordAmount] for dictated amounts. */
+        private val PERSIAN_NUMBER_WORDS: Map<String, Double> = mapOf(
+            "صفر" to 0.0, "یک" to 1.0, "دو" to 2.0, "سه" to 3.0, "چهار" to 4.0,
+            "پنج" to 5.0, "شش" to 6.0, "هفت" to 7.0, "هشت" to 8.0, "نه" to 9.0,
+            "ده" to 10.0, "یازده" to 11.0, "دوازده" to 12.0, "سیزده" to 13.0,
+            "چهارده" to 14.0, "پانزده" to 15.0, "شانزده" to 16.0, "هفده" to 17.0,
+            "هجده" to 18.0, "نوزده" to 19.0,
+            "بیست" to 20.0, "سی" to 30.0, "چهل" to 40.0, "پنجاه" to 50.0,
+            "شصت" to 60.0, "هفتاد" to 70.0, "هشتاد" to 80.0, "نود" to 90.0,
+            "صد" to 100.0, "یکصد" to 100.0, "دویست" to 200.0, "سیصد" to 300.0,
+            "چهارصد" to 400.0, "پانصد" to 500.0, "ششصد" to 600.0, "هفتصد" to 700.0,
+            "هشتصد" to 800.0, "نهصد" to 900.0
+        )
+        private val PERSIAN_NUMBER_MULTIPLIERS: Map<String, Double> = mapOf(
+            "هزار" to 1_000.0, "میلیون" to 1_000_000.0, "میلیارد" to 1_000_000_000.0
+        )
+    }
 }
