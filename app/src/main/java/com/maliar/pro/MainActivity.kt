@@ -15,8 +15,12 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.maliar.pro.databinding.ActivityMainBinding
+import com.maliar.pro.utils.AnnouncementManager
 import com.maliar.pro.utils.KeyManager
+import com.maliar.pro.utils.PreferencesManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -150,6 +154,35 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 .setNegativeButton("بعداً", null)
+                .show()
+        }
+        showRemoteAnnouncementIfAny()
+    }
+
+    /**
+     * Shown last, after the permission dialogs, so it never fights with them for the
+     * screen. Reads a small JSON file from a URL you control (see AnnouncementManager) -
+     * whatever "id" is in that file decides whether this has already been dismissed, so
+     * changing the id later (a new announcement) shows it again to everyone, including
+     * people who dismissed an older one. Any network failure here is silent - this is
+     * purely informational and must never get in the way of using the app.
+     */
+    private fun showRemoteAnnouncementIfAny() {
+        lifecycleScope.launch {
+            val announcement = withContext(Dispatchers.IO) { AnnouncementManager.fetch() } ?: return@launch
+            if (!announcement.enabled) return@launch
+
+            val prefs = PreferencesManager(this@MainActivity)
+            if (announcement.id == prefs.getLastSeenAnnouncementId()) return@launch
+            if (isFinishing || isDestroyed) return@launch
+
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle(announcement.title)
+                .setMessage(announcement.message)
+                .setCancelable(true)
+                .setPositiveButton(announcement.buttonText ?: "متوجه شدم") { _, _ ->
+                    prefs.setLastSeenAnnouncementId(announcement.id)
+                }
                 .show()
         }
     }
