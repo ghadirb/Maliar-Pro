@@ -4,9 +4,9 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,8 +27,18 @@ import java.util.Locale
  */
 object SubscriptionManager {
 
-    // TODO: replace with your real deployed backend URL, e.g. "https://maliar-billing.liara.run"
-    const val BACKEND_BASE_URL = "https://CHANGE-ME.liara.run"
+    // TODO: replace these with your real deployed backend URLs. Both work exactly the
+    // same way (a plain GET returning JSON), whether the backend is:
+    //  - a Node.js server (e.g. the one in /server, deployed to Liara), where these are
+    //    two separate paths on the same host, e.g.:
+    //      "https://maliar-billing.liara.run/subscription/status"
+    //      "https://maliar-billing.liara.run/payment/request"
+    //  - a Google Apps Script Web App (see /server/apps-script), where both point at the
+    //    SAME exec URL but with a different "path" query param already baked in, e.g.:
+    //      "https://script.google.com/macros/s/XXXXX/exec?path=status"
+    //      "https://script.google.com/macros/s/XXXXX/exec?path=request"
+    const val STATUS_URL = "https://CHANGE-ME/subscription/status"
+    const val REQUEST_URL = "https://CHANGE-ME/payment/request"
 
     const val FREE_DAILY_AI_LIMIT = 15
 
@@ -87,6 +97,14 @@ object SubscriptionManager {
             "• یا با ارتقا به اشتراک پریمیوم، محدودیت روزانه را کاملاً بردارید"
     }
 
+    /** Appends a query parameter to a URL, using "?" if it has none yet or "&" if it
+     *  already does (needed because Apps Script URLs already contain "?path=..."). */
+    private fun appendParam(url: String, key: String, value: String): String {
+        val separator = if (url.contains("?")) "&" else "?"
+        val encoded = URLEncoder.encode(value, "UTF-8")
+        return "$url$separator$key=$encoded"
+    }
+
     /**
      * Asks the backend for this device's current subscription status and updates the
      * local cache. Safe to call often (e.g. app open, subscription screen open) - if the
@@ -96,7 +114,7 @@ object SubscriptionManager {
     suspend fun refreshFromServer(context: Context): Boolean = withContext(Dispatchers.IO) {
         try {
             val deviceId = PreferencesManager(context).getOrCreateDeviceId()
-            val url = URL("$BACKEND_BASE_URL/subscription/status?deviceId=$deviceId")
+            val url = URL(appendParam(STATUS_URL, "deviceId", deviceId))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 12000
@@ -128,19 +146,13 @@ object SubscriptionManager {
     suspend fun requestPayment(context: Context, plan: Plan): String? = withContext(Dispatchers.IO) {
         try {
             val deviceId = PreferencesManager(context).getOrCreateDeviceId()
-            val url = URL("$BACKEND_BASE_URL/payment/request")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
+            var url = appendParam(REQUEST_URL, "deviceId", deviceId)
+            url = appendParam(url, "plan", plan.apiValue)
+
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
-
-            val body = JSONObject().apply {
-                put("deviceId", deviceId)
-                put("plan", plan.apiValue)
-            }
-            OutputStreamWriter(connection.outputStream).use { it.write(body.toString()) }
 
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }

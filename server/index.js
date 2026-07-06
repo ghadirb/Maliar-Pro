@@ -79,9 +79,9 @@ app.get('/subscription/status', (req, res) => {
   res.json({ isPremium: premiumUntil > Date.now(), premiumUntil });
 });
 
-app.post('/payment/request', async (req, res) => {
+app.get('/payment/request', async (req, res) => {
   try {
-    const { deviceId, plan } = req.body || {};
+    const { deviceId, plan } = req.query || {};
     const planConfig = PLANS[plan];
     if (!deviceId || !planConfig) {
       return res.status(400).json({ error: 'deviceId and a valid plan are required' });
