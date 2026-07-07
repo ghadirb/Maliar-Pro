@@ -121,7 +121,8 @@ object AutoProvisioningManager {
 
             // 4) Save and activate in Preferences
             val prefsManager = PreferencesManager(context)
-            prefsManager.saveAPIKeys(processedKeys)
+            val personalKeys = prefsManager.getAPIKeys().filterNot { it.isAutoProvisioned }
+            prefsManager.saveAPIKeys(personalKeys + processedKeys)
             Log.d(TAG, "✅ ${processedKeys.size} keys saved and activated in prefs")
 
             Result.success(processedKeys)

@@ -50,6 +50,7 @@ class APIKeysFragment : Fragment() {
         )
         binding.keysRecyclerView.adapter = adapter
 
+        binding.retryButton.visibility = View.GONE
         binding.retryButton.setOnClickListener { runAutoProvisioning() }
         binding.addKeyButton.setOnClickListener { showAddPersonalKeyDialog() }
 
@@ -62,7 +63,7 @@ class APIKeysFragment : Fragment() {
     }
 
     private fun refreshList() {
-        val keys = prefs.getAPIKeys()
+        val keys = prefs.getAPIKeys().filterNot { it.isAutoProvisioned }
         if (keys.isEmpty()) {
             binding.emptyState.visibility = View.VISIBLE
             binding.keysRecyclerView.visibility = View.GONE
@@ -127,7 +128,7 @@ class APIKeysFragment : Fragment() {
             .setMessage("این کلید فقط روی همین گوشی ذخیره می‌شود و مصرف آن نامحدود و بدون سقف روزانه است، چون هزینه‌ی آن مستقیم از حساب خودتان کسر می‌شود.")
             .setView(container)
             .setPositiveButton("ذخیره") { _, _ ->
-                val providerName = providerInput.text.toString().trim().uppercase()
+                val providerName = providerInput.text.toString().trim()
                 val keyValue = keyInput.text.toString().trim()
                 val baseUrl = baseUrlInput.text.toString().trim().ifBlank { null }
 
@@ -135,11 +136,7 @@ class APIKeysFragment : Fragment() {
                     Toast.makeText(requireContext(), "کلید API را وارد کنید", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                val provider = try {
-                    AIProvider.valueOf(providerName)
-                } catch (e: IllegalArgumentException) {
-                    AIProvider.CUSTOM
-                }
+                val provider = inferProvider(providerName, baseUrl)
                 if (provider == AIProvider.CUSTOM && baseUrl.isNullOrBlank()) {
                     Toast.makeText(requireContext(), "برای CUSTOM باید Base URL را هم وارد کنید", Toast.LENGTH_LONG).show()
                     return@setPositiveButton
@@ -148,7 +145,7 @@ class APIKeysFragment : Fragment() {
                 val newKey = APIKey(
                     provider = provider,
                     key = keyValue,
-                    baseUrl = baseUrl,
+                    baseUrl = baseUrl ?: defaultBaseUrlFor(provider),
                     isActive = true,
                     isAutoProvisioned = false
                 )
@@ -158,5 +155,21 @@ class APIKeysFragment : Fragment() {
             }
             .setNegativeButton("انصراف", null)
             .show()
+    }
+    private fun inferProvider(input: String, baseUrl: String?): AIProvider {
+        val combined = "$input ${baseUrl.orEmpty()}".lowercase()
+        return when {
+            combined.contains("gapgpt") || combined.contains("gapgpt.app") -> AIProvider.GAPGPT
+            combined.contains("liara") || combined.contains("liara.ir") -> AIProvider.LIARA
+            combined.contains("openai") || combined.contains("openai.com") -> AIProvider.OPENAI
+            else -> runCatching { AIProvider.valueOf(input.trim().uppercase()) }.getOrDefault(AIProvider.CUSTOM)
+        }
+    }
+
+    private fun defaultBaseUrlFor(provider: AIProvider): String? = when (provider) {
+        AIProvider.GAPGPT -> "https://api.gapgpt.app/v1"
+        AIProvider.LIARA -> "https://ai.liara.ir/api/69467b6ba99a2016cac892e1/v1"
+        AIProvider.OPENAI -> "https://api.openai.com/v1"
+        else -> null
     }
 }

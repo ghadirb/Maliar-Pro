@@ -164,7 +164,9 @@ object AIHelper {
         withContext(Dispatchers.IO) {
             try {
                 val prefs = PreferencesManager(context)
-                val active = prefs.getAPIKeys().filter { it.isActive }
+                val allActive = prefs.getAPIKeys().filter { it.isActive }
+                val personalActive = allActive.filterNot { it.isAutoProvisioned }
+                val active = personalActive.ifEmpty { allActive }
                 if (active.isEmpty()) return@withContext null
 
                 // Prefer GAPGPT, then Liara, then anything else active

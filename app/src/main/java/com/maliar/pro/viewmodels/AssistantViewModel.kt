@@ -76,6 +76,16 @@ class AssistantViewModel(
                 return@launch
             }
 
+            if (!isAppRelatedMessage(message)) {
+                _chatMessages.value = _chatMessages.value + ChatMessage(
+                    (System.currentTimeMillis() + 1).toString(),
+                    "\u0627\u06cc\u0646 \u062f\u0633\u062a\u06cc\u0627\u0631 \u0641\u0642\u0637 \u0628\u0647 \u0633\u0648\u0627\u0644\u200c\u0647\u0627 \u0648 \u062f\u0633\u062a\u0648\u0631\u0647\u0627\u06cc \u0645\u0631\u062a\u0628\u0637 \u0628\u0627 \u0628\u062e\u0634\u200c\u0647\u0627\u06cc \u0628\u0631\u0646\u0627\u0645\u0647 \u0645\u0627\u0644\u06cc\u0627\u0631 \u067e\u0627\u0633\u062e \u0645\u06cc\u200c\u062f\u0647\u062f: \u062d\u0633\u0627\u0628\u062f\u0627\u0631\u06cc\u060c \u0648\u0636\u0639\u06cc\u062a \u0645\u0627\u0644\u06cc\u060c \u06cc\u0627\u062f\u0622\u0648\u0631\u06cc\u060c \u0645\u062e\u0627\u0637\u0628\u06cc\u0646\u060c \u067e\u0631\u062f\u0627\u062e\u062a\u060c \u0627\u0634\u062a\u0631\u0627\u06a9 \u0648 \u062a\u0646\u0638\u06cc\u0645\u0627\u062a.",
+                    false
+                )
+                _isProcessing.value = false
+                return@launch
+            }
+
             // Try online AI with priority: GAPGPT -> Liara -> local processing
             val response = try {
                 if (!com.maliar.pro.utils.SubscriptionManager.canUseAi(appContext)) {
@@ -120,6 +130,51 @@ class AssistantViewModel(
     }
 
     /** Converts Persian/Arabic-Indic digits in a string to plain ASCII digits. */
+    private fun isAppRelatedMessage(message: String): Boolean {
+        val normalized = normalizeDigits(message).lowercase()
+        val keywords = listOf(
+            "\u0645\u0627\u0644\u06cc\u0627\u0631",
+            "\u0628\u0631\u0646\u0627\u0645\u0647",
+            "\u062d\u0633\u0627\u0628\u062f\u0627\u0631\u06cc",
+            "\u0645\u0627\u0644\u06cc",
+            "\u062f\u0631\u0622\u0645\u062f",
+            "\u0647\u0632\u06cc\u0646\u0647",
+            "\u062e\u0631\u062c",
+            "\u0648\u0627\u0631\u06cc\u0632",
+            "\u0628\u0631\u062f\u0627\u0634\u062a",
+            "\u067e\u0631\u062f\u0627\u062e\u062a",
+            "\u0645\u0648\u062c\u0648\u062f\u06cc",
+            "\u0645\u0627\u0646\u062f\u0647",
+            "\u0628\u0627\u0646\u06a9",
+            "\u062d\u0633\u0627\u0628",
+            "\u06a9\u0627\u0631\u062a",
+            "\u0686\u06a9",
+            "\u0642\u0633\u0637",
+            "\u0627\u0642\u0633\u0627\u0637",
+            "\u062f\u0627\u0631\u0627\u06cc\u06cc",
+            "\u0628\u062f\u0647\u06cc",
+            "\u0647\u062f\u0641",
+            "\u0628\u0648\u062f\u062c\u0647",
+            "\u06cc\u0627\u062f\u0622\u0648\u0631",
+            "\u06cc\u0627\u062f\u0645",
+            "\u0647\u0634\u062f\u0627\u0631",
+            "\u0627\u0644\u0627\u0631\u0645",
+            "\u062a\u0645\u0627\u0633",
+            "\u0645\u062e\u0627\u0637\u0628",
+            "\u0627\u0634\u062a\u0631\u0627\u06a9",
+            "\u067e\u0631\u06cc\u0645\u06cc\u0648\u0645",
+            "\u06a9\u0644\u06cc\u062f",
+            "\u062a\u0646\u0638\u06cc\u0645\u0627\u062a",
+            "\u067e\u0634\u062a\u06cc\u0628\u0627\u0646",
+            "api",
+            "openai",
+            "gapgpt",
+            "liara",
+            "gpt"
+        )
+        return keywords.any { normalized.contains(it) }
+    }
+
     private fun normalizeDigits(text: String): String {
         val persian = "۰۱۲۳۴۵۶۷۸۹"
         val arabic = "٠١٢٣٤٥٦٧٨٩"
@@ -438,7 +493,9 @@ class AssistantViewModel(
         try {
             val prefs = PreferencesManager(appContext)
             val keys = prefs.getAPIKeys()
-            keys.filter { it.isActive }.map { 
+            val personalActiveKeys = keys.filter { it.isActive && !it.isAutoProvisioned }
+            val usableKeys = personalActiveKeys.ifEmpty { keys.filter { it.isActive } }
+            usableKeys.map {
                 val baseUrl = it.baseUrl ?: when (it.provider) {
                     AIProvider.GAPGPT -> "https://api.gapgpt.app/v1"
                     AIProvider.LIARA -> "https://ai.liara.ir/api/69467b6ba99a2016cac892e1/v1"
