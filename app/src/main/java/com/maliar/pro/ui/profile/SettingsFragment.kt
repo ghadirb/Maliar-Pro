@@ -1,9 +1,11 @@
 package com.maliar.pro.ui.profile
 
+import android.Manifest
 import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -11,6 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.maliar.pro.databinding.FragmentSettingsBinding
@@ -37,6 +40,17 @@ class SettingsFragment : Fragment() {
     private val restoreLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) confirmAndRestore(uri)
     }
+    private val smsPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        val granted = results.values.all { it }
+        if (granted) {
+            prefs.setSmsReadingEnabled(true)
+            binding.smsReadingSwitch.isChecked = true
+        } else {
+            prefs.setSmsReadingEnabled(false)
+            binding.smsReadingSwitch.isChecked = false
+            Toast.makeText(requireContext(), "بدون مجوز خواندن پیامک، این قابلیت فعال نمی‌شود", Toast.LENGTH_LONG).show()
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -53,6 +67,7 @@ class SettingsFragment : Fragment() {
         setupNotificationSettings()
         setupBackgroundServiceSetting()
         setupBackupSettings()
+        setupSmsReadingSetting()
     }
 
     override fun onResume() {
@@ -172,6 +187,38 @@ class SettingsFragment : Fragment() {
                 AutoBackupWorker.cancel(requireContext())
             }
         }
+    }
+
+    private fun setupSmsReadingSetting() {
+        binding.smsReadingSwitch.isChecked = prefs.isSmsReadingEnabled() && hasSmsPermissions()
+        if (prefs.isSmsReadingEnabled() && !hasSmsPermissions()) {
+            prefs.setSmsReadingEnabled(false)
+        }
+
+        binding.smsReadingSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (!isChecked) {
+                prefs.setSmsReadingEnabled(false)
+                return@setOnCheckedChangeListener
+            }
+
+            if (hasSmsPermissions()) {
+                prefs.setSmsReadingEnabled(true)
+            } else {
+                binding.smsReadingSwitch.isChecked = false
+                smsPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.RECEIVE_SMS,
+                        Manifest.permission.READ_SMS
+                    )
+                )
+            }
+        }
+    }
+
+    private fun hasSmsPermissions(): Boolean {
+        val context = requireContext()
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun performBackup(uri: Uri) {

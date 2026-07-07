@@ -2,10 +2,14 @@
 // needed alternative to the Node.js server in /server. Uses PropertiesService as a tiny
 // key-value store (no Google Sheet needed) and UrlFetchApp to call the gateway's API.
 //
-// Supports two gateways - pick one with PAYMENT_GATEWAY ("zarinpal" or "nextpay"):
+// Supports three gateways - pick one with PAYMENT_GATEWAY ("zarinpal", "nextpay", or
+// "payping"):
 //   - Zarinpal needs its own merchant account approved and working.
 //   - NextPay needs a "درگاه مستقیم" (direct gateway) API key, NOT the "صفحه پرداخت
 //     شخصی" (personal payment page) - that one has no API for an app to call.
+//   - PayPing needs an access token (Bearer) from its developer console. No manual
+//     "product"/"permalink" setup needed in the PayPing dashboard - this calls /v3/pay
+//     directly with the exact plan amount each time, same pattern as the other two.
 //
 // SETUP:
 // 1. Go to https://script.google.com/ -> New project.
@@ -13,7 +17,7 @@
 // 3. In "Project Settings" (gear icon) -> Script Properties, add ONE "Property" +
 //    "Value" row per line below (the Property box takes the name on the left,
 //    the Value box takes what's on the right):
-//      PAYMENT_GATEWAY      = zarinpal   (or nextpay)
+//      PAYMENT_GATEWAY      = zarinpal   (or nextpay, or payping)
 //      -- if using zarinpal --
 //      ZARINPAL_MERCHANT_ID = your merchant id
 //      ZARINPAL_SANDBOX     = true   (set to false once you've tested)
@@ -22,6 +26,10 @@
 //      -- if using nextpay --
 //      NEXTPAY_API_KEY      = your direct-gateway api_key from NextPay's panel
 //      PRICE_MONTHLY_TOMAN  = 80000   (NextPay's amount is in Toman, not Rial)
+//      PRICE_YEARLY_TOMAN   = 650000
+//      -- if using payping --
+//      PAYPING_TOKEN        = your PayPing access token (Bearer)
+//      PRICE_MONTHLY_TOMAN  = 80000   (PayPing's amount is in Toman too)
 //      PRICE_YEARLY_TOMAN   = 650000
 // 4. Deploy -> New deployment -> type: "Web app".
 //      Execute as: Me
@@ -37,11 +45,12 @@ function getSetting_(key, fallback) {
 
 function activeGateway_() {
   const g = getSetting_('PAYMENT_GATEWAY', 'zarinpal');
-  return (g === 'nextpay') ? 'nextpay' : 'zarinpal';
+  if (g === 'nextpay' || g === 'payping') return g;
+  return 'zarinpal';
 }
 
 function getPlans_() {
-  if (activeGateway_() === 'nextpay') {
+  if (activeGateway_() === 'nextpay' || activeGateway_() === 'payping') {
     return {
       monthly: { days: 30, amount: parseInt(getSetting_('PRICE_MONTHLY_TOMAN', '80000'), 10) },
       yearly: { days: 365, amount: parseInt(getSetting_('PRICE_YEARLY_TOMAN', '650000'), 10) }
@@ -52,6 +61,8 @@ function getPlans_() {
     yearly: { days: 365, amount: parseInt(getSetting_('PRICE_YEARLY_RIAL', '6500000'), 10) }
   };
 }
+
+const PAYPING_BASE = 'https://api.payping.ir/v3';
 
 function isSandbox_() {
   return getSetting_('ZARINPAL_SANDBOX', 'true') === 'true';
@@ -125,12 +136,26 @@ function htmlOutput_(message) {
 // Android client sends deviceId/plan as query params instead - see SubscriptionManager.kt).
 
 function doGet(e) {
-  const params = e.parameter || {};
+  return routeRequest_(e);
+}
+
+// PayPing's payment-result callback is a real HTTP POST (application/x-www-form-urlencoded),
+// unlike Zarinpal/NextPay which redirect back with a plain GET - Apps Script needs a
+// separate doPost entry point to receive it. e.parameter merges the URL's own query
+// params (path/deviceId/plan, which we put in the returnUrl ourselves) together with the
+// POSTed form fields (paymentCode, paymentRefId, amount, etc.), so the same routing works.
+function doPost(e) {
+  return routeRequest_(e);
+}
+
+function routeRequest_(e) {
+  const params = (e && e.parameter) || {};
   const path = params.path;
 
   if (path === 'status') return handleStatus_(params);
   if (path === 'request') return handleRequest_(params);
   if (path === 'callback') return handleCallback_(params);
+  if (path === 'paypingCallback') return handleCallbackPayping_(params);
 
   return jsonOutput_({ error: 'unknown_path' });
 }
@@ -148,9 +173,42 @@ function handleRequest_(params) {
   const planConfig = getPlans_()[plan];
   if (!deviceId || !planConfig) return jsonOutput_({ error: 'deviceId and a valid plan are required' });
 
-  return (activeGateway_() === 'nextpay')
-    ? handleRequestNextpay_(deviceId, plan, planConfig)
-    : handleRequestZarinpal_(deviceId, plan, planConfig);
+  const gateway = activeGateway_();
+  if (gateway === 'nextpay') return handleRequestNextpay_(deviceId, plan, planConfig);
+  if (gateway === 'payping') return handleRequestPayping_(deviceId, plan, planConfig);
+  return handleRequestZarinpal_(deviceId, plan, planConfig);
+}
+
+function handleRequestPayping_(deviceId, plan, planConfig) {
+  const token = getSetting_('PAYPING_TOKEN', '');
+  if (!token) return jsonOutput_({ error: 'PAYPING_TOKEN is not configured' });
+
+  const selfUrl = ScriptApp.getService().getUrl();
+  const clientRefId = deviceId + '_' + plan + '_' + Date.now();
+  const returnUrl = selfUrl + '?path=paypingCallback&deviceId=' + encodeURIComponent(deviceId) + '&plan=' + plan;
+
+  const response = UrlFetchApp.fetch(PAYPING_BASE + '/pay', {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + token },
+    payload: JSON.stringify({
+      amount: planConfig.amount,
+      returnUrl: returnUrl,
+      description: 'مالیار پرو - ' + (plan === 'monthly' ? 'اشتراک ماهانه' : 'اشتراک سالانه'),
+      clientRefId: clientRefId
+    })
+  });
+
+  const data = JSON.parse(response.getContentText());
+  if (data && data.paymentCode) {
+    const order = { deviceId: deviceId, plan: plan, amount: planConfig.amount, paymentCode: data.paymentCode, clientRefId: clientRefId, verified: false };
+    saveOrder_(data.paymentCode, order);
+    saveOrder_(clientRefId, order);
+    return jsonOutput_({ paymentUrl: data.url || (PAYPING_BASE + '/pay/start/' + data.paymentCode) });
+  }
+
+  return jsonOutput_({ error: 'payping_request_failed', details: data });
 }
 
 function handleRequestZarinpal_(deviceId, plan, planConfig) {
@@ -221,6 +279,64 @@ function handleCallback_(params) {
   return (activeGateway_() === 'nextpay')
     ? handleCallbackNextpay_(params)
     : handleCallbackZarinpal_(params);
+}
+
+function handleCallbackPayping_(params) {
+  // PayPing posts the result back to returnUrl. Field names have changed between
+  // documentation versions, so accept the common spellings and verify against the
+  // original order saved under paymentCode before granting premium access.
+  const paymentCode = params.paymentCode || params.PaymentCode || params.code;
+  const clientRefId = params.clientRefId || params.ClientRefId || params.client_ref_id;
+  const refId = params.paymentRefId || params.refId || params.RefId || params.refid || '';
+
+  if (!paymentCode && !clientRefId) {
+    return htmlOutput_('<h2>❌ پرداخت ناموفق</h2><p>پرداخت لغو شد یا اطلاعات برگشتی ناقص بود.</p>');
+  }
+
+  const order = getOrder_(paymentCode) || getOrder_(clientRefId);
+  if (!order) {
+    return htmlOutput_('<h2>❌ پرداخت ناموفق</h2><p>این تراکنش شناخته نشده است.</p>');
+  }
+  if (order.verified) {
+    return htmlOutput_('<h2>✅ پرداخت با موفقیت انجام شد</h2><p>اشتراک پریمیوم شما فعال است.</p>');
+  }
+  if (params.amount && Number(params.amount) !== Number(order.amount)) {
+    return htmlOutput_('<h2>❌ پرداخت ناموفق</h2><p>مبلغ برگشتی با سفارش ثبت‌شده همخوانی ندارد.</p>');
+  }
+
+  const token = getSetting_('PAYPING_TOKEN', '');
+  if (!token) {
+    return htmlOutput_('<h2>❌ پرداخت ناموفق</h2><p>توکن پی‌پینگ روی سرور تنظیم نشده است.</p>');
+  }
+
+  const response = UrlFetchApp.fetch(PAYPING_BASE + '/pay/verify', {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + token },
+    payload: JSON.stringify({
+      paymentCode: paymentCode || order.paymentCode,
+      clientRefId: clientRefId || order.clientRefId,
+      paymentRefId: refId,
+      amount: order.amount
+    })
+  });
+
+  const status = response.getResponseCode();
+  const text = response.getContentText();
+  const data = text ? JSON.parse(text) : {};
+
+  if (status >= 200 && status < 300) {
+    order.verified = true;
+    order.refId = refId;
+    order.verifyResponse = data;
+    saveOrder_(paymentCode || order.paymentCode, order);
+    saveOrder_(clientRefId || order.clientRefId, order);
+    grantPremiumDays_(order.deviceId, getPlans_()[order.plan].days);
+    return htmlOutput_('<h2>✅ پرداخت با موفقیت انجام شد</h2><p>اشتراک پریمیوم شما فعال شد.</p>');
+  }
+
+  return htmlOutput_('<h2>❌ پرداخت ناموفق</h2><p>تایید پرداخت توسط پی‌پینگ ناموفق بود.</p>');
 }
 
 function handleCallbackZarinpal_(params) {

@@ -19,6 +19,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Opt-in only (see PreferencesManager.isSmsReadingEnabled, off by default) - lets the
+         app recognize bank transaction SMS and auto-record them as accounting entries. -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+
     <!-- Needed so the app can keep a foreground service (persistent notification)
          alive to keep smart reminders / assistant features responsive in the background. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -89,6 +94,19 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Opt-in (Settings toggle) bank-transaction SMS reader - see SmsReceiver.kt.
+             android:permission restricts who can even trigger this broadcast to the
+             platform itself, on top of the runtime-permission and Settings-toggle checks
+             already inside the receiver. -->
+        <receiver
+            android:name=".receivers.SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="500">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
 
