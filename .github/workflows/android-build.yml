@@ -2,6 +2,15 @@ name: Android CI Build
 
 on:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - debug
+          - release
   push:
     branches: [ main, master, develop ]
   pull_request:
@@ -28,12 +37,83 @@ jobs:
         with:
           gradle-version: 8.2
 
-      - name: Build APK (debug)
+      # Restore static keystore from Base64 secret (if available)
+      - name: Restore Keystore from Secret
+        id: restore_keystore
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android_release_key.jks
+            echo "Keystore restored from KEYSTORE_BASE64 secret"
+          else
+            echo "KEYSTORE_BASE64 secret not found. Will generate a new keystore."
+          fi
+
+      # Generate keystore only if it doesn't exist (first run or when secret not set)
+      - name: Generate Keystore (first time setup)
+        if: steps.restore_keystore.conclusion == 'success' && !hashFiles('android_release_key.jks')
+        run: |
+          keytool -genkey -v \
+            -keystore android_release_key.jks \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias maliar_pro_key \
+            -storepass "${{ secrets.KEYSTORE_STORE_PASSWORD || 'MaliarPro123!' }}" \
+            -keypass "${{ secrets.KEYSTORE_KEY_PASSWORD || 'MaliarPro123!' }}" \
+            -dname "CN=Maliar Pro, OU=Development, O=Maliar, L=Tehran, ST=Tehran, C=IR"
+          echo "NEW_KEYSTORE_GENERATED=true" >> $GITHUB_ENV
+
+      # If a new keystore was generated (first run without secret), output its Base64
+      - name: Output Keystore Base64 (for saving as Secret)
+        if: env.NEW_KEYSTORE_GENERATED == 'true'
+        run: |
+          echo "============================================"
+          echo "  NEW KEYSTORE GENERATED!"
+          echo "  To make this keystore permanent:"
+          echo "  1. Copy the Base64 string below"
+          echo "  2. Go to GitHub repo Settings > Secrets and variables > Actions"
+          echo "  3. Add a new secret named KEYSTORE_BASE64"
+          echo "  4. Paste the Base64 string as the value"
+          echo "  5. Also add these secrets:"
+          echo "     - KEYSTORE_STORE_PASSWORD: MaliarPro123!"
+          echo "     - KEYSTORE_KEY_PASSWORD: MaliarPro123!"
+          echo "============================================"
+          echo ""
+          base64 android_release_key.jks
+          echo ""
+          echo "============================================"
+          echo "  Save the Base64 output above as KEYSTORE_BASE64 secret"
+          echo "============================================"
+
+      # Build Release APK
+      - name: Build Release APK
+        if: ${{ github.event.inputs.build_type == 'release' || github.event_name != 'workflow_dispatch' }}
+        env:
+          JAVA_TOOL_OPTIONS: "-Xmx4g"
+          KEYSTORE_STORE_PASSWORD: "${{ secrets.KEYSTORE_STORE_PASSWORD || 'MaliarPro123!' }}"
+          KEYSTORE_KEY_PASSWORD: "${{ secrets.KEYSTORE_KEY_PASSWORD || 'MaliarPro123!' }}"
+          KEYSTORE_KEY_ALIAS: "maliar_pro_key"
+          KEYSTORE_STORE_FILE: "android_release_key.jks"
+        run: gradle :app:assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+
+      # Upload Release APK
+      - name: Upload Release APK artifact
+        if: ${{ github.event.inputs.build_type == 'release' || github.event_name != 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+
+      # Build Debug APK
+      - name: Build Debug APK
+        if: ${{ github.event.inputs.build_type == 'debug' }}
         env:
           JAVA_TOOL_OPTIONS: "-Xmx4g"
         run: gradle :app:assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
 
-      - name: Upload APK artifact
+      # Upload Debug APK
+      - name: Upload Debug APK artifact
+        if: ${{ github.event.inputs.build_type == 'debug' }}
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk

@@ -4,6 +4,21 @@ plugins {
     id("kotlin-kapt")
 }
 
+// Load keystore properties from file (local) or environment variables (CI)
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = java.util.Properties()
+
+if (keystorePropertiesFile.exists()) {
+    // Local build: load from keystore.properties file
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
+} else {
+    // CI build: load from environment variables (GitHub Secrets)
+    keystoreProperties.setProperty("storePassword", System.getenv("KEYSTORE_STORE_PASSWORD") ?: "MaliarPro123!")
+    keystoreProperties.setProperty("keyPassword", System.getenv("KEYSTORE_KEY_PASSWORD") ?: "MaliarPro123!")
+    keystoreProperties.setProperty("keyAlias", System.getenv("KEYSTORE_KEY_ALIAS") ?: "maliar_pro_key")
+    keystoreProperties.setProperty("storeFile", System.getenv("KEYSTORE_STORE_FILE") ?: "android_release_key.jks")
+}
+
 android {
     namespace = "com.maliar.pro"
     compileSdk = 34
@@ -18,6 +33,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = keystoreProperties.getProperty("storeFile")?.let {
+                if (it.isNotEmpty()) rootProject.file(it) else null
+            }
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -25,6 +51,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     
