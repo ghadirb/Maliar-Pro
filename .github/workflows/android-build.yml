@@ -60,7 +60,11 @@ jobs:
           KEYSTORE_KEY_PASSWORD: "MaliarPro123!"
           KEYSTORE_KEY_ALIAS: "maliar_pro_key"
           KEYSTORE_STORE_FILE: "android_release_key.jks"
-        run: gradle :app:assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+        run: ./gradlew :app:assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+
+      - name: Verify Release APK exists
+        if: ${{ github.event.inputs.build_type == 'release' || github.event_name != 'workflow_dispatch' }}
+        run: test -f app/build/outputs/apk/release/app-release.apk
 
       # Upload Release APK
       - name: Upload Release APK artifact
@@ -75,7 +79,11 @@ jobs:
         if: ${{ github.event.inputs.build_type == 'debug' }}
         env:
           JAVA_TOOL_OPTIONS: "-Xmx4g"
-        run: gradle :app:assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+        run: ./gradlew :app:assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+
+      - name: Verify Debug APK exists
+        if: ${{ github.event.inputs.build_type == 'debug' }}
+        run: test -f app/build/outputs/apk/debug/app-debug.apk
 
       # Upload Debug APK
       - name: Upload Debug APK artifact
