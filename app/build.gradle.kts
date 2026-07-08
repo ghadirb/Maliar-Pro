@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,11 +9,11 @@ plugins {
 
 // Load keystore properties from file (local) or environment variables (CI)
 val keystorePropertiesFile = rootProject.file("keystore.properties")
-val keystoreProperties = java.util.Properties()
+val keystoreProperties = Properties()
 
 if (keystorePropertiesFile.exists()) {
     // Local build: load from keystore.properties file
-    keystoreProperties.load(keystorePropertiesFile.inputStream())
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 } else {
     // CI build: load from environment variables (GitHub Secrets)
     keystoreProperties.setProperty("storePassword", System.getenv("KEYSTORE_STORE_PASSWORD") ?: "MaliarPro123!")
