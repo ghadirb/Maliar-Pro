@@ -11,7 +11,7 @@ import com.maliar.pro.utils.SubscriptionManager
 import kotlinx.coroutines.launch
 
 /**
- * Lets the person see their current AI-usage entitlement (free daily limit vs premium)
+ * Lets the person see their current AI-usage entitlement (one-time free limit vs premium)
  * and start a Zarinpal payment for a monthly/yearly plan. The actual payment + activation
  * happens on the backend (see /server) - this screen only requests a payment URL and
  * opens it in the browser, then lets the person pull the resulting status back down.
@@ -61,10 +61,10 @@ class SubscriptionActivity : AppCompatActivity() {
         statusView.text = when {
             premiumLabel != null -> premiumLabel
             SubscriptionManager.hasPersonalKey(this) ->
-                "شما در حال استفاده از کلید هوش مصنوعی شخصی خودتان هستید - بدون محدودیت روزانه."
+                "شما در حال استفاده از کلید هوش مصنوعی شخصی خودتان هستید - بدون محدودیت."
             else -> {
-                val remaining = SubscriptionManager.remainingFreeToday(this)
-                "امروز $remaining از ${SubscriptionManager.FREE_DAILY_AI_LIMIT} پیام رایگان باقی مانده است."
+                val remaining = SubscriptionManager.remainingFreeLifetime(this)
+                "$remaining از ${SubscriptionManager.FREE_AI_LIFETIME_LIMIT} پیام رایگان اولیه باقی مانده است."
             }
         }
     }

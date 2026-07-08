@@ -40,15 +40,12 @@ object SubscriptionManager {
     const val STATUS_URL = "https://CHANGE-ME/subscription/status"
     const val REQUEST_URL = "https://CHANGE-ME/payment/request"
 
-    const val FREE_DAILY_AI_LIMIT = 15
+    const val FREE_AI_LIFETIME_LIMIT = 15
 
     enum class Plan(val apiValue: String, val days: Int, val label: String) {
         MONTHLY("monthly", 30, "اشتراک ماهانه"),
         YEARLY("yearly", 365, "اشتراک سالانه")
     }
-
-    private fun todayKey(): String =
-        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
     fun isPremium(context: Context): Boolean {
         val prefs = PreferencesManager(context)
@@ -61,12 +58,15 @@ object SubscriptionManager {
         return PreferencesManager(context).getAPIKeys().any { it.isActive && !it.isAutoProvisioned }
     }
 
-    /** Remaining free shared-key AI calls for today (resets automatically at midnight). */
-    fun remainingFreeToday(context: Context): Int {
-        val prefs = PreferencesManager(context)
-        val today = todayKey()
-        val used = if (prefs.getDailyAiCountDate() == today) prefs.getDailyAiCount() else 0
-        return (FREE_DAILY_AI_LIMIT - used).coerceAtLeast(0)
+    /** Remaining free shared-key AI calls for this install/device lifetime.
+     *
+     * This is intentionally no longer a daily counter: the free shared-key allowance is
+     * a one-time trial. A local SharedPreferences counter cannot reliably survive app
+     * uninstall/reinstall; hard anti-reset enforcement must be done by the billing backend
+     * against a signed-in account or server-side device/install identity. */
+    fun remainingFreeLifetime(context: Context): Int {
+        val used = PreferencesManager(context).getDailyAiCount()
+        return (FREE_AI_LIFETIME_LIMIT - used).coerceAtLeast(0)
     }
 
     /** Call this BEFORE making a shared-key AI request. Personal keys and active premium
@@ -74,7 +74,7 @@ object SubscriptionManager {
     fun canUseAi(context: Context): Boolean {
         if (isPremium(context)) return true
         if (hasPersonalKey(context)) return true
-        return remainingFreeToday(context) > 0
+        return remainingFreeLifetime(context) > 0
     }
 
     /** Call this AFTER a successful shared-key AI request so the daily counter reflects
@@ -82,19 +82,17 @@ object SubscriptionManager {
     fun recordAiUsage(context: Context) {
         if (isPremium(context) || hasPersonalKey(context)) return
         val prefs = PreferencesManager(context)
-        val today = todayKey()
-        val current = if (prefs.getDailyAiCountDate() == today) prefs.getDailyAiCount() else 0
-        prefs.setDailyAiCount(current + 1, today)
+        val current = prefs.getDailyAiCount()
+        prefs.setDailyAiCount(current + 1, "lifetime")
     }
 
     /** A short Persian message explaining why the AI is unavailable right now, meant to be
      *  shown directly in the chat/assistant UI in place of an actual AI reply. */
     fun upgradeMessage(context: Context): String {
-        return "⚠️ سقف رایگان روزانه ($FREE_DAILY_AI_LIMIT پیام) شما تمام شده است.\n" +
-            "برای ادامه‌ی استفاده از دستیار هوشمند امروز، می‌توانید:\n" +
-            "• فردا دوباره امتحان کنید (سقف رایگان هر روز از نو شروع می‌شود)\n" +
+        return "⚠️ سهمیه رایگان اولیه ($FREE_AI_LIFETIME_LIMIT پیام) شما تمام شده است.\n" +
+            "برای ادامه‌ی استفاده از دستیار هوشمند، می‌توانید:\n" +
             "• از تنظیمات → کلیدهای هوش مصنوعی، کلید شخصی خودتان را اضافه کنید (نامحدود و رایگان از طرف ما)\n" +
-            "• یا با ارتقا به اشتراک پریمیوم، محدودیت روزانه را کاملاً بردارید"
+            "• یا با ارتقا به اشتراک پریمیوم، محدودیت را کاملاً بردارید"
     }
 
     /** Appends a query parameter to a URL, using "?" if it has none yet or "&" if it

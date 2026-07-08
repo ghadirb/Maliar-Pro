@@ -14,7 +14,7 @@ class EditIncomeDialog(private val context: Context, private val viewModel: Acco
         builder.setTitle("ویرایش درآمد")
 
         val view = android.view.LayoutInflater.from(context).inflate(com.maliar.pro.R.layout.dialog_add_income, null)
-        val categoryInput = view.findViewById<EditText>(com.maliar.pro.R.id.categoryInput)
+        val categoryInput = view.findViewById<EditText>(com.maliar.pro.R.id.sourceInput)
         val amountInput = view.findViewById<EditText>(com.maliar.pro.R.id.amountInput)
         val descriptionInput = view.findViewById<EditText>(com.maliar.pro.R.id.descriptionInput)
 

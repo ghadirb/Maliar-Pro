@@ -90,10 +90,10 @@ class SettingsFragment : Fragment() {
         binding.subscriptionStatusText.text = when {
             premiumLabel != null -> premiumLabel
             com.maliar.pro.utils.SubscriptionManager.hasPersonalKey(context) ->
-                "شما از کلید هوش مصنوعی شخصی خودتان استفاده می‌کنید - بدون محدودیت روزانه."
+                "شما از کلید هوش مصنوعی شخصی خودتان استفاده می‌کنید - بدون محدودیت."
             else -> {
-                val remaining = com.maliar.pro.utils.SubscriptionManager.remainingFreeToday(context)
-                "امروز $remaining از ${com.maliar.pro.utils.SubscriptionManager.FREE_DAILY_AI_LIMIT} پیام رایگان باقی مانده"
+                val remaining = com.maliar.pro.utils.SubscriptionManager.remainingFreeLifetime(context)
+                "$remaining از ${com.maliar.pro.utils.SubscriptionManager.FREE_AI_LIFETIME_LIMIT} پیام رایگان اولیه باقی مانده"
             }
         }
     }

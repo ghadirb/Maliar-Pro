@@ -76,15 +76,8 @@ class AssistantViewModel(
                 return@launch
             }
 
-            if (!isAppRelatedMessage(message)) {
-                _chatMessages.value = _chatMessages.value + ChatMessage(
-                    (System.currentTimeMillis() + 1).toString(),
-                    "\u0627\u06cc\u0646 \u062f\u0633\u062a\u06cc\u0627\u0631 \u0641\u0642\u0637 \u0628\u0647 \u0633\u0648\u0627\u0644\u200c\u0647\u0627 \u0648 \u062f\u0633\u062a\u0648\u0631\u0647\u0627\u06cc \u0645\u0631\u062a\u0628\u0637 \u0628\u0627 \u0628\u062e\u0634\u200c\u0647\u0627\u06cc \u0628\u0631\u0646\u0627\u0645\u0647 \u0645\u0627\u0644\u06cc\u0627\u0631 \u067e\u0627\u0633\u062e \u0645\u06cc\u200c\u062f\u0647\u062f: \u062d\u0633\u0627\u0628\u062f\u0627\u0631\u06cc\u060c \u0648\u0636\u0639\u06cc\u062a \u0645\u0627\u0644\u06cc\u060c \u06cc\u0627\u062f\u0622\u0648\u0631\u06cc\u060c \u0645\u062e\u0627\u0637\u0628\u06cc\u0646\u060c \u067e\u0631\u062f\u0627\u062e\u062a\u060c \u0627\u0634\u062a\u0631\u0627\u06a9 \u0648 \u062a\u0646\u0638\u06cc\u0645\u0627\u062a.",
-                    false
-                )
-                _isProcessing.value = false
-                return@launch
-            }
+            // App-related commands are still executed locally above, but general questions
+            // are now allowed to reach the online model as long as quota/subscription allows it.
 
             // Try online AI with priority: GAPGPT -> Liara -> local processing
             val response = try {
@@ -253,6 +246,26 @@ class AssistantViewModel(
 
         val isIncome = incomeKeywords.any { message.contains(it) }
         val isExpense = expenseKeywords.any { message.contains(it) }
+        val isEdit = listOf("ویرایش", "تغییر", "اصلاح", "بروزرسانی", "به‌روزرسانی").any { message.contains(it) }
+
+        if (isEdit && isIncome != isExpense) {
+            val amount = parsePersianAmount(message)
+            if (amount == null || amount <= 0) {
+                val kind = if (isIncome) "درآمد" else "هزینه"
+                return "⚠️ متوجه شدم می‌خواهید $kind را ویرایش کنید، اما مبلغ جدید را متوجه نشدم."
+            }
+            return if (isIncome) {
+                val latest = accountingManager.getAllIncomesList().firstOrNull()
+                    ?: return "⚠️ درآمدی برای ویرایش پیدا نشد."
+                accountingManager.updateIncome(latest.copy(amount = amount, description = message.trim()))
+                "✅ آخرین درآمد به مبلغ ${String.format("%,.0f", amount)} تومان ویرایش شد."
+            } else {
+                val latest = accountingManager.getAllExpensesList().firstOrNull()
+                    ?: return "⚠️ هزینه‌ای برای ویرایش پیدا نشد."
+                accountingManager.updateExpense(latest.copy(amount = amount, description = message.trim()))
+                "✅ آخرین هزینه به مبلغ ${String.format("%,.0f", amount)} تومان ویرایش شد."
+            }
+        }
 
         // Ambiguous (matches both, or neither) - this doesn't look like a single, clear
         // accounting command, so let it fall through to normal AI chat / queries.

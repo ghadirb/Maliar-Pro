@@ -87,7 +87,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
-                    android:text="استفاده‌ی نامحدود از دستیار هوشمند (چت، صوت، یادآوری هوشمند گفتاری) بدون سقف روزانه."
+                    android:text="استفاده‌ی نامحدود از دستیار هوشمند (چت، صوت، یادآوری هوشمند گفتاری) بدون سقف سهمیه رایگان."
                     android:textSize="13sp"
                     android:textColor="#616161" />
 

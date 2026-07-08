@@ -87,7 +87,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="3 پیشنهاد جدید"
+                            android:id="@+id/suggestionsCountText"
+                            android:text="در حال محاسبه..."
                             android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
 
@@ -95,6 +96,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
+                            android:id="@+id/suggestionsButton"
                             android:text="مشاهده بیشتر"
                             style="@style/Widget.Material3.Button.TextButton" />
 
@@ -134,7 +136,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="2 هشدار فعال"
+                            android:id="@+id/alertsCountText"
+                            android:text="در حال محاسبه..."
                             android:textColor="@color/warning"
                             android:textSize="12sp" />
 
@@ -142,6 +145,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
+                            android:id="@+id/alertsButton"
                             android:text="مشاهده بیشتر"
                             style="@style/Widget.Material3.Button.TextButton" />
 
@@ -180,7 +184,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="وضعیت خوب"
+                            android:id="@+id/quickAnalysisText"
+                            android:text="در حال محاسبه..."
                             android:textColor="@color/success"
                             android:textSize="12sp" />
 
@@ -188,6 +193,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
+                            android:id="@+id/quickAnalysisButton"
                             android:text="مشاهده بیشتر"
                             style="@style/Widget.Material3.Button.TextButton" />
 
