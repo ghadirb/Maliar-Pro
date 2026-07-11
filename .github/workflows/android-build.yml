@@ -58,7 +58,9 @@ jobs:
           BAZAAR_IAB_PUBLIC_KEY: ${{ secrets.BAZAAR_IAB_PUBLIC_KEY }}
           MYKET_IAB_PUBLIC_KEY: ${{ secrets.MYKET_IAB_PUBLIC_KEY }}
         run: |
-          ./gradlew :app:assemble${{ matrix.store }}Release :app:bundle${{ matrix.store }}Release --no-daemon
+          store="${{ matrix.store }}"
+          flavor="$(tr '[:lower:]' '[:upper:]' <<< "${store:0:1}")${store:1}"
+          ./gradlew ":app:assemble${flavor}Release" ":app:bundle${flavor}Release" --no-daemon
 
       - name: Upload release APK
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'release' }}
@@ -79,7 +81,10 @@ jobs:
         env:
           BAZAAR_IAB_PUBLIC_KEY: ${{ secrets.BAZAAR_IAB_PUBLIC_KEY }}
           MYKET_IAB_PUBLIC_KEY: ${{ secrets.MYKET_IAB_PUBLIC_KEY }}
-        run: ./gradlew :app:assemble${{ matrix.store }}Debug --no-daemon
+        run: |
+          store="${{ matrix.store }}"
+          flavor="$(tr '[:lower:]' '[:upper:]' <<< "${store:0:1}")${store:1}"
+          ./gradlew ":app:assemble${flavor}Debug" --no-daemon
 
       - name: Upload debug APK
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug' }}

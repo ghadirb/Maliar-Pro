@@ -27,15 +27,15 @@
 #           bash, then to run this script, type that shell name before the whole
 #           command line, like:
 #
-#               ksh Gradle
+#               ksh gradlew
 #
 #           Busybox and similar reduced shells will NOT work, because this script
 #           requires all of these POSIX shell features:
 #             * functions;
-#             * expansions «$var», «${var}», «${var:-default}», «${var+SET}»,
-#               «${var#prefix}», «${var%suffix}», and «$( cmd )»;
-#             * compound commands having a testable exit status, especially «case»;
-#             * various built-in commands including «command», «set», and «ulimit».
+#             * expansions "$var", "${var}", "${var:-default}", "${var+SET}",
+#               "${var#prefix}", "${var%suffix}", and "$( cmd )";
+#             * compound commands having a testable exit status, especially "case";
+#             * various built-in commands including "command", "set", and "ulimit".
 #
 #       (2) This script targets any POSIX shell, so it avoids extensions provided
 #           by Bash, Ksh, etc; in particular arrays are avoided.
@@ -67,7 +67,7 @@ app_path=$0
 
 # Need this for daisy-chained symlinks.
 while
-    APP_HOME=${app_path%"${app_path##*/}}"}  # leaves a trailing /; empty if no leading path
+    APP_HOME=${app_path%"${app_path##*/}"}  # leaves a trailing /; empty if no leading path
     [ -h "$app_path" ]
 do
     ls=$( ls -ld "$app_path" )
