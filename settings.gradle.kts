@@ -5,11 +5,15 @@
 // broken builds before (e.g. "Received status code 502 from server: Bad Gateway" from
 // maven.aliyun.com) even though the real repos were sitting right there unreachable-only-
 // locally. GITHUB_ACTIONS is set to "true" automatically by every Actions runner.
-val isCi = System.getenv("GITHUB_ACTIONS") == "true" || System.getenv("CI") == "true"
+//
+// NOTE: pluginManagement{} is evaluated in its own isolated pass before the rest of this
+// script, so a shared top-level `val isCi = ...` declared here is NOT visible inside it
+// (causes "Unresolved reference"). System.getenv(...) is a plain JVM call though, so it's
+// called directly, inline, in both blocks below instead of through a shared variable.
 
 pluginManagement {
     repositories {
-        if (isCi) {
+        if (System.getenv("GITHUB_ACTIONS") == "true" || System.getenv("CI") == "true") {
             google()
             mavenCentral()
             gradlePluginPortal()
@@ -26,7 +30,7 @@ pluginManagement {
         maven { url = uri("https://maven.aliyun.com/repository/google") }
         maven { url = uri("https://en-mirror.ir") }
         maven { url = uri("https://maven.myket.ir") }
-        if (!isCi) {
+        if (System.getenv("GITHUB_ACTIONS") != "true" && System.getenv("CI") != "true") {
             google()
             mavenCentral()
             gradlePluginPortal()
@@ -36,7 +40,7 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        if (isCi) {
+        if (System.getenv("GITHUB_ACTIONS") == "true" || System.getenv("CI") == "true") {
             google()
             mavenCentral()
         }
@@ -47,7 +51,7 @@ dependencyResolutionManagement {
         // Hosts Myket's billing client (com.github.myketstore:myket-billing-client),
         // shared by both the bazaar and myket flavors - see StoreBillingHelper.kt.
         maven { url = uri("https://jitpack.io") }
-        if (!isCi) {
+        if (System.getenv("GITHUB_ACTIONS") != "true" && System.getenv("CI") != "true") {
             google()
             mavenCentral()
         }
