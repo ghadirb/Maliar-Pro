@@ -155,9 +155,38 @@ dependencies {
 
     // The official Myket client is configured per product flavor for both Myket and
     // Cafe Bazaar, as documented by Myket. Each store receives its own signed APK/AAB.
-    implementation("com.github.myketstore:myket-billing-client:1.6")
+    implementation("com.github.myketstore:myket-billing-client:1.19")
     
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+}
+
+// TEMPORARY DIAGNOSTIC TASK - remove once the real com.myket.billingclient.* imports in
+// StoreBillingHelper.kt are confirmed correct. The CI build hit "Unresolved reference:
+// myket/IabHelper/IabResult/Purchase" for this dependency, meaning the actual Java
+// package inside the myket-billing-client AAR differs from what's currently imported.
+// This task finds the resolved artifact (whatever configuration it's in) and lists every
+// .class file inside it, which reveals the real package/class names to fix the imports.
+tasks.register("printMyketBillingClientClasses") {
+    doLast {
+        project.configurations.forEach { config ->
+            if (config.isCanBeResolved) {
+                try {
+                    config.resolvedConfiguration.lenientConfiguration.artifacts.forEach { artifact ->
+                        if (artifact.file.name.contains("myket-billing-client")) {
+                            println("=== ${config.name}: ${artifact.file.absolutePath} ===")
+                            java.util.zip.ZipFile(artifact.file).use { zip ->
+                                zip.entries().asSequence()
+                                    .filter { it.name.endsWith(".class") }
+                                    .forEach { println("CLASS_ENTRY: ${it.name}") }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Some configurations can't be resolved cleanly on their own - ignore and move on.
+                }
+            }
+        }
+    }
 }
