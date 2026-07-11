@@ -28,6 +28,10 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_SUBSCRIPTION_CHECK = "last_subscription_check"
         private const val KEY_DAILY_AI_COUNT = "daily_ai_count"
         private const val KEY_DAILY_AI_COUNT_DATE = "daily_ai_count_date"
+        private const val KEY_QUOTA_NOTIFIED = "quota_exhausted_notified"
+        private const val KEY_EXPIRY_REMINDER_SCHEDULED_FOR = "expiry_reminder_scheduled_for"
+        private const val KEY_PHONE_NUMBER = "phone_number"
+        private const val KEY_LAST_STORE_CHANNEL = "last_store_channel"
     }
 
     fun saveAPIKeys(keys: List<APIKey>) {
@@ -146,6 +150,41 @@ class PreferencesManager(context: Context) {
             .putInt(KEY_DAILY_AI_COUNT, count)
             .putString(KEY_DAILY_AI_COUNT_DATE, date)
             .apply()
+    }
+
+    // --- Payment/notification bookkeeping ---
+
+    /** So the "free quota exhausted" notification is shown once, not on every failed
+     *  canUseAi() check. Reset back to false whenever premium is (re)activated. */
+    fun hasNotifiedQuotaExhausted(): Boolean = prefs.getBoolean(KEY_QUOTA_NOTIFIED, false)
+
+    fun setNotifiedQuotaExhausted(notified: Boolean) {
+        prefs.edit().putBoolean(KEY_QUOTA_NOTIFIED, notified).apply()
+    }
+
+    /** The premiumUntil value (epoch millis) that the currently-scheduled expiry-reminder
+     *  WorkManager job was scheduled for. Used to avoid re-scheduling the same reminder
+     *  over and over, and to know when to reschedule (e.g. after a renewal). */
+    fun getExpiryReminderScheduledFor(): Long = prefs.getLong(KEY_EXPIRY_REMINDER_SCHEDULED_FOR, 0L)
+
+    fun setExpiryReminderScheduledFor(premiumUntil: Long) {
+        prefs.edit().putLong(KEY_EXPIRY_REMINDER_SCHEDULED_FOR, premiumUntil).apply()
+    }
+
+    /** Optional phone number, only used so the payment backend can text/identify a
+     *  receipt or recover a purchase for support - never required to use the app. */
+    fun getPhoneNumber(): String? = prefs.getString(KEY_PHONE_NUMBER, null)
+
+    fun setPhoneNumber(phone: String?) {
+        prefs.edit().putString(KEY_PHONE_NUMBER, phone).apply()
+    }
+
+    /** Which store the last successful/attempted purchase went through - "bazaar",
+     *  "myket" or "direct". Purely informational (e.g. for support/debugging). */
+    fun getLastStoreChannel(): String? = prefs.getString(KEY_LAST_STORE_CHANNEL, null)
+
+    fun setLastStoreChannel(channel: String) {
+        prefs.edit().putString(KEY_LAST_STORE_CHANNEL, channel).apply()
     }
 
     // --- Bank SMS reading (opt-in) ---

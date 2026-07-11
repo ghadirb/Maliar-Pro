@@ -21,16 +21,20 @@
 //      -- if using zarinpal --
 //      ZARINPAL_MERCHANT_ID = your merchant id
 //      ZARINPAL_SANDBOX     = true   (set to false once you've tested)
-//      PRICE_MONTHLY_RIAL   = 800000
-//      PRICE_YEARLY_RIAL    = 6500000
+//      PRICE_MONTHLY_RIAL   = 1990000   (= 199,000 Toman)
+//      PRICE_YEARLY_RIAL    = 18900000  (= 1,890,000 Toman)
 //      -- if using nextpay --
 //      NEXTPAY_API_KEY      = your direct-gateway api_key from NextPay's panel
-//      PRICE_MONTHLY_TOMAN  = 80000   (NextPay's amount is in Toman, not Rial)
-//      PRICE_YEARLY_TOMAN   = 650000
+//      PRICE_MONTHLY_TOMAN  = 199000   (NextPay's amount is in Toman, not Rial)
+//      PRICE_YEARLY_TOMAN   = 1890000
 //      -- if using payping --
 //      PAYPING_TOKEN        = your PayPing access token (Bearer)
-//      PRICE_MONTHLY_TOMAN  = 80000   (PayPing's amount is in Toman too)
-//      PRICE_YEARLY_TOMAN   = 650000
+//      PRICE_MONTHLY_TOMAN  = 199000   (PayPing's amount is in Toman too)
+//      PRICE_YEARLY_TOMAN   = 1890000
+//      -- if using Bazaar / Myket in-app products too --
+//      APP_PACKAGE_NAME     = com.maliar.pro
+//      BAZAAR_API_TOKEN     = token from Bazaar developer dashboard
+//      MYKET_ACCESS_TOKEN   = token from Myket developer dashboard
 // 4. Deploy -> New deployment -> type: "Web app".
 //      Execute as: Me
 //      Who has access: Anyone
@@ -50,15 +54,16 @@ function activeGateway_() {
 }
 
 function getPlans_() {
+  // Monthly: 199,000 Toman. Yearly: 1,890,000 Toman (= 1,990,000 / 18,900,000 Rial).
   if (activeGateway_() === 'nextpay' || activeGateway_() === 'payping') {
     return {
-      monthly: { days: 30, amount: parseInt(getSetting_('PRICE_MONTHLY_TOMAN', '80000'), 10) },
-      yearly: { days: 365, amount: parseInt(getSetting_('PRICE_YEARLY_TOMAN', '650000'), 10) }
+      monthly: { days: 30, amount: parseInt(getSetting_('PRICE_MONTHLY_TOMAN', '199000'), 10) },
+      yearly: { days: 365, amount: parseInt(getSetting_('PRICE_YEARLY_TOMAN', '1890000'), 10) }
     };
   }
   return {
-    monthly: { days: 30, amount: parseInt(getSetting_('PRICE_MONTHLY_RIAL', '800000'), 10) },
-    yearly: { days: 365, amount: parseInt(getSetting_('PRICE_YEARLY_RIAL', '6500000'), 10) }
+    monthly: { days: 30, amount: parseInt(getSetting_('PRICE_MONTHLY_RIAL', '1990000'), 10) },
+    yearly: { days: 365, amount: parseInt(getSetting_('PRICE_YEARLY_RIAL', '18900000'), 10) }
   };
 }
 
@@ -116,6 +121,15 @@ function saveOrder_(key, order) {
   PropertiesService.getScriptProperties().setProperty('order_' + key, JSON.stringify(order));
 }
 
+function getStorePurchase_(key) {
+  const raw = PropertiesService.getScriptProperties().getProperty('store_purchase_' + key);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function saveStorePurchase_(key, purchase) {
+  PropertiesService.getScriptProperties().setProperty('store_purchase_' + key, JSON.stringify(purchase));
+}
+
 // --- HTTP response helpers -----------------------------------------------------------
 
 function jsonOutput_(obj) {
@@ -156,8 +170,112 @@ function routeRequest_(e) {
   if (path === 'request') return handleRequest_(params);
   if (path === 'callback') return handleCallback_(params);
   if (path === 'paypingCallback') return handleCallbackPayping_(params);
+  if (path === 'verifyStore') return handleVerifyStore_(params);
 
   return jsonOutput_({ error: 'unknown_path' });
+}
+
+// --- Bazaar / Myket in-app purchase verification (optional) -------------------------
+// Only needed if you want people who installed from Bazaar/Myket to pay through the
+// store's own in-app purchase sheet instead of a browser. Add these Script Properties:
+//   APP_PACKAGE_NAME, BAZAAR_API_TOKEN, MYKET_ACCESS_TOKEN
+// Confirmed against each store's own docs (July 2026): BOTH now use a single static
+// per-app token in a request header - no OAuth2, no refresh, nothing to renew. SKUs must
+// match BazaarBillingHelper.SKU_*/MyketBillingHelper.SKU_* on the Android side, and must
+// be created as CONSUMABLE in-app products (Myket has no real subscription product type).
+
+const PLAN_TO_SKU_ = { monthly: 'maliar_pro_monthly', yearly: 'maliar_pro_yearly' };
+
+/** Confirmed against Bazaar's official "راه اندازی API (روش جدید)" و "ارسال درخواست
+ *  به API بازار (روش جدید)" docs:
+ *  GET https://pardakht.cafebazaar.ir/devapi/v2/api/validate/{PACKAGE_NAME}/inapp/{SKU}/purchases/{PURCHASE_TOKEN}
+ *  Header: CAFEBAZAAR-PISHKHAN-API-SECRET: {TOKEN}
+ *  Response.purchaseState: 0 = purchased normally, 1 = refunded. */
+function verifyBazaarPurchase_(sku, purchaseToken) {
+  const apiSecret = getSetting_('BAZAAR_API_TOKEN', '');
+  if (!apiSecret) return false;
+  const packageName = getSetting_('APP_PACKAGE_NAME', 'com.maliar.pro');
+  const url = 'https://pardakht.cafebazaar.ir/devapi/v2/api/validate/' + packageName +
+    '/inapp/' + sku + '/purchases/' + purchaseToken;
+  const response = UrlFetchApp.fetch(url, {
+    method: 'get',
+    muteHttpExceptions: true,
+    headers: { 'CAFEBAZAAR-PISHKHAN-API-SECRET': apiSecret }
+  });
+  if (response.getResponseCode() !== 200) return false;
+  const data = JSON.parse(response.getContentText());
+  return data.purchaseState === 0 || data.purchaseState === '0';
+}
+
+/** Confirmed against Myket's official "استفاده از API صحت سنجی خرید" docs:
+ *  POST https://developer.myket.ir/api/partners/applications/{PACKAGE_NAME}/purchases/products/{SKU_ID}/verify
+ *  Header: X-Access-Token: {ACCESS_TOKEN}   Body: { "tokenId": "{TOKEN_ID}" }
+ *  Response.purchaseState: 0 = successful purchase, 1 = failed. */
+function verifyMyketPurchase_(sku, purchaseToken) {
+  const accessToken = getSetting_('MYKET_ACCESS_TOKEN', '');
+  if (!accessToken) return false;
+  const packageName = getSetting_('APP_PACKAGE_NAME', 'com.maliar.pro');
+  const url = 'https://developer.myket.ir/api/partners/applications/' + packageName +
+    '/purchases/products/' + sku + '/verify';
+  const response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    headers: { 'X-Access-Token': accessToken },
+    payload: JSON.stringify({ tokenId: purchaseToken })
+  });
+  if (response.getResponseCode() !== 200) return false;
+  const data = JSON.parse(response.getContentText());
+  return data.purchaseState === 0 || data.purchaseState === '0';
+}
+
+function handleVerifyStore_(params) {
+  const deviceId = params.deviceId;
+  const plan = params.plan;
+  const channel = params.channel;
+  const purchaseToken = params.purchaseToken;
+  const planConfig = getPlans_()[plan];
+  const sku = PLAN_TO_SKU_[plan];
+
+  if (!deviceId || !planConfig || !sku || !purchaseToken || (channel !== 'bazaar' && channel !== 'myket')) {
+    return jsonOutput_({ verified: false, error: 'invalid_request' });
+  }
+
+  try {
+    const purchaseKey = channel + ':' + purchaseToken;
+    const existing = getStorePurchase_(purchaseKey);
+    if (existing) {
+      if (existing.deviceId !== deviceId || existing.plan !== plan) {
+        return jsonOutput_({ verified: false, error: 'purchase_already_linked' });
+      }
+      return jsonOutput_({ verified: true, premiumUntil: getDeviceRecord_(deviceId).premiumUntil || 0, alreadyProcessed: true });
+    }
+    const verified = (channel === 'bazaar')
+      ? verifyBazaarPurchase_(sku, purchaseToken)
+      : verifyMyketPurchase_(sku, purchaseToken);
+
+    if (!verified) {
+      return jsonOutput_({ verified: false, premiumUntil: getDeviceRecord_(deviceId).premiumUntil || 0 });
+    }
+
+    // Serialize the check-and-grant step so two simultaneous callbacks cannot add the
+    // same receipt twice.
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(10000)) return jsonOutput_({ verified: false, error: 'verification_busy' });
+    try {
+      const completed = getStorePurchase_(purchaseKey);
+      if (completed) {
+        return jsonOutput_({ verified: true, premiumUntil: getDeviceRecord_(deviceId).premiumUntil || 0, alreadyProcessed: true });
+      }
+      saveStorePurchase_(purchaseKey, { deviceId: deviceId, plan: plan, channel: channel, createdAt: Date.now() });
+      const premiumUntil = grantPremiumDays_(deviceId, planConfig.days);
+      return jsonOutput_({ verified: true, premiumUntil: premiumUntil });
+    } finally {
+      lock.releaseLock();
+    }
+  } catch (err) {
+    return jsonOutput_({ verified: false, error: 'verification_failed' });
+  }
 }
 
 function handleStatus_(params) {

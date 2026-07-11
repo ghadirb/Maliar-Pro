@@ -1,6 +1,10 @@
 package com.maliar.pro.utils
 
 import android.content.Context
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.maliar.pro.billing.StoreChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -10,6 +14,7 @@ import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * Decides whether the person is allowed to make an AI-backed request right now, and talks
@@ -21,26 +26,37 @@ import java.util.Locale
  * because that's the only usage the app owner actually pays for. Anyone who added their
  * own personal AI key, or who is on an active premium subscription, is unlimited.
  *
- * IMPORTANT (TODO for the app owner): set [BACKEND_BASE_URL] to your deployed backend's
- * real URL (see the /server folder for a ready-to-deploy Node.js project) once you've
- * registered a Zarinpal merchant account and deployed it, e.g. to Liara.
+ * IMPORTANT (TODO for the app owner): set [STATUS_URL]/[REQUEST_URL]/[VERIFY_STORE_URL] to
+ * your deployed backend's real URLs (see the /server folder for a ready-to-deploy Node.js
+ * project) once you've registered a Zarinpal/PayPing merchant account and deployed it,
+ * e.g. to Liara.
  */
 object SubscriptionManager {
 
-    // TODO: replace these with your real deployed backend URLs. Both work exactly the
-    // same way (a plain GET returning JSON), whether the backend is:
+    // TODO: replace these with your real deployed backend URLs. All work exactly the
+    // same way (a plain HTTP call returning JSON), whether the backend is:
     //  - a Node.js server (e.g. the one in /server, deployed to Liara), where these are
-    //    two separate paths on the same host, e.g.:
+    //    separate paths on the same host, e.g.:
     //      "https://maliar-billing.liara.run/subscription/status"
     //      "https://maliar-billing.liara.run/payment/request"
-    //  - a Google Apps Script Web App (see /server/apps-script), where both point at the
-    //    SAME exec URL but with a different "path" query param already baked in, e.g.:
+    //      "https://maliar-billing.liara.run/payment/verify-store"
+    //  - a Google Apps Script Web App (see /server/apps-script), where all three point at
+    //    the SAME exec URL but with a different "path" query param already baked in, e.g.:
     //      "https://script.google.com/macros/s/XXXXX/exec?path=status"
     //      "https://script.google.com/macros/s/XXXXX/exec?path=request"
-    const val STATUS_URL = "https://CHANGE-ME/subscription/status"
-    const val REQUEST_URL = "https://CHANGE-ME/payment/request"
+    //      "https://script.google.com/macros/s/XXXXX/exec?path=verifyStore"
+    const val STATUS_URL = "https://script.google.com/macros/s/AKfycbzh8tDg66U3vCSVbHJYjEwBbAktOMPxj7N4tspLPyw9bT5lBm-CS-d7R46qxfLRxwbW/exec?path=status"
+    const val REQUEST_URL = "https://script.google.com/macros/s/AKfycbzh8tDg66U3vCSVbHJYjEwBbAktOMPxj7N4tspLPyw9bT5lBm-CS-d7R46qxfLRxwbW/exec?path=request"
+
+    // Verifies a Bazaar/Myket in-app-purchase token server-to-server (with Bazaar's/
+    // Myket's own APIs) BEFORE granting premium days - see /server/index.js's
+    // /payment/verify-store route and README for the API credentials you need to fill in.
+    const val VERIFY_STORE_URL = "https://script.google.com/macros/s/AKfycbzh8tDg66U3vCSVbHJYjEwBbAktOMPxj7N4tspLPyw9bT5lBm-CS-d7R46qxfLRxwbW/exec?path=verifyStore"
 
     const val FREE_AI_LIFETIME_LIMIT = 15
+
+    /** How many days before expiry the reminder notification should fire. */
+    const val EXPIRY_REMINDER_DAYS_BEFORE = 3
 
     enum class Plan(val apiValue: String, val days: Int, val label: String) {
         MONTHLY("monthly", 30, "اشتراک ماهانه"),
@@ -70,11 +86,21 @@ object SubscriptionManager {
     }
 
     /** Call this BEFORE making a shared-key AI request. Personal keys and active premium
-     *  subscriptions always return true without touching the daily counter at all. */
+     *  subscriptions always return true without touching the daily counter at all. The
+     *  first time this returns false for someone with no personal key, it also fires the
+     *  "quota exhausted" notification once (see [PreferencesManager.hasNotifiedQuotaExhausted]). */
     fun canUseAi(context: Context): Boolean {
         if (isPremium(context)) return true
         if (hasPersonalKey(context)) return true
-        return remainingFreeLifetime(context) > 0
+        val hasQuota = remainingFreeLifetime(context) > 0
+        if (!hasQuota) {
+            val prefs = PreferencesManager(context)
+            if (!prefs.hasNotifiedQuotaExhausted()) {
+                prefs.setNotifiedQuotaExhausted(true)
+                NotificationHelper.notifyQuotaExhausted(context)
+            }
+        }
+        return hasQuota
     }
 
     /** Call this AFTER a successful shared-key AI request so the daily counter reflects
@@ -125,6 +151,14 @@ object SubscriptionManager {
                 val prefs = PreferencesManager(context)
                 prefs.setPremiumUntil(premiumUntil)
                 prefs.setLastSubscriptionCheck(System.currentTimeMillis())
+                if (premiumUntil > System.currentTimeMillis()) {
+                    // Active premium (fresh purchase or still-valid renewal) - clear the
+                    // "quota exhausted" flag so it can fire again if they ever let a
+                    // future subscription lapse, and (re)schedule the expiry reminder for
+                    // this specific premiumUntil.
+                    prefs.setNotifiedQuotaExhausted(false)
+                    scheduleExpiryReminder(context, premiumUntil)
+                }
                 true
             } else {
                 false
@@ -136,10 +170,12 @@ object SubscriptionManager {
     }
 
     /**
-     * Asks the backend to start a Zarinpal payment for [plan] and returns the payment page
-     * URL to open in a browser, or null if the request failed. The backend is responsible
-     * for the actual Zarinpal PaymentRequest.json/PaymentVerification.json calls and for
-     * activating the subscription once Zarinpal confirms payment - see /server/README-fa.md.
+     * Asks the backend to start a Zarinpal/PayPing payment for [plan] and returns the
+     * payment page URL to open in a browser, or null if the request failed. Only used for
+     * [StoreChannel.DIRECT] installs - Bazaar/Myket installs use their native in-app
+     * purchase sheet instead (see [verifyStorePurchase]). The backend is responsible for
+     * the actual gateway request/verify calls and for activating the subscription once the
+     * gateway confirms payment - see /server/README-fa.md.
      */
     suspend fun requestPayment(context: Context, plan: Plan): String? = withContext(Dispatchers.IO) {
         try {
@@ -162,6 +198,86 @@ object SubscriptionManager {
             android.util.Log.w("SubscriptionManager", "requestPayment failed: ${e.message}")
             null
         }
+    }
+
+    /** Which store to bill through for this install - Bazaar/Myket in-app purchase, or
+     *  the direct Zarinpal/PayPing web checkout for anything else (sideloaded APK, a
+     *  store without its own IAB, etc). Call this from the subscription screen to decide
+     *  which purchase flow (native store sheet vs. opening a browser) to show. */
+    fun detectStoreChannel(context: Context): StoreChannel = StoreChannel.current()
+
+    /**
+     * Sends a completed Bazaar/Myket in-app-purchase token to the backend so it can be
+     * verified server-to-server against Bazaar's/Myket's own purchase-verification API
+     * before any premium days are granted - never grant premium purely because the SDK
+     * callback on-device said "success", since that response can be spoofed. On success,
+     * the backend's response reflects the new premiumUntil, same JSON shape as
+     * /subscription/status.
+     */
+    suspend fun verifyStorePurchase(
+        context: Context,
+        channel: StoreChannel,
+        plan: Plan,
+        purchaseToken: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val deviceId = PreferencesManager(context).getOrCreateDeviceId()
+            var url = appendParam(VERIFY_STORE_URL, "deviceId", deviceId)
+            url = appendParam(url, "plan", plan.apiValue)
+            url = appendParam(url, "channel", channel.apiValue)
+            url = appendParam(url, "purchaseToken", purchaseToken)
+
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(body)
+                val premiumUntil = json.optLong("premiumUntil", 0L)
+                val prefs = PreferencesManager(context)
+                prefs.setPremiumUntil(premiumUntil)
+                prefs.setLastStoreChannel(channel.apiValue)
+                val verified = json.optBoolean("verified", premiumUntil > System.currentTimeMillis())
+                if (verified && premiumUntil > System.currentTimeMillis()) {
+                    prefs.setNotifiedQuotaExhausted(false)
+                    scheduleExpiryReminder(context, premiumUntil)
+                }
+                verified
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("SubscriptionManager", "verifyStorePurchase failed: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Schedules (or reschedules) a one-time background job that fires
+     * [EXPIRY_REMINDER_DAYS_BEFORE] days before [premiumUntil], warning the person their
+     * subscription is about to lapse. Safe to call as often as you like - it replaces any
+     * previously scheduled reminder (ExistingWorkPolicy.REPLACE), and does nothing if a
+     * reminder for this exact expiry timestamp is already scheduled.
+     */
+    fun scheduleExpiryReminder(context: Context, premiumUntil: Long) {
+        val prefs = PreferencesManager(context)
+        if (prefs.getExpiryReminderScheduledFor() == premiumUntil) return // already scheduled
+
+        val fireAt = premiumUntil - EXPIRY_REMINDER_DAYS_BEFORE * 24 * 60 * 60 * 1000L
+        val delayMs = (fireAt - System.currentTimeMillis()).coerceAtLeast(0L)
+
+        val request = OneTimeWorkRequestBuilder<SubscriptionReminderWorker>()
+            .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "subscription_expiry_reminder",
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+        prefs.setExpiryReminderScheduledFor(premiumUntil)
     }
 
     /** Human-readable Persian label for the premium expiry, or null if not premium. */

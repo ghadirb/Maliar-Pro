@@ -26,7 +26,7 @@
    - `ZARINPAL_MERCHANT_ID`
    - `ZARINPAL_SANDBOX` (اول `true` برای تست، بعد `false`)
    - `PUBLIC_BASE_URL` = همان آدرسی که لیارا داد (بدون `/` انتهایی)
-   - `PRICE_MONTHLY_RIAL`, `PRICE_YEARLY_RIAL` (به ریال)
+   - `PRICE_MONTHLY_RIAL` = 1990000 (یعنی ۱۹۹,۰۰۰ تومان), `PRICE_YEARLY_RIAL` = 18900000 (یعنی ۱,۸۹۰,۰۰۰ تومان)
 
 ### ⚠️ نکته‌ی مهم درباره‌ی db.json
 این نسخه‌ی ساده، وضعیت کاربران را در یک فایل `db.json` کنار خود سرور نگه می‌دارد. اگر
@@ -37,11 +37,13 @@
 لیارا هم ارائه می‌دهد) جایگزین کنید - بقیه‌ی کد بدون تغییر کار می‌کند.
 
 ## مرحله ۳: وصل کردن اپ اندروید به این بک‌اند
-فایل زیر را در پروژه‌ی اندروید باز کنید و آدرس واقعی را جایگزین کنید:
+فایل زیر را در پروژه‌ی اندروید باز کنید و سه آدرس واقعی را جایگزین `CHANGE-ME` کنید:
 
 `app/src/main/java/com/maliar/pro/utils/SubscriptionManager.kt`
 ```kotlin
-const val BACKEND_BASE_URL = "https://maliar-billing.liara.run"
+const val STATUS_URL = "https://maliar-billing.liara.run/subscription/status"
+const val REQUEST_URL = "https://maliar-billing.liara.run/payment/request"
+const val VERIFY_STORE_URL = "https://maliar-billing.liara.run/payment/verify-store"
 ```
 
 سپس اپ را دوباره بسازید (rebuild) و نصب کنید.
@@ -61,3 +63,42 @@ const val BACKEND_BASE_URL = "https://maliar-billing.liara.run"
   یک HMAC ساده روی deviceId اضافه کنید تا `/subscription/status` هم امن‌تر شود.
 - اگر بعداً لاگین واقعی (شماره موبایل/ایمیل) اضافه کردید، `deviceId` را با یک شناسه‌ی
   کاربر واقعی جایگزین کنید تا با تعویض گوشی، اشتراک کاربر از دست نرود.
+
+## مرحله ۵ (اختیاری): فعال کردن پرداخت درون‌برنامه‌ای بازار و مایکت
+راهنمای به‌روز و مرحله‌به‌مرحله، شامل ساخت سه خروجی مستقل و تنظیم GitHub Actions، در
+فایل [`STORE_SETUP_FA.md`](STORE_SETUP_FA.md) است. بازار و مایکت باید با flavor جدا
+ساخته شوند؛ تشخیص فروشگاه از installer یک APK مشترک برای این دو مسیر قابل اتکا نیست.
+اگر می‌خواهید کاربرانی که از کافه‌بازار یا مایکت نصب کرده‌اند، از صفحه‌ی خرید همان
+فروشگاه (به‌جای مرورگر) پرداخت کنند، این مرحله را هم انجام دهید. اپ اندروید همیشه محل
+برای بازار و مایکت خروجی مستقل ساخته می‌شود (`bazaarRelease` و `myketRelease`) و تنظیمات
+کلاینت و سرور هر دو لازم‌اند:
+
+### بازار (Cafe Bazaar)
+1. در پیشخان توسعه‌دهندگان بازار، دو محصول درون‌برنامه‌ای با شناسه‌های دقیقاً
+   `maliar_pro_monthly` و `maliar_pro_yearly` بسازید (نوع: مصرف‌شدنی/Consumable).
+2. کلید عمومی RSA برنامه را از پیشخان بگیرید و در
+   `app/src/main/java/com/maliar/pro/billing/BazaarBillingHelper.kt` جای
+   `PUT_YOUR_BAZAAR_RSA_PUBLIC_KEY_HERE` بگذارید.
+3. برای صحت‌سنجی سمت سرور، از پیشخان بازار توکن API بگیرید و در `.env` مقدار
+   `BAZAAR_API_TOKEN` را ست کنید.
+
+### مایکت
+1. در پیشخان توسعه‌دهندگان مایکت، دو محصول درون‌برنامه‌ای **مصرف‌شدنی** با همان دو شناسه‌ی
+   بالا بسازید. مایکت از اشتراک واقعی پشتیبانی نمی‌کند، پس هر دو باید مصرف‌شدنی باشند.
+2. کلید عمومی برنامه را از پیشخان (بخش «کلید») بگیرید و در
+   `app/src/main/java/com/maliar/pro/billing/MyketBillingHelper.kt` جای
+   `PUT_YOUR_MYKET_RSA_PUBLIC_KEY_HERE` بگذارید.
+3. برای صحت‌سنجی سمت سرور، از پیشخان مایکت (بخش محصولات درون‌برنامه‌ای) یک
+   `X-Access-Token` بگیرید و در `.env` مقدار `MYKET_ACCESS_TOKEN` را ست کنید - بر خلاف
+   بازار، هیچ Client ID/Secret/Refresh Token دیگری لازم نیست.
+
+هر دو مسیر کاملاً اختیاری‌اند: تا وقتی این متغیرها را ست نکنید، `/payment/verify-store`
+فقط `verified:false` برمی‌گرداند و مسیر مستقیم زرین‌پال/پی‌پینگ بدون مشکل کار می‌کند.
+
+## اگر تصمیم گرفتید از Google Apps Script به‌جای سرور Node.js استفاده کنید
+پوشه‌ی `apps-script/Code.gs` همان قابلیت‌ها (شامل صحت‌سنجی بازار/مایکت) را با
+Google Apps Script - بدون نیاز به هاست کردن جایی مثل لیارا - پیاده‌سازی می‌کند. راهنمای
+کامل نصب آن در همان فایل (کامنت‌های ابتدای فایل) است. در این حالت هر سه آدرس بالا
+(`STATUS_URL`/`REQUEST_URL`/`VERIFY_STORE_URL`) به یک آدرس `.../exec` با `?path=...` متفاوت
+اشاره می‌کنند (مثلاً `...exec?path=verifyStore`) - دقیقاً همان‌طور که در ابتدای `Code.gs`
+توضیح داده شده است.

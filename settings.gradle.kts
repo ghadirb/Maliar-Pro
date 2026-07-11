@@ -23,6 +23,8 @@ dependencyResolutionManagement {
         maven { url = uri("https://maven.aliyun.com/repository/public") }
         maven { url = uri("https://en-mirror.ir") }
         maven { url = uri("https://maven.myket.ir") }
+        // Hosts Cafe Bazaar's Poolakey in-app billing SDK and Myket's billing client.
+        maven { url = uri("https://jitpack.io") }
         google()
         mavenCentral()
     }

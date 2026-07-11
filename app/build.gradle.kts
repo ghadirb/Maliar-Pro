@@ -1,6 +1,12 @@
 import java.util.Properties
 import java.io.FileInputStream
 
+fun projectSetting(name: String): String =
+    providers.gradleProperty(name).orNull ?: System.getenv(name).orEmpty()
+
+fun buildConfigString(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -34,6 +40,28 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    flavorDimensions += "store"
+    productFlavors {
+        create("direct") {
+            dimension = "store"
+            buildConfigField("String", "STORE_CHANNEL", "\"direct\"")
+            buildConfigField("String", "IAB_PUBLIC_KEY", "\"\"")
+            manifestPlaceholders["marketPermission"] = "com.maliar.pro.permission.UNUSED_BILLING"
+        }
+        create("bazaar") {
+            dimension = "store"
+            buildConfigField("String", "STORE_CHANNEL", "\"bazaar\"")
+            buildConfigField("String", "IAB_PUBLIC_KEY", buildConfigString(projectSetting("BAZAAR_IAB_PUBLIC_KEY")))
+            manifestPlaceholders["marketPermission"] = "com.farsitel.bazaar.permission.PAY_THROUGH_BAZAAR"
+        }
+        create("myket") {
+            dimension = "store"
+            buildConfigField("String", "STORE_CHANNEL", "\"myket\"")
+            buildConfigField("String", "IAB_PUBLIC_KEY", buildConfigString(projectSetting("MYKET_IAB_PUBLIC_KEY")))
+            manifestPlaceholders["marketPermission"] = "ir.mservices.market.BILLING"
+        }
     }
 
     signingConfigs {
@@ -72,6 +100,7 @@ android {
     
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 
@@ -110,6 +139,10 @@ dependencies {
     
     // OkHttp for network requests
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // The official Myket client is configured per product flavor for both Myket and
+    // Cafe Bazaar, as documented by Myket. Each store receives its own signed APK/AAB.
+    implementation("com.github.myketstore:myket-billing-client:1.6")
     
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

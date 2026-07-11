@@ -19,6 +19,25 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Filled by the selected store flavor at build time. -->
+    <uses-permission android:name="${marketPermission}" />
+
+    <!-- Required by Myket's billing client (only used when the app was installed from
+         Myket) - straight from Myket's own "جاوا (Java)" integration docs. -->
+
+    <!-- Android 11+ package visibility: lets the billing SDKs
+         actually see/bind to the Bazaar and Myket apps if installed. -->
+    <queries>
+        <package android:name="com.farsitel.bazaar" />
+        <package android:name="ir.mservices.market" />
+        <intent>
+            <action android:name="ir.mservices.market.InAppBillingService.BIND" />
+        </intent>
+        <intent>
+            <action android:name="ir.cafebazaar.pardakht.InAppBillingService.BIND" />
+        </intent>
+    </queries>
+
     <!-- Opt-in only (see PreferencesManager.isSmsReadingEnabled, off by default) - lets the
          app recognize bank transaction SMS and auto-record them as accounting entries. -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />

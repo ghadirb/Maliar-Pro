@@ -17,10 +17,17 @@ const SANDBOX = (process.env.ZARINPAL_SANDBOX || 'true') === 'true';
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'http://localhost:3000';
 const PORT = process.env.PORT || 3000;
 
+// Prices are in Rial (Zarinpal's unit) - 1 Toman = 10 Rial.
+// Monthly: 199,000 Toman = 1,990,000 Rial. Yearly: 1,890,000 Toman = 18,900,000 Rial.
 const PLANS = {
-  monthly: { days: 30, amountRial: parseInt(process.env.PRICE_MONTHLY_RIAL || '800000', 10) },
-  yearly: { days: 365, amountRial: parseInt(process.env.PRICE_YEARLY_RIAL || '6500000', 10) }
+  monthly: { days: 30, amountRial: parseInt(process.env.PRICE_MONTHLY_RIAL || '1990000', 10) },
+  yearly: { days: 365, amountRial: parseInt(process.env.PRICE_YEARLY_RIAL || '18900000', 10) }
 };
+
+// SKU ids as registered in the Bazaar/Myket developer panels - must match
+// BazaarBillingHelper.SKU_* / MyketBillingHelper.SKU_* on the Android side.
+const PLAN_TO_SKU = { monthly: 'maliar_pro_monthly', yearly: 'maliar_pro_yearly' };
+const APP_PACKAGE_NAME = process.env.APP_PACKAGE_NAME || 'com.maliar.pro';
 
 const ZARINPAL_REQUEST_URL = SANDBOX
   ? 'https://sandbox.zarinpal.com/pg/v4/payment/request.json'
@@ -36,7 +43,7 @@ const ZARINPAL_STARTPAY_URL = SANDBOX
 
 function loadDb() {
   if (!fs.existsSync(DB_PATH)) {
-    return { devices: {}, orders: {} };
+    return { devices: {}, orders: {}, storePurchases: {} };
   }
   try {
     return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
@@ -66,6 +73,61 @@ function grantPremiumDays(deviceId, days) {
   db.devices[deviceId] = { premiumUntil };
   saveDb(db);
   return premiumUntil;
+}
+
+// --- Bazaar / Myket in-app purchase verification --------------------------------------
+// Confirmed against each store's own official docs (July 2026): BOTH now use a simple
+// static per-app token in a request header - no OAuth2, no refresh, no expiry to manage.
+// Bazaar: header "CAFEBAZAAR-PISHKHAN-API-SECRET" (from پیشخان بازار -> برنامه شما ->
+// API پیشخان بازار -> دریافت توکن جدید). Myket: header "X-Access-Token" (see
+// verifyMyketPurchase below). If you haven't set up credentials in .env for a given
+// store, its verify function simply returns false - the Zarinpal direct-payment flow
+// keeps working regardless.
+
+/** Confirmed against Bazaar's official "راه اندازی API (روش جدید)" و "ارسال درخواست
+ *  به API بازار (روش جدید)" docs:
+ *  GET https://pardakht.cafebazaar.ir/devapi/v2/api/validate/{PACKAGE_NAME}/inapp/{SKU}/purchases/{PURCHASE_TOKEN}
+ *  Header: CAFEBAZAAR-PISHKHAN-API-SECRET: {TOKEN}
+ *  Response.purchaseState: 0 = purchased normally, 1 = refunded. */
+async function verifyBazaarPurchase(sku, purchaseToken) {
+  const apiSecret = process.env.BAZAAR_API_TOKEN || '';
+  if (!apiSecret) return false;
+  const url = `https://pardakht.cafebazaar.ir/devapi/v2/api/validate/${APP_PACKAGE_NAME}/inapp/${sku}/purchases/${purchaseToken}`;
+  const resp = await fetch(url, {
+    headers: { 'CAFEBAZAAR-PISHKHAN-API-SECRET': apiSecret }
+  });
+  if (!resp.ok) return false;
+  const data = await resp.json();
+  return data.purchaseState === 0 || data.purchaseState === '0';
+}
+
+async function getMyketAccessToken() {
+  // Confirmed against Myket's official "استفاده از API صحت سنجی خرید" docs: Myket's
+  // purchase-verification API also just uses a single static "X-Access-Token" you
+  // generate once per app in the developer panel and store directly as
+  // MYKET_ACCESS_TOKEN in .env - no token exchange call needed.
+  return process.env.MYKET_ACCESS_TOKEN || '';
+}
+
+/** Confirmed against Myket's official "استفاده از API صحت سنجی خرید" docs:
+ *  POST https://developer.myket.ir/api/partners/applications/{PACKAGE_NAME}/purchases/products/{SKU_ID}/verify
+ *  Header: X-Access-Token: {ACCESS_TOKEN}   Body: { "tokenId": "{TOKEN_ID}" }
+ *  Response.purchaseState: 0 = successful purchase, 1 = failed. */
+async function verifyMyketPurchase(sku, purchaseToken) {
+  const accessToken = await getMyketAccessToken();
+  if (!accessToken) return false;
+  const url = `https://developer.myket.ir/api/partners/applications/${APP_PACKAGE_NAME}/purchases/products/${sku}/verify`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'X-Access-Token': accessToken,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ tokenId: purchaseToken })
+  });
+  if (!resp.ok) return false;
+  const data = await resp.json();
+  return data.purchaseState === 0 || data.purchaseState === '0';
 }
 
 // --- routes --------------------------------------------------------------------------
@@ -117,6 +179,56 @@ app.get('/payment/request', async (req, res) => {
   } catch (e) {
     console.error('POST /payment/request failed:', e);
     res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+app.post('/payment/verify-store', async (req, res) => {
+  try {
+    const input = { ...(req.query || {}), ...(req.body || {}) };
+    const { deviceId, plan, channel, purchaseToken } = input;
+    const planConfig = PLANS[plan];
+    const sku = PLAN_TO_SKU[plan];
+    if (!deviceId || !planConfig || !sku || !purchaseToken || !['bazaar', 'myket'].includes(channel)) {
+      return res.status(400).json({ error: 'deviceId, a valid plan, channel (bazaar/myket) and purchaseToken are required' });
+    }
+
+    const purchaseKey = `${channel}:${purchaseToken}`;
+    const db = loadDb();
+    const existing = db.storePurchases && db.storePurchases[purchaseKey];
+    if (existing) {
+      if (existing.deviceId !== deviceId || existing.plan !== plan) {
+        return res.status(409).json({ verified: false, error: 'purchase_already_linked' });
+      }
+      return res.json({ verified: true, premiumUntil: getPremiumUntil(deviceId), alreadyProcessed: true });
+    }
+
+    const verified = channel === 'bazaar'
+      ? await verifyBazaarPurchase(sku, purchaseToken)
+      : await verifyMyketPurchase(sku, purchaseToken);
+
+    if (!verified) {
+      return res.json({ verified: false, premiumUntil: getPremiumUntil(deviceId) });
+    }
+
+    // Re-read after the network verification too: two callbacks can be in flight at
+    // once, and only the first one is allowed to grant this token's entitlement.
+    const latestDb = loadDb();
+    if (latestDb.storePurchases && latestDb.storePurchases[purchaseKey]) {
+      return res.json({ verified: true, premiumUntil: getPremiumUntil(deviceId), alreadyProcessed: true });
+    }
+    // Persist the token before granting access. A repeated callback then returns the
+    // original entitlement instead of extending premium a second time.
+    latestDb.storePurchases = latestDb.storePurchases || {};
+    latestDb.storePurchases[purchaseKey] = { deviceId, plan, channel, createdAt: Date.now() };
+    saveDb(latestDb);
+    const premiumUntil = grantPremiumDays(deviceId, planConfig.days);
+    res.json({ verified: true, premiumUntil });
+  } catch (e) {
+    console.error('POST /payment/verify-store failed:', e);
+    // Fails closed (verified:false) rather than 500-ing into a false grant - a
+    // misconfigured/missing Bazaar or Myket credential should never accidentally look
+    // like a successful purchase to the app.
+    res.json({ verified: false, error: 'verification_failed' });
   }
 });
 
