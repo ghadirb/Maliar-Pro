@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.io.FileInputStream
+import java.util.zip.ZipFile
 
 fun projectSetting(name: String): String =
     providers.gradleProperty(name).orNull ?: System.getenv(name).orEmpty()
@@ -176,7 +177,7 @@ tasks.register("printMyketBillingClientClasses") {
                     config.resolvedConfiguration.lenientConfiguration.artifacts.forEach { artifact ->
                         if (artifact.file.name.contains("myket-billing-client")) {
                             println("=== ${config.name}: ${artifact.file.absolutePath} ===")
-                            java.util.zip.ZipFile(artifact.file).use { zip ->
+                            ZipFile(artifact.file).use { zip ->
                                 zip.entries().asSequence()
                                     .filter { it.name.endsWith(".class") }
                                     .forEach { println("CLASS_ENTRY: ${it.name}") }
