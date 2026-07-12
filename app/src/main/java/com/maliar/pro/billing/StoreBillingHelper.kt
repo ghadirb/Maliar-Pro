@@ -1,7 +1,6 @@
 package com.maliar.pro.billing
 
 import android.app.Activity
-import android.content.Intent
 import ir.myket.billingclient.IabHelper
 import ir.myket.billingclient.util.IabResult
 import ir.myket.billingclient.util.Inventory
@@ -61,9 +60,6 @@ internal class StoreBillingHelper(private val publicKey: () -> String) {
             }
         }, payload)
     }
-
-    fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean =
-        helper?.handleActivityResult(requestCode, resultCode, data) ?: false
 
     fun consume(purchaseToken: String, onResult: (Boolean) -> Unit) {
         val current = helper ?: run {

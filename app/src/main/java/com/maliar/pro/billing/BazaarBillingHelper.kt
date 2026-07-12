@@ -1,7 +1,6 @@
 package com.maliar.pro.billing
 
 import android.app.Activity
-import android.content.Intent
 import com.maliar.pro.BuildConfig
 
 /** Billing adapter for the `bazaar` product flavor. */
@@ -25,6 +24,4 @@ object BazaarBillingHelper {
     fun consume(purchaseToken: String, onResult: (Boolean) -> Unit) =
         delegate.consume(purchaseToken, onResult)
 
-    fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean =
-        delegate.handleActivityResult(requestCode, resultCode, data)
 }

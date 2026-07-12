@@ -55,15 +55,6 @@ class SubscriptionActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (storeChannel) {
-            StoreChannel.BAZAAR -> BazaarBillingHelper.handleActivityResult(requestCode, resultCode, data)
-            StoreChannel.MYKET -> MyketBillingHelper.handleActivityResult(requestCode, resultCode, data)
-            StoreChannel.DIRECT -> Unit
-        }
-    }
-
     override fun onResume() {
         super.onResume()
         refreshStatus(showToast = false)
