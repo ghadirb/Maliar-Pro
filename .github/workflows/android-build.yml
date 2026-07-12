@@ -60,9 +60,6 @@ jobs:
         run: |
           store="${{ matrix.store }}"
           flavor="$(tr '[:lower:]' '[:upper:]' <<< "${store:0:1}")${store:1}"
-          # TEMPORARY: prints the real class names inside myket-billing-client so we can
-          # confirm/fix the imports in StoreBillingHelper.kt - remove this line once fixed.
-          ./gradlew ":app:printMyketBillingClientClasses" --no-daemon || true
           ./gradlew ":app:assemble${flavor}Release" ":app:bundle${flavor}Release" --no-daemon
 
       - name: Upload release APK

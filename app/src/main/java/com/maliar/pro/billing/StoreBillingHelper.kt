@@ -2,10 +2,10 @@ package com.maliar.pro.billing
 
 import android.app.Activity
 import android.content.Intent
-import com.myket.billingclient.IabHelper
-import com.myket.billingclient.IabResult
-import com.myket.billingclient.Inventory
-import com.myket.billingclient.Purchase
+import ir.myket.billingclient.IabHelper
+import ir.myket.billingclient.util.IabResult
+import ir.myket.billingclient.util.Inventory
+import ir.myket.billingclient.util.Purchase
 
 /**
  * Shared implementation used by the Bazaar and Myket flavors. Products remain owned
@@ -75,7 +75,7 @@ internal class StoreBillingHelper(private val publicKey: () -> String) {
             consumePurchase(current, cached, onResult)
             return
         }
-        current.queryInventoryAsync(true, listOf(BazaarBillingHelper.SKU_MONTHLY, BazaarBillingHelper.SKU_YEARLY), null) {
+        current.queryInventoryAsync(true, listOf(BazaarBillingHelper.SKU_MONTHLY, BazaarBillingHelper.SKU_YEARLY)) {
                 result: IabResult, inventory: Inventory? ->
             val purchase = if (result.isSuccess && inventory != null) {
                 listOf(BazaarBillingHelper.SKU_MONTHLY, BazaarBillingHelper.SKU_YEARLY)
@@ -88,7 +88,7 @@ internal class StoreBillingHelper(private val publicKey: () -> String) {
 
     private fun recoverPendingPurchases(onPendingPurchase: (PurchaseResult.Success) -> Unit) {
         val current = helper ?: return
-        current.queryInventoryAsync(true, listOf(BazaarBillingHelper.SKU_MONTHLY, BazaarBillingHelper.SKU_YEARLY), null) {
+        current.queryInventoryAsync(true, listOf(BazaarBillingHelper.SKU_MONTHLY, BazaarBillingHelper.SKU_YEARLY)) {
                 result: IabResult, inventory: Inventory? ->
             if (result.isFailure || inventory == null) return@queryInventoryAsync
             listOf(BazaarBillingHelper.SKU_MONTHLY, BazaarBillingHelper.SKU_YEARLY).forEach { sku ->
