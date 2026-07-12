@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.io.File
 import java.io.FileInputStream
 import java.util.zip.ZipFile
 
@@ -164,28 +165,43 @@ dependencies {
 }
 
 // TEMPORARY DIAGNOSTIC TASK - remove once the real com.myket.billingclient.* imports in
-// StoreBillingHelper.kt are confirmed correct. The CI build hit "Unresolved reference:
-// myket/IabHelper/IabResult/Purchase" for this dependency, meaning the actual Java
-// package inside the myket-billing-client AAR differs from what's currently imported.
-// This task finds the resolved artifact (whatever configuration it's in) and lists every
-// .class file inside it, which reveals the real package/class names to fix the imports.
+// StoreBillingHelper.kt are confirmed correct. First attempt only listed the .aar's own
+// top-level zip entries (AndroidManifest.xml, res/, classes.jar, ...) - none of those end
+// in ".class" since an AAR nests its actual compiled code inside classes.jar. This version
+// digs one level deeper: opens classes.jar from inside the AAR and lists ITS entries.
 tasks.register("printMyketBillingClientClasses") {
     doLast {
+        val seen = mutableSetOf<String>()
         project.configurations.forEach { config ->
             if (config.isCanBeResolved) {
                 try {
                     config.resolvedConfiguration.lenientConfiguration.artifacts.forEach { artifact ->
-                        if (artifact.file.name.contains("myket-billing-client")) {
-                            println("=== ${config.name}: ${artifact.file.absolutePath} ===")
-                            ZipFile(artifact.file).use { zip ->
-                                zip.entries().asSequence()
-                                    .filter { it.name.endsWith(".class") }
-                                    .forEach { println("CLASS_ENTRY: ${it.name}") }
+                        if (artifact.file.name.contains("myket-billing-client") && seen.add(artifact.file.absolutePath)) {
+                            println("=== ${artifact.file.absolutePath} ===")
+                            ZipFile(artifact.file).use { aar ->
+                                println("AAR top-level entries:")
+                                aar.entries().asSequence().forEach { println("AAR_ENTRY: ${it.name}") }
+                                val classesJarEntry = aar.getEntry("classes.jar")
+                                if (classesJarEntry != null) {
+                                    val tempJar = File.createTempFile("myket-billing-classes", ".jar")
+                                    aar.getInputStream(classesJarEntry).use { input ->
+                                        tempJar.outputStream().use { output -> input.copyTo(output) }
+                                    }
+                                    ZipFile(tempJar).use { classesJar ->
+                                        println("classes.jar entries:")
+                                        classesJar.entries().asSequence()
+                                            .filter { it.name.endsWith(".class") }
+                                            .forEach { println("CLASS_ENTRY: ${it.name}") }
+                                    }
+                                    tempJar.delete()
+                                } else {
+                                    println("No classes.jar entry found inside the AAR.")
+                                }
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    // Some configurations can't be resolved cleanly on their own - ignore and move on.
+                    println("printMyketBillingClientClasses: skipped ${config.name}: ${e.message}")
                 }
             }
         }
