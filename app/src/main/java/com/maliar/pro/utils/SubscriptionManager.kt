@@ -141,8 +141,8 @@ object SubscriptionManager {
             val url = URL(appendParam(STATUS_URL, "deviceId", deviceId))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            connection.connectTimeout = 12000
-            connection.readTimeout = 12000
+            connection.connectTimeout = 25000
+            connection.readTimeout = 25000
 
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val body = connection.inputStream.bufferedReader().use { it.readText() }
@@ -164,7 +164,7 @@ object SubscriptionManager {
                 false
             }
         } catch (e: Exception) {
-            android.util.Log.w("SubscriptionManager", "refreshFromServer failed: ${e.message}")
+            android.util.Log.w("SubscriptionManager", "refreshFromServer failed: ${e.javaClass.simpleName}: ${e.message}")
             false
         }
     }
@@ -185,8 +185,8 @@ object SubscriptionManager {
 
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
+            connection.connectTimeout = 25000
+            connection.readTimeout = 25000
 
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
@@ -195,7 +195,7 @@ object SubscriptionManager {
                 null
             }
         } catch (e: Exception) {
-            android.util.Log.w("SubscriptionManager", "requestPayment failed: ${e.message}")
+            android.util.Log.w("SubscriptionManager", "requestPayment failed: ${e.javaClass.simpleName}: ${e.message}")
             null
         }
     }
