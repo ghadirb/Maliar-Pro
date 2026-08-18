@@ -6,7 +6,6 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import com.maliar.pro.database.SmartReminderManager
-import com.maliar.pro.utils.VoiceCallHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,30 +18,15 @@ class ReminderActionReceiver : BroadcastReceiver() {
 
         if (reminderId < 0) return
 
-        // "call" runs immediately on the receiving thread (no DB access needed) so the
-        // dialer/call intent fires the moment the notification button is tapped.
-        if (action == "call") {
-            val phoneNumber = intent.getStringExtra("phone_number").orEmpty()
-            if (phoneNumber.isNotBlank()) {
-                VoiceCallHelper.makeCallWithResult(context, phoneNumber)
-            }
-            return
-        }
-
         // Any real action taken on a reminder (done/snooze/dismiss) must actually remove
-        // the notification banner from the status bar - setAutoCancel(true) only clears a
-        // notification when its *main body* is tapped, never when an action button is
-        // tapped, so without this explicit cancel() the notification used to just sit
-        // there forever no matter which button was pressed.
+        // the notification banner from the status bar.
         val notificationManager = NotificationManagerCompat.from(context)
         notificationManager.cancel(reminderId.toInt())
-        // A smart reminder's speaking loop posts its own separate notification (a
-        // different ID, offset by 90000) - clear that one too so nothing lingers.
+        // A smart reminder's speaking loop posts its own separate notification.
         notificationManager.cancel(90000 + reminderId.toInt())
 
-        // Any real action taken on a smart reminder (done/snooze/dismiss) means the person
-        // has responded - stop the repeating TTS voice immediately regardless of which
-        // action they picked.
+        // Any real action taken on a smart reminder means the person has responded - stop
+        // the repeating TTS voice immediately.
         if (action == "complete" || action == "snooze" || action == "dismiss") {
             SmartReminderTtsService.stop(reminderId)
         }
