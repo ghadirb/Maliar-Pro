@@ -20,9 +20,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_BACKUP_URI = "last_backup_uri"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
-        private const val KEY_SMS_READING_ENABLED = "sms_reading_enabled"
 
-        // --- Subscription / entitlement ---
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_PREMIUM_UNTIL = "premium_until"
         private const val KEY_LAST_SUBSCRIPTION_CHECK = "last_subscription_check"
@@ -45,9 +43,7 @@ class PreferencesManager(context: Context) {
         return gson.fromJson(json, type)
     }
 
-    fun hasAPIKeys(): Boolean {
-        return prefs.contains(KEY_API_KEYS)
-    }
+    fun hasAPIKeys(): Boolean = prefs.contains(KEY_API_KEYS)
 
     fun clearAPIKeys() {
         prefs.edit().remove(KEY_API_KEYS).apply()
@@ -57,41 +53,24 @@ class PreferencesManager(context: Context) {
         prefs.edit().putBoolean(KEY_AUTO_PROVISIONING, enabled).apply()
     }
 
-    fun isAutoProvisioningEnabled(): Boolean {
-        return prefs.getBoolean(KEY_AUTO_PROVISIONING, true)
-    }
+    fun isAutoProvisioningEnabled(): Boolean = prefs.getBoolean(KEY_AUTO_PROVISIONING, true)
 
     fun setNotificationMode(mode: String) {
         prefs.edit().putString(KEY_NOTIFICATION_MODE, mode).apply()
     }
 
     fun getNotificationMode(): String {
-        // Only "none" and "action" exist now (the old middle "simple" option was removed
-        // from Settings) - default to notifications on for anyone without a saved value yet,
-        // and anyone with "simple" saved from before also lands on the real notification.
         val stored = prefs.getString(KEY_NOTIFICATION_MODE, "action") ?: "action"
         return if (stored == "none") "none" else "action"
     }
 
-    /**
-     * Whether MaliarBackgroundService (the persistent, silent "app is running"
-     * notification) is allowed to run. Defaults to true because it measurably helps smart
-     * reminders fire reliably on aggressive OEMs - but AlarmManager-scheduled alarms still
-     * work without it (just somewhat less reliably on some devices), so it's safe for the
-     * person to turn off if they'd rather not see that notification at all.
-     */
-    fun isBackgroundServiceEnabled(): Boolean {
-        return prefs.getBoolean(KEY_BACKGROUND_SERVICE_ENABLED, true)
-    }
+    fun isBackgroundServiceEnabled(): Boolean =
+        prefs.getBoolean(KEY_BACKGROUND_SERVICE_ENABLED, true)
 
     fun setBackgroundServiceEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BACKGROUND_SERVICE_ENABLED, enabled).apply()
     }
 
-    // --- Backup & restore ---
-
-    /** The last SAF location (device storage OR a provider like Google Drive) the person
-     *  backed up to - kept so automatic daily backups can reuse it without asking again. */
     fun setLastBackupUri(uri: String?) {
         prefs.edit().putString(KEY_LAST_BACKUP_URI, uri).apply()
     }
@@ -104,19 +83,12 @@ class PreferencesManager(context: Context) {
 
     fun isAutoBackupEnabled(): Boolean = prefs.getBoolean(KEY_AUTO_BACKUP_ENABLED, false)
 
-    // --- Startup announcement ---
-
     fun getLastSeenAnnouncementId(): String? = prefs.getString(KEY_LAST_SEEN_ANNOUNCEMENT_ID, null)
 
     fun setLastSeenAnnouncementId(id: String) {
         prefs.edit().putString(KEY_LAST_SEEN_ANNOUNCEMENT_ID, id).apply()
     }
 
-    // --- Subscription / entitlement ---
-
-    /** A stable random ID for this install, generated once and reused - sent to the
-     *  backend so it can tell this device apart from others without needing a full
-     *  login/account system. */
     fun getOrCreateDeviceId(): String {
         val existing = prefs.getString(KEY_DEVICE_ID, null)
         if (!existing.isNullOrBlank()) return existing
@@ -125,7 +97,6 @@ class PreferencesManager(context: Context) {
         return fresh
     }
 
-    /** Epoch millis when the premium subscription expires; 0 means never subscribed. */
     fun getPremiumUntil(): Long = prefs.getLong(KEY_PREMIUM_UNTIL, 0L)
 
     fun setPremiumUntil(epochMillis: Long) {
@@ -138,9 +109,6 @@ class PreferencesManager(context: Context) {
         prefs.edit().putLong(KEY_LAST_SUBSCRIPTION_CHECK, epochMillis).apply()
     }
 
-    /** Today's free-tier AI usage count and the date it belongs to (yyyy-MM-dd), so
-     *  SubscriptionManager can reset the counter the moment the date rolls over without
-     *  needing a background job. */
     fun getDailyAiCount(): Int = prefs.getInt(KEY_DAILY_AI_COUNT, 0)
 
     fun getDailyAiCountDate(): String? = prefs.getString(KEY_DAILY_AI_COUNT_DATE, null)
@@ -152,46 +120,28 @@ class PreferencesManager(context: Context) {
             .apply()
     }
 
-    // --- Payment/notification bookkeeping ---
-
-    /** So the "free quota exhausted" notification is shown once, not on every failed
-     *  canUseAi() check. Reset back to false whenever premium is (re)activated. */
     fun hasNotifiedQuotaExhausted(): Boolean = prefs.getBoolean(KEY_QUOTA_NOTIFIED, false)
 
     fun setNotifiedQuotaExhausted(notified: Boolean) {
         prefs.edit().putBoolean(KEY_QUOTA_NOTIFIED, notified).apply()
     }
 
-    /** The premiumUntil value (epoch millis) that the currently-scheduled expiry-reminder
-     *  WorkManager job was scheduled for. Used to avoid re-scheduling the same reminder
-     *  over and over, and to know when to reschedule (e.g. after a renewal). */
-    fun getExpiryReminderScheduledFor(): Long = prefs.getLong(KEY_EXPIRY_REMINDER_SCHEDULED_FOR, 0L)
+    fun getExpiryReminderScheduledFor(): Long =
+        prefs.getLong(KEY_EXPIRY_REMINDER_SCHEDULED_FOR, 0L)
 
     fun setExpiryReminderScheduledFor(premiumUntil: Long) {
         prefs.edit().putLong(KEY_EXPIRY_REMINDER_SCHEDULED_FOR, premiumUntil).apply()
     }
 
-    /** Optional phone number, only used so the payment backend can text/identify a
-     *  receipt or recover a purchase for support - never required to use the app. */
     fun getPhoneNumber(): String? = prefs.getString(KEY_PHONE_NUMBER, null)
 
     fun setPhoneNumber(phone: String?) {
         prefs.edit().putString(KEY_PHONE_NUMBER, phone).apply()
     }
 
-    /** Which store the last successful/attempted purchase went through - "bazaar",
-     *  "myket" or "direct". Purely informational (e.g. for support/debugging). */
     fun getLastStoreChannel(): String? = prefs.getString(KEY_LAST_STORE_CHANNEL, null)
 
     fun setLastStoreChannel(channel: String) {
         prefs.edit().putString(KEY_LAST_STORE_CHANNEL, channel).apply()
-    }
-
-    // --- Bank SMS reading (opt-in) ---
-
-    fun isSmsReadingEnabled(): Boolean = prefs.getBoolean(KEY_SMS_READING_ENABLED, false)
-
-    fun setSmsReadingEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_SMS_READING_ENABLED, enabled).apply()
     }
 }
