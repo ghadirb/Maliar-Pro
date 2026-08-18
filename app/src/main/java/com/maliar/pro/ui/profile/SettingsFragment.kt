@@ -1,11 +1,9 @@
 package com.maliar.pro.ui.profile
 
-import android.Manifest
 import android.app.AlertDialog
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -13,7 +11,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.maliar.pro.databinding.FragmentSettingsBinding
@@ -32,24 +29,11 @@ class SettingsFragment : Fragment() {
     private lateinit var binding: FragmentSettingsBinding
     private val prefs by lazy { PreferencesManager(requireContext()) }
 
-    // Must be registered before the fragment reaches CREATED - a property initializer
-    // (runs during construction) is early enough, an onViewCreated call would not be.
     private val backupLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) performBackup(uri)
     }
     private val restoreLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) confirmAndRestore(uri)
-    }
-    private val smsPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
-        val granted = results.values.all { it }
-        if (granted) {
-            prefs.setSmsReadingEnabled(true)
-            binding.smsReadingSwitch.isChecked = true
-        } else {
-            prefs.setSmsReadingEnabled(false)
-            binding.smsReadingSwitch.isChecked = false
-            Toast.makeText(requireContext(), "بدون مجوز خواندن پیامک، این قابلیت فعال نمی‌شود", Toast.LENGTH_LONG).show()
-        }
     }
 
     override fun onCreateView(
@@ -67,13 +51,10 @@ class SettingsFragment : Fragment() {
         setupNotificationSettings()
         setupBackgroundServiceSetting()
         setupBackupSettings()
-        setupSmsReadingSetting()
     }
 
     override fun onResume() {
         super.onResume()
-        // Coming back from SubscriptionActivity after a payment - reflect the new status
-        // right away instead of showing the stale one from before the person left.
         renderSubscriptionStatus()
     }
 
@@ -98,16 +79,8 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    /**
-     * The persistent, silent "مالیار پرو در حال اجراست" notification (MaliarBackgroundService)
-     * used to always start automatically with zero way to turn it off - it exists purely to
-     * make smart reminders/the assistant more reliable in the background, not something the
-     * app strictly needs to function. This lets the person turn it off entirely if they'd
-     * rather never see it, accepting a small reliability trade-off on some phones.
-     */
     private fun setupBackgroundServiceSetting() {
         binding.backgroundServiceSwitch.isChecked = prefs.isBackgroundServiceEnabled()
-
         binding.backgroundServiceSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefs.setBackgroundServiceEnabled(isChecked)
             if (isChecked) {
@@ -121,10 +94,6 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupNotificationSettings() {
-        // Only two real states now: reminders fire completely silently, or with the full
-        // action notification (انجام شد / تعویق / تماس). The old "ساده" middle option never
-        // matched what people expected from a notification "type" and was removed - anyone
-        // with it saved from before just lands on the "با نوتیفیکیشن" option below.
         val notificationMode = prefs.getNotificationMode()
         when (notificationMode) {
             "none" -> binding.noneNotification.isChecked = true
@@ -139,10 +108,6 @@ class SettingsFragment : Fragment() {
             prefs.setNotificationMode(mode)
 
             if (mode == "none") {
-                // The point of this mode is that it takes effect immediately, not just for
-                // the next reminder - so any reminder notification already on screen right
-                // now is cleared too. Only the reminder channel is touched, so the always-on
-                // background-service notification (a separate feature) is left alone.
                 val notificationManager = requireContext()
                     .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -157,12 +122,6 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    /**
-     * Backup uses Storage Access Framework (ACTION_CREATE_DOCUMENT / ACTION_OPEN_DOCUMENT)
-     * instead of a hand-built Google Drive integration - the system picker that opens
-     * already lets the person choose "Google Drive" (or any other cloud app / plain device
-     * storage) as the target on its own, with no OAuth setup needed here at all.
-     */
     private fun setupBackupSettings() {
         binding.backupNowButton.setOnClickListener {
             val fileName = "maliar-pro-backup-${SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.US).format(Date())}.zip"
@@ -189,46 +148,12 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun setupSmsReadingSetting() {
-        binding.smsReadingSwitch.isChecked = prefs.isSmsReadingEnabled() && hasSmsPermissions()
-        if (prefs.isSmsReadingEnabled() && !hasSmsPermissions()) {
-            prefs.setSmsReadingEnabled(false)
-        }
-
-        binding.smsReadingSwitch.setOnCheckedChangeListener { _, isChecked ->
-            if (!isChecked) {
-                prefs.setSmsReadingEnabled(false)
-                return@setOnCheckedChangeListener
-            }
-
-            if (hasSmsPermissions()) {
-                prefs.setSmsReadingEnabled(true)
-            } else {
-                binding.smsReadingSwitch.isChecked = false
-                smsPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.RECEIVE_SMS,
-                        Manifest.permission.READ_SMS
-                    )
-                )
-            }
-        }
-    }
-
-    private fun hasSmsPermissions(): Boolean {
-        val context = requireContext()
-        return ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
-    }
-
     private fun performBackup(uri: Uri) {
-        // A picked document Uri only grants temporary access by default - persisting it is
-        // what lets the daily auto-backup worker reuse it later without asking again.
         try {
             requireContext().contentResolver.takePersistableUriPermission(
                 uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
-        } catch (e: Exception) { /* some providers don't support persisting - backup itself still works now */ }
+        } catch (e: Exception) { }
 
         setBackupStatus("⏳ در حال تهیه پشتیبان…")
         viewLifecycleOwner.lifecycleScope.launch {
@@ -256,10 +181,6 @@ class SettingsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val ok = withContext(Dispatchers.IO) { BackupManager.restoreFromUri(requireContext(), uri) }
             if (ok) {
-                // The live Room connection was closed as part of the restore - continuing
-                // to use it (or reopening it) in this same process risks reading a half-
-                // swapped database, so the app must fully restart before anything touches
-                // it again.
                 AlertDialog.Builder(requireContext())
                     .setTitle("بازیابی انجام شد")
                     .setMessage("اطلاعات با موفقیت بازیابی شد. برای دیدن تغییرات، برنامه الان بسته می‌شود - دوباره آن را باز کنید.")
