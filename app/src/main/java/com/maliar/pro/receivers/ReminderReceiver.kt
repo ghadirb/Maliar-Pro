@@ -13,21 +13,7 @@ import com.maliar.pro.database.AlertType
 import com.maliar.pro.ui.reminders.FullScreenAlarmActivity
 import com.maliar.pro.utils.PreferencesManager
 
-/**
- * Fires when a reminder's alarm time arrives.
- *
- * There are really only two independent things going on here, and they used to be
- * tangled together in a way that made the notification-mode setting feel broken:
- *
- * 1. alertType decides *what kind of alarm this is* (a plain reminder, a full-screen
- *    alarm, or a "smart" spoken reminder) - this is chosen per-reminder and is NOT
- *    affected by the global notification-mode setting.
- * 2. notificationMode (none / simple / action, from Settings) decides *how the plain
- *    notification for a NOTIFICATION-type reminder looks*: "بدون نوتیفیکیشن" suppresses
- *    it completely, "ساده" shows a plain banner with no buttons, "با اکشن" adds the
- *    انجام‌شد/تعویق/تماس buttons. Each of the three now genuinely looks/behaves
- *    differently - they don't just collapse into "shows vs. doesn't show".
- */
+/** Fires when a reminder's alarm time arrives. */
 class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -35,14 +21,11 @@ class ReminderReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra("reminder_title") ?: "یادآوری"
         val description = intent.getStringExtra("reminder_description") ?: ""
         val alertType = intent.getStringExtra("alert_type") ?: AlertType.NOTIFICATION.name
-        val contactName = intent.getStringExtra("contact_name") ?: ""
-        val contactPhone = intent.getStringExtra("contact_phone") ?: ""
 
         when (alertType) {
             AlertType.SMART.name -> {
-                // Speaks the reminder aloud immediately and repeats until dismissed -
-                // independent of whatever the FullScreenAlarmActivity does visually.
-                com.maliar.pro.receivers.SmartReminderTtsService.start(context, reminderId, title, description)
+                // Speaks the reminder aloud immediately and repeats until dismissed.
+                SmartReminderTtsService.start(context, reminderId, title, description)
             }
             AlertType.FULL_SCREEN.name -> {
                 showFullScreenIntentNotification(context, reminderId, title, description)
@@ -50,32 +33,12 @@ class ReminderReceiver : BroadcastReceiver() {
             else -> {
                 val prefs = PreferencesManager(context)
                 val notificationMode = prefs.getNotificationMode()
-                if (notificationMode == "none") {
-                    // The whole point of this mode: no notification UI at all.
-                    return
-                }
-                showPlainNotification(context, title, description, reminderId, notificationMode, contactName, contactPhone)
+                if (notificationMode == "none") return
+                showPlainNotification(context, title, description, reminderId, notificationMode)
             }
         }
     }
 
-    /**
-     * A reliable full-screen alarm has to handle two very different situations:
-     *
-     * - App already open (an Activity is visible): a BroadcastReceiver CAN start an
-     *   Activity directly here with no restriction at all, since the process already has
-     *   a visible window - going through a notification first (and waiting for a tap)
-     *   was pure unnecessary delay in this case, not a platform requirement.
-     * - App in the background: directly calling startActivity() here would be silently
-     *   blocked by Android's background-activity-launch restriction, so
-     *   NotificationCompat.setFullScreenIntent is used instead - the sanctioned bypass
-     *   real alarm-clock apps rely on. Android itself auto-promotes this straight to the
-     *   full-screen Activity *when the device is locked*; if the phone happens to be
-     *   unlocked but the app isn't open, Android intentionally only shows a heads-up
-     *   notification instead of taking over the screen - this is a deliberate platform
-     *   restriction (since Android 10) that no regular third-party app can bypass, to
-     *   stop apps from hijacking the screen while someone is actively using their phone.
-     */
     private fun showFullScreenIntentNotification(
         context: Context,
         reminderId: Long,
@@ -120,9 +83,7 @@ class ReminderReceiver : BroadcastReceiver() {
         title: String,
         message: String,
         reminderId: Long,
-        notificationMode: String,
-        contactName: String,
-        contactPhone: String
+        notificationMode: String
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -140,8 +101,6 @@ class ReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Swiping the notification away should still mark it handled instead of leaving
-        // the reminder's alarm state dangling with nothing telling the app it was seen.
         val dismissIntent = Intent(context, ReminderActionReceiver::class.java).apply {
             putExtra("reminder_id", reminderId)
             putExtra("action", "dismiss")
@@ -183,25 +142,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             builder.addAction(R.drawable.ic_snooze, "⏰ ۱۰ دقیقه بعد", snoozePendingIntent)
-
-            // If a contact was attached to this reminder, offer a direct one-tap call
-            // button that dials that exact contact.
-            if (contactPhone.isNotBlank()) {
-                val callIntent = Intent(context, ReminderActionReceiver::class.java).apply {
-                    putExtra("reminder_id", reminderId)
-                    putExtra("action", "call")
-                    putExtra("phone_number", contactPhone)
-                }
-                val callPendingIntent = PendingIntent.getBroadcast(
-                    context, reminderId.toInt() + 3000, callIntent,
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                )
-                val label = if (contactName.isNotBlank()) "📞 تماس با $contactName" else "📞 تماس"
-                builder.addAction(R.drawable.ic_notification, label, callPendingIntent)
-            }
         } else {
-            // "ساده" (simple): just the title/text above, tap to open - deliberately no
-            // buttons at all, and a plain priority so it doesn't behave like an alarm.
             builder.setPriority(NotificationCompat.PRIORITY_DEFAULT)
         }
 
