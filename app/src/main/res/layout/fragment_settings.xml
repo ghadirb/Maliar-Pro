@@ -26,13 +26,11 @@
             app:cardBackgroundColor="#FFF8E1"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp">
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp">
-
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -40,7 +38,6 @@
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="4dp" />
-
                 <TextView
                     android:id="@+id/subscriptionStatusText"
                     android:layout_width="match_parent"
@@ -49,15 +46,12 @@
                     android:text=""
                     android:textSize="12sp"
                     android:textColor="#757575" />
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/manageSubscriptionButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="مدیریت اشتراک" />
-
             </LinearLayout>
-
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
@@ -66,13 +60,11 @@
             android:layout_marginBottom="12dp"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp">
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp">
-
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -80,28 +72,22 @@
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp" />
-
                 <RadioGroup
                     android:id="@+id/notificationModeGroup"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
-
                     <RadioButton
                         android:id="@+id/noneNotification"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="بدون نوتیفیکیشن" />
-
                     <RadioButton
                         android:id="@+id/actionNotification"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="با نوتیفیکیشن (دکمه‌های انجام شد / تعویق / تماس)" />
-
+                        android:text="با نوتیفیکیشن (دکمه‌های انجام شد / تعویق)" />
                 </RadioGroup>
-
             </LinearLayout>
-
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
@@ -110,29 +96,24 @@
             android:layout_marginBottom="12dp"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp">
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp">
-
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/backgroundServiceSwitch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="نگه‌داشتن برنامه در پس‌زمینه" />
-
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="یک نوتیفیکیشن بی‌صدا و ثابت نشان می‌دهد، اما یادآوری‌های هوشمند و دستیار را قابل‌اعتمادتر می‌کند. خاموش کردن این گزینه، آن نوتیفیکیشن را کاملاً حذف می‌کند ولی ممکن است در بعضی گوشی‌ها یادآوری‌ها با کمی تأخیر برسند."
+                    android:text="یک نوتیفیکیشن بی‌صدا و ثابت نشان می‌دهد و یادآوری‌های هوشمند را قابل‌اعتمادتر می‌کند."
                     android:textSize="12sp"
                     android:textColor="#757575" />
-
             </LinearLayout>
-
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
@@ -141,13 +122,11 @@
             android:layout_marginBottom="12dp"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp">
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp">
-
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -155,20 +134,17 @@
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="4dp" />
-
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
-                    android:text="تمام اطلاعات برنامه (حسابداری، یادآوری‌ها، مخاطبین، وضعیت مالی) در یک فایل zip ذخیره می‌شود. مقصد را خودتان از صفحه‌ی بعد انتخاب می‌کنید - می‌تواند حافظه‌ی گوشی یا هر سرویسی مثل گوگل‌درایو باشد که روی گوشی نصب دارید."
+                    android:text="اطلاعات برنامه در یک فایل zip ذخیره می‌شود و مقصد را خودتان انتخاب می‌کنید."
                     android:textSize="12sp"
                     android:textColor="#757575" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
-
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/backupNowButton"
                         android:layout_width="0dp"
@@ -176,7 +152,6 @@
                         android:layout_weight="1"
                         android:layout_marginEnd="8dp"
                         android:text="تهیه پشتیبان" />
-
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/restoreButton"
                         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -184,9 +159,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="بازیابی" />
-
                 </LinearLayout>
-
                 <TextView
                     android:id="@+id/backupStatusText"
                     android:layout_width="match_parent"
@@ -195,70 +168,18 @@
                     android:textSize="12sp"
                     android:textColor="#757575"
                     android:visibility="gone" />
-
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="12dp"
                     android:background="#E0E0E0" />
-
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/autoBackupSwitch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="همگام‌سازی خودکار روزانه" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="هر روز یک نسخه‌ی جدید در همان مقصدی که بار اول انتخاب کردید ذخیره می‌شود و نسخه‌ی قبلی را جایگزین می‌کند. ابتدا یک بار «تهیه پشتیبان» را بزنید تا مقصد ثبت شود."
-                    android:textSize="12sp"
-                    android:textColor="#757575" />
-
             </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="تشخیص خودکار پیامک‌های بانکی"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:text="با فعال کردن این گزینه، پیامک‌های واریز/برداشت بانک به‌طور خودکار در حسابداری ثبت می‌شوند و می‌توانید بعداً عنوان آن‌ها را ویرایش کنید. این گزینه پیش‌فرض خاموش است و نیاز به مجوز خواندن پیامک دارد."
-                    android:textSize="12sp"
-                    android:textColor="#757575" />
-
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/smsReadingSwitch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="خواندن پیامک‌های بانکی" />
-
-            </LinearLayout>
-
         </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
-
 </ScrollView>
