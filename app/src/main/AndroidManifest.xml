@@ -6,9 +6,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -18,9 +16,6 @@
 
     <!-- Filled by the selected store flavor at build time. -->
     <uses-permission android:name="${marketPermission}" />
-
-    <!-- Required by Myket's billing client (only used when the app was installed from
-         Myket) - straight from Myket's own "جاوا (Java)" integration docs. -->
 
     <!-- Android 11+ package visibility: lets the billing SDKs
          actually see/bind to the Bazaar and Myket apps if installed. -->
@@ -35,10 +30,7 @@
         </intent>
     </queries>
 
-    <!-- Opt-in only (see PreferencesManager.isSmsReadingEnabled, off by default) - lets the
-         app recognize bank transaction SMS and auto-record them as accounting entries. -->
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- SMS/phone permissions intentionally removed in the Play-safe test branch. -->
 
     <!-- Needed so the app can keep a foreground service (persistent notification)
          alive to keep smart reminders / assistant features responsive in the background. -->
@@ -46,8 +38,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- Lets a smart-reminder alarm launch its full-screen activity immediately when it
-         fires, even if the app is in the background - the same mechanism real alarm-clock
-         and incoming-call apps use to bypass the background-activity-start restriction. -->
+         fires, even if the app is in the background. -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
@@ -70,15 +61,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Records a short voice command (e.g. "به علی زنگ بزن"), transcribes it, and
-             after a plain confirmation dialog places a real call to the matched contact.
-             Launched from the persistent background notification's action button. -->
-        <activity
-            android:name=".ui.assistant.VoiceCommandActivity"
-            android:exported="false"
-            android:theme="@style/Theme.MaliarPro" />
-
-        <!-- Subscription / premium upgrade screen -->
         <activity
             android:name=".ui.profile.SubscriptionActivity"
             android:exported="false"
@@ -113,19 +95,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Opt-in (Settings toggle) bank-transaction SMS reader - see SmsReceiver.kt.
-             android:permission restricts who can even trigger this broadcast to the
-             platform itself, on top of the runtime-permission and Settings-toggle checks
-             already inside the receiver. -->
-        <receiver
-            android:name=".receivers.SmsReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="500">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
-        </receiver>
-
         <!-- Keeps the process alive in the background with a persistent, low-priority
              notification so smart reminders / assistant features keep working reliably
              even when the app UI isn't open. -->
@@ -138,11 +107,7 @@
                 android:value="Keeps smart reminders and the assistant responsive in the background" />
         </service>
 
-        <!-- Speaks a smart reminder aloud (TTS) the instant its alarm fires, and repeats
-             it until the person marks it done - see SmartReminderTtsService for details.
-             Uses "specialUse" (the same type MaliarBackgroundService above already uses
-             successfully) rather than "mediaPlayback", which has stricter and less
-             predictable enforcement across Android versions/OEMs. -->
+        <!-- Speaks a smart reminder aloud and repeats it until dismissed. -->
         <service
             android:name=".receivers.SmartReminderTtsService"
             android:exported="false"
