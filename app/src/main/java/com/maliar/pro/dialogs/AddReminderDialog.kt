@@ -10,8 +10,6 @@ import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
 import com.maliar.pro.R
 import com.maliar.pro.database.AlertType
-import com.maliar.pro.database.Contact
-import com.maliar.pro.database.ContactManager
 import com.maliar.pro.database.Priority
 import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.database.ReminderType
@@ -25,20 +23,11 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 
 private val REPEAT_PATTERN_LABELS = linkedMapOf(
-    RepeatPattern.ONCE to "یک‌بار",
-    RepeatPattern.DAILY to "روزانه",
-    RepeatPattern.WEEKLY to "هفتگی",
-    RepeatPattern.MONTHLY to "ماهانه",
-    RepeatPattern.YEARLY to "سالانه",
-    RepeatPattern.WEEKDAYS to "روزهای کاری",
+    RepeatPattern.ONCE to "یک‌بار", RepeatPattern.DAILY to "روزانه", RepeatPattern.WEEKLY to "هفتگی",
+    RepeatPattern.MONTHLY to "ماهانه", RepeatPattern.YEARLY to "سالانه", RepeatPattern.WEEKDAYS to "روزهای کاری",
     RepeatPattern.WEEKENDS to "آخر هفته"
 )
 
-/**
- * Real, fully-functional "add reminder" dialog. Replaces the previous empty
- * FAB TODO in RemindersFragment. Uses SmartReminderManager so the reminder
- * is both stored in Room AND actually scheduled with AlarmManager.
- */
 class AddReminderDialog(
     private val context: Context,
     private val smartReminderManager: SmartReminderManager,
@@ -53,7 +42,6 @@ class AddReminderDialog(
 
     fun show() {
         val view = LayoutInflater.from(context).inflate(R.layout.dialog_add_reminder, null)
-
         val titleInput = view.findViewById<TextInputEditText>(R.id.reminderTitleInput)
         val descriptionInput = view.findViewById<TextInputEditText>(R.id.reminderDescriptionInput)
         val categorySpinner = view.findViewById<Spinner>(R.id.categorySpinner)
@@ -62,83 +50,32 @@ class AddReminderDialog(
         val priorityChipGroup = view.findViewById<ChipGroup>(R.id.priorityChipGroup)
         val alertTypeChipGroup = view.findViewById<ChipGroup>(R.id.alertTypeChipGroup)
         val repeatPatternSpinner = view.findViewById<Spinner>(R.id.repeatPatternSpinner)
-        val contactButton = view.findViewById<Button>(R.id.reminderContactButton)
-
-        var selectedContact: Contact? = null
-        fun refreshContactButtonText() {
-            contactButton.text = selectedContact?.let { "مخاطب: ${it.name}" } ?: "انتخاب مخاطب"
-        }
-        refreshContactButtonText()
-
-        contactButton.setOnClickListener {
-            CoroutineScope(Dispatchers.Main).launch {
-                val contacts = ContactManager(context).getAllContactsList()
-                if (contacts.isEmpty()) {
-                    AlertDialog.Builder(context)
-                        .setTitle("مخاطبی وجود ندارد")
-                        .setMessage("ابتدا از بخش «مخاطبین» یک مخاطب اضافه کنید.")
-                        .setPositiveButton("باشه", null)
-                        .show()
-                    return@launch
-                }
-                val names = contacts.map { "${it.name} (${it.phoneNumber})" }.toTypedArray()
-                AlertDialog.Builder(context)
-                    .setTitle("انتخاب مخاطب برای تماس")
-                    .setItems(names) { _, which ->
-                        selectedContact = contacts[which]
-                        refreshContactButtonText()
-                    }
-                    .setNeutralButton("حذف انتخاب") { _, _ ->
-                        selectedContact = null
-                        refreshContactButtonText()
-                    }
-                    .setNegativeButton("لغو", null)
-                    .show()
-            }
-        }
 
         val categories = listOf("عمومی", "مالی", "کاری", "شخصی", "سلامت", "خانواده")
         categorySpinner.adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, categories)
+        repeatPatternSpinner.adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, REPEAT_PATTERN_LABELS.values.toList())
 
-        repeatPatternSpinner.adapter = ArrayAdapter(
-            context, android.R.layout.simple_spinner_dropdown_item, REPEAT_PATTERN_LABELS.values.toList()
-        )
-
-        fun refreshDateButtonText() {
-            dateButton.text = PersianCalendarHelper.formatJalali(jalaliYear, jalaliMonth, jalaliDay)
-        }
-        fun refreshTimeButtonText() {
-            timeButton.text = String.format("%02d:%02d", hour, minute)
-        }
-        refreshDateButtonText()
-        refreshTimeButtonText()
+        fun refreshDateButtonText() { dateButton.text = PersianCalendarHelper.formatJalali(jalaliYear, jalaliMonth, jalaliDay) }
+        fun refreshTimeButtonText() { timeButton.text = String.format("%02d:%02d", hour, minute) }
+        refreshDateButtonText(); refreshTimeButtonText()
 
         dateButton.setOnClickListener {
-            PersianDatePickerDialog(
-                context, initialYear = jalaliYear, initialMonth = jalaliMonth, initialDay = jalaliDay
-            ) { y, m, d ->
-                jalaliYear = y; jalaliMonth = m; jalaliDay = d
-                refreshDateButtonText()
+            PersianDatePickerDialog(context, initialYear = jalaliYear, initialMonth = jalaliMonth, initialDay = jalaliDay) { y, m, d ->
+                jalaliYear = y; jalaliMonth = m; jalaliDay = d; refreshDateButtonText()
             }.show()
         }
-
         timeButton.setOnClickListener {
             com.maliar.pro.ui.common.MaliarTimePickerDialog.show(context, hour, minute) { h, min ->
-                hour = h; minute = min
-                refreshTimeButtonText()
+                hour = h; minute = min; refreshTimeButtonText()
             }
         }
 
-        AlertDialog.Builder(context)
-            .setTitle("افزودن یادآوری")
-            .setView(view)
+        AlertDialog.Builder(context).setTitle("افزودن یادآوری").setView(view)
             .setPositiveButton("ذخیره") { _, _ ->
                 val title = titleInput.text?.toString().orEmpty()
                 if (title.isBlank()) return@setPositiveButton
-
                 val description = descriptionInput.text?.toString().orEmpty()
                 val category = categorySpinner.selectedItem?.toString().orEmpty()
-
                 val priority = when (priorityChipGroup.checkedChipId) {
                     R.id.chipLowPriority -> Priority.LOW
                     R.id.chipHighPriority -> Priority.HIGH
@@ -149,36 +86,18 @@ class AddReminderDialog(
                     R.id.chipAlertSmart -> AlertType.SMART
                     else -> AlertType.NOTIFICATION
                 }
-                val repeatPattern = REPEAT_PATTERN_LABELS.keys.toList()
-                    .getOrElse(repeatPatternSpinner.selectedItemPosition) { RepeatPattern.ONCE }
-
+                val repeatPattern = REPEAT_PATTERN_LABELS.keys.toList().getOrElse(repeatPatternSpinner.selectedItemPosition) { RepeatPattern.ONCE }
                 val dateMillis = PersianCalendarHelper.jalaliToGregorianMillis(jalaliYear, jalaliMonth, jalaliDay)
                 val cal = Calendar.getInstance().apply {
-                    timeInMillis = dateMillis
-                    set(Calendar.HOUR_OF_DAY, hour)
-                    set(Calendar.MINUTE, minute)
-                    set(Calendar.SECOND, 0)
+                    timeInMillis = dateMillis; set(Calendar.HOUR_OF_DAY, hour); set(Calendar.MINUTE, minute); set(Calendar.SECOND, 0)
                 }
-
                 val reminder = ReminderEntity(
-                    title = title,
-                    description = description,
-                    reminderType = ReminderType.SIMPLE.name,
-                    priority = priority.name,
-                    alertType = alertType.name,
-                    triggerTime = cal.timeInMillis,
-                    repeatPattern = repeatPattern.name,
-                    category = category,
-                    contactName = selectedContact?.name.orEmpty(),
-                    contactPhoneNumber = selectedContact?.phoneNumber.orEmpty()
+                    title = title, description = description, reminderType = ReminderType.SIMPLE.name,
+                    priority = priority.name, alertType = alertType.name, triggerTime = cal.timeInMillis,
+                    repeatPattern = repeatPattern.name, category = category
                 )
-
-                CoroutineScope(Dispatchers.Main).launch {
-                    smartReminderManager.addReminder(reminder)
-                    onSaved()
-                }
+                CoroutineScope(Dispatchers.Main).launch { smartReminderManager.addReminder(reminder); onSaved() }
             }
-            .setNegativeButton("لغو", null)
-            .show()
+            .setNegativeButton("لغو", null).show()
     }
 }
