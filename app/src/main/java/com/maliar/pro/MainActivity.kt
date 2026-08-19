@@ -13,7 +13,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.maliar.pro.databinding.ActivityMainBinding
 import com.maliar.pro.utils.AnnouncementManager
 import com.maliar.pro.utils.KeyManager
@@ -31,37 +30,8 @@ class MainActivity : AppCompatActivity() {
             if (!granted) {
                 // The user denied it; notifications simply won't show. We don't force it.
             }
-            requestAssistantActionPermissions()
-        }
-
-    /**
-     * The assistant's "call so-and-so" command and the notification action buttons need
-     * CALL_PHONE / READ_CONTACTS at runtime (declaring them in the manifest alone does
-     * nothing on Android 6+). Without this, VoiceCallHelper.makeCall() throws a
-     * SecurityException every single time and the assistant silently "does nothing" when
-     * asked to call someone - which is exactly the symptom being reported.
-     */
-    private val assistantPermissionsLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             checkExactAlarmPermission()
         }
-
-    private fun requestAssistantActionPermissions() {
-        val needed = listOf(
-            android.Manifest.permission.CALL_PHONE,
-            android.Manifest.permission.READ_CONTACTS,
-            // Needed for the assistant's voice-command notification and for smart
-            // reminders' spoken "انجام شد" voice-response detection.
-            android.Manifest.permission.RECORD_AUDIO
-        ).filter {
-            ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-        if (needed.isNotEmpty()) {
-            assistantPermissionsLauncher.launch(needed.toTypedArray())
-        } else {
-            checkExactAlarmPermission()
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,7 +42,6 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 KeyManager.loadKeys(this@MainActivity)
-                // Initialize AI services with keys
             } catch (e: Exception) {
                 // Handle key loading error
             }
@@ -84,9 +53,8 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * On Android 13+ (API 33+) notifications require a runtime permission grant.
-     * On Android 12+ (API 31+) exact alarms require the user to explicitly
-     * allow "Alarms & reminders" in system settings. Without both of these,
-     * reminders/notifications silently never fire.
+     * No SMS, phone-call, or contacts permission is requested here. The app's
+     * background reminders continue through the exact-alarm and battery settings below.
      */
     private fun ensureNotificationPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -98,7 +66,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
         }
-        requestAssistantActionPermissions()
+        checkExactAlarmPermission()
     }
 
     private fun checkExactAlarmPermission() {
@@ -127,11 +95,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Many OEMs (Xiaomi/MIUI, Huawei/EMUI, Oppo/ColorOS, Samsung, etc.) aggressively kill
-     * background apps and silently prevent scheduled alarms/notifications from firing at all,
-     * even when POST_NOTIFICATIONS and SCHEDULE_EXACT_ALARM are both granted, unless the app
-     * is explicitly excluded from battery optimization. This is one of the most common
-     * real-world reasons reminders "just don't do anything" on real devices.
+     * Many OEMs aggressively kill background apps and silently prevent scheduled alarms
+     * and notifications from firing. Keep this reminder reliability setting independent
+     * from SMS/phone/contact functionality.
      */
     private fun checkBatteryOptimization() {
         val powerManager = getSystemService(POWER_SERVICE) as android.os.PowerManager
@@ -159,14 +125,6 @@ class MainActivity : AppCompatActivity() {
         showRemoteAnnouncementIfAny()
     }
 
-    /**
-     * Shown last, after the permission dialogs, so it never fights with them for the
-     * screen. Reads a small JSON file from a URL you control (see AnnouncementManager) -
-     * whatever "id" is in that file decides whether this has already been dismissed, so
-     * changing the id later (a new announcement) shows it again to everyone, including
-     * people who dismissed an older one. Any network failure here is silent - this is
-     * purely informational and must never get in the way of using the app.
-     */
     private fun showRemoteAnnouncementIfAny() {
         lifecycleScope.launch {
             val announcement = withContext(Dispatchers.IO) { AnnouncementManager.fetch() } ?: return@launch
