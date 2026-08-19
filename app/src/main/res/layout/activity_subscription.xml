@@ -52,7 +52,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="یادآوری‌ها، هشدار تمام‌صفحه، تقویم شمسی، حسابداری، مخاطبین و پشتیبان‌گیری — بدون نیاز به اشتراک."
+                    android:text="یادآوری‌ها، هشدار تمام‌صفحه، تقویم شمسی، حسابداری و پشتیبان‌گیری — بدون نیاز به اشتراک."
                     android:textSize="13sp"
                     android:textColor="#616161" />
 

@@ -170,7 +170,7 @@ class SettingsFragment : Fragment() {
     private fun confirmAndRestore(uri: Uri) {
         AlertDialog.Builder(requireContext())
             .setTitle("بازیابی اطلاعات")
-            .setMessage("با این کار تمام اطلاعات فعلی برنامه (حسابداری، یادآوری‌ها، مخاطبین) با اطلاعات داخل این فایل پشتیبان جایگزین می‌شود و برنامه بسته می‌شود. ادامه می‌دهید؟")
+            .setMessage("با این کار تمام اطلاعات فعلی برنامه (حسابداری و یادآوری‌ها) با اطلاعات داخل این فایل پشتیبان جایگزین می‌شود و برنامه بسته می‌شود. ادامه می‌دهید؟")
             .setPositiveButton("بله، بازیابی کن") { _, _ -> performRestore(uri) }
             .setNegativeButton("لغو", null)
             .show()

@@ -10,8 +10,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
- * Backs up / restores the *entire* app database (accounting, reminders, contacts,
- * financial status - everything) by zipping the raw SQLite files directly, rather than
+ * Backs up / restores the *entire* app database (accounting, reminders, financial status - everything) by zipping the raw SQLite files directly, rather than
  * hand-serializing every table to JSON. This guarantees a full, exact copy with no risk of
  * missing a field or table, and needs no changes here if entities change later.
  *
