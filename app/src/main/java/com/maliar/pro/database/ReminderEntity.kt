@@ -30,11 +30,6 @@ data class ReminderEntity(
     val category: String = "",
     val linkedCheckId: Long? = null,
     val linkedInstallmentId: Long? = null,
-    // Optional contact attached to this reminder so an "action" notification can offer a
-    // real "call" button (dials the exact person picked from the app's own Contacts tab,
-    // instead of only "done"/"snooze").
-    val contactName: String = "",
-    val contactPhoneNumber: String = ""
 )
 
 enum class ReminderType {

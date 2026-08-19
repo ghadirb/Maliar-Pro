@@ -149,8 +149,6 @@ class SmartReminderManager(private val context: Context) {
             putExtra("use_alarm", useAlarm)
             putExtra("repeat_pattern", reminder.repeatPattern)
             putExtra("reminder_type", reminder.reminderType)
-            putExtra("contact_name", reminder.contactName)
-            putExtra("contact_phone", reminder.contactPhoneNumber)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(

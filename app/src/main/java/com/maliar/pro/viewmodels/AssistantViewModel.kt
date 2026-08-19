@@ -10,10 +10,8 @@ import com.maliar.pro.database.Expense
 import com.maliar.pro.database.Reminder
 import com.maliar.pro.database.Priority
 import com.maliar.pro.database.RecurringType
-import com.maliar.pro.database.ContactManager
 import com.maliar.pro.models.AIProvider
 import com.maliar.pro.utils.PreferencesManager
-import com.maliar.pro.utils.VoiceCallHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -428,29 +426,6 @@ class AssistantViewModel(
         title = title.replace("و نیم", "").trim(' ', ',', '،', ':')
         if (title.isBlank()) title = "یادآوری"
 
-        // If the reminder mentions calling someone ("با علی تماس بگیرم"), try to match it
-        // against the app's own Contacts so the "action" notification mode can offer a
-        // real one-tap call button - not just a text reminder that says to call someone.
-        var matchedContactName = ""
-        var matchedContactPhone = ""
-        val callMention = Regex("با\\s+([\\p{L}\\s]{2,20}?)\\s*تماس").find(message)
-            ?: Regex("([\\p{L}\\s]{2,20}?)\\s*(?:رو|را)?\\s*(?:صدا بزن|زنگ بزن)").find(message)
-        if (callMention != null) {
-            val nameGuess = callMention.groupValues[1].trim()
-            if (nameGuess.isNotBlank()) {
-                try {
-                    val contacts = ContactManager(appContext).getAllContactsList()
-                    val matched = contacts.firstOrNull {
-                        it.name.contains(nameGuess, ignoreCase = true) || nameGuess.contains(it.name, ignoreCase = true)
-                    }
-                    if (matched != null) {
-                        matchedContactName = matched.name
-                        matchedContactPhone = matched.phoneNumber
-                    }
-                } catch (e: Exception) { /* no contact match, ignore */ }
-            }
-        }
-
         // If the person explicitly asked for a "smart" reminder, schedule it as one so it
         // gets the spoken TTS treatment instead of a plain notification.
         val requestedAlertType = if (message.contains("هوشمند")) {
@@ -468,8 +443,6 @@ class AssistantViewModel(
             triggerTime = cal.timeInMillis,
             repeatPattern = com.maliar.pro.database.RepeatPattern.ONCE.name,
             category = "دستیار",
-            contactName = matchedContactName,
-            contactPhoneNumber = matchedContactPhone
         )
         val savedId = smartReminderManager.addReminder(reminder)
 
@@ -479,10 +452,7 @@ class AssistantViewModel(
             cal.get(java.util.Calendar.MINUTE)
         )
         return if (savedId > 0) {
-            val contactNote = if (matchedContactPhone.isNotBlank())
-                "\n📞 در حالت نوتیفیکیشن «با اکشن»، دکمه تماس مستقیم با $matchedContactName هم نمایش داده می‌شود."
-            else ""
-            "✅ یادآوری «$title» برای ساعت $timeStr ثبت و زمان‌بندی شد (شناسه #$savedId).$contactNote"
+            "✅ یادآوری «$title» برای ساعت $timeStr ثبت و زمان‌بندی شد (شناسه #$savedId)."
         } else {
             "❌ ذخیره‌سازی یادآوری با خطا مواجه شد، لطفاً دوباره تلاش کنید."
         }
@@ -708,36 +678,6 @@ class AssistantViewModel(
     private suspend fun processCommand(message: String): String {
         val lower = message.lowercase()
         
-        if (lower.contains("تماس") || lower.contains("call") || lower.contains("زنگ بزن")) {
-            val contactName = message.substringAfter("تماس").trim()
-                .substringAfter("زنگ بزن").trim()
-                .substringAfter("call").trim()
-            if (contactName.isNotEmpty()) {
-                try {
-                    val contactManager = ContactManager(appContext)
-                    val contacts = contactManager.getAllContactsList()
-                    val matched = contacts.firstOrNull { 
-                        it.name.contains(contactName, ignoreCase = true) || 
-                        contactName.contains(it.name, ignoreCase = true)
-                    }
-                    if (matched != null && !matched.phoneNumber.isNullOrEmpty()) {
-                        return when (VoiceCallHelper.makeCallWithResult(appContext, matched.phoneNumber)) {
-                            VoiceCallHelper.CallResult.CALLED_DIRECTLY -> "📞 در حال برقراری تماس با ${matched.name}..."
-                            VoiceCallHelper.CallResult.OPENED_DIALER_NO_PERMISSION ->
-                                "📲 مجوز تماس مستقیم داده نشده، برای همین صفحه‌ی شماره‌گیر با شماره‌ی ${matched.name} باز شد؛ فقط کافیه دکمه‌ی تماس را بزنید.\n" +
-                                "برای اینکه بعداً دستیار خودش مستقیم تماس بگیرد، از تنظیمات گوشی → برنامه‌ها → مالیار پرو → مجوزها، «تماس تلفنی» را فعال کنید."
-                            VoiceCallHelper.CallResult.FAILED -> "❌ خطا در برقراری تماس"
-                        }
-                    } else {
-                        val allNames = contacts.joinToString("، ") { it.name }
-                        return "⚠️ مخاطب '$contactName' پیدا نشد. مخاطبین شما: $allNames"
-                    }
-                } catch (e: Exception) {
-                    return "❌ خطا در دسترسی به مخاطبین: ${e.message}"
-                }
-            }
-        }
-
         // Add other command handling...
         return when {
             lower.contains("تراز") || lower.contains("balance") || lower.contains("موجودی") -> {

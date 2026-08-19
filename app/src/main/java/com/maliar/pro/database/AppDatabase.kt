@@ -8,15 +8,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.migration.Migration
 
 @Database(
-    entities = [Contact::class, Income::class, Expense::class, Check::class, Installment::class, Reminder::class,
+    entities = [Income::class, Expense::class, Check::class, Installment::class, Reminder::class,
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
                ReminderEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
-    abstract fun contactDao(): ContactDao
     abstract fun accountingDao(): AccountingDao
     abstract fun reminderDao(): ReminderDao
     abstract fun financialStatusDao(): FinancialStatusDao
@@ -61,6 +60,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `contacts`")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS `advanced_reminders_new` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL,
+                    `reminderType` TEXT NOT NULL, `priority` TEXT NOT NULL, `alertType` TEXT NOT NULL, `triggerTime` INTEGER NOT NULL,
+                    `repeatPattern` TEXT NOT NULL, `customRepeatDays` TEXT NOT NULL, `locationLat` REAL, `locationLng` REAL,
+                    `locationRadius` INTEGER NOT NULL, `locationName` TEXT NOT NULL, `isCompleted` INTEGER NOT NULL, `completedAt` INTEGER,
+                    `createdAt` INTEGER NOT NULL, `tags` TEXT NOT NULL, `relatedPerson` TEXT NOT NULL, `snoozeCount` INTEGER NOT NULL,
+                    `lastSnoozed` INTEGER, `notes` TEXT NOT NULL, `category` TEXT NOT NULL, `linkedCheckId` INTEGER, `linkedInstallmentId` INTEGER
+                )""".trimIndent())
+                db.execSQL("""INSERT INTO `advanced_reminders_new`
+                    (`id`,`title`,`description`,`reminderType`,`priority`,`alertType`,`triggerTime`,`repeatPattern`,`customRepeatDays`,
+                     `locationLat`,`locationLng`,`locationRadius`,`locationName`,`isCompleted`,`completedAt`,`createdAt`,`tags`,
+                     `relatedPerson`,`snoozeCount`,`lastSnoozed`,`notes`,`category`,`linkedCheckId`,`linkedInstallmentId`)
+                    SELECT `id`,`title`,`description`,`reminderType`,`priority`,`alertType`,`triggerTime`,`repeatPattern`,`customRepeatDays`,
+                     `locationLat`,`locationLng`,`locationRadius`,`locationName`,`isCompleted`,`completedAt`,`createdAt`,`tags`,
+                     `relatedPerson`,`snoozeCount`,`lastSnoozed`,`notes`,`category`,`linkedCheckId`,`linkedInstallmentId`
+                    FROM `advanced_reminders`""".trimIndent())
+                db.execSQL("DROP TABLE `advanced_reminders`")
+                db.execSQL("ALTER TABLE `advanced_reminders_new` RENAME TO `advanced_reminders`")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -68,7 +91,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "maliar_pro_database"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

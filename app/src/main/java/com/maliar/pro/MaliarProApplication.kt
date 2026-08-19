@@ -20,8 +20,6 @@ class MaliarProApplication : Application() {
         const val CHANNEL_NAME = "مالیار پرو"
         const val REMINDER_CHANNEL_ID = "reminder_channel"
         const val REMINDER_CHANNEL_NAME = "یادآوری‌ها"
-        const val CALL_CHANNEL_ID = "call_channel"
-        const val CALL_CHANNEL_NAME = "تماس‌ها"
         const val BACKGROUND_CHANNEL_ID = "background_channel"
         const val BACKGROUND_CHANNEL_NAME = "فعالیت پس‌زمینه"
 
@@ -78,16 +76,6 @@ class MaliarProApplication : Application() {
             }
             notificationManager.createNotificationChannel(reminderChannel)
             
-            // Call channel
-            val callChannel = NotificationChannel(
-                CALL_CHANNEL_ID,
-                CALL_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "کانال تماس‌ها"
-            }
-            notificationManager.createNotificationChannel(callChannel)
-
             // Background keep-alive channel - deliberately minimal importance so the
             // persistent "app is running" notification never makes a sound/pops up,
             // it just needs to exist to satisfy the foreground service requirement.
