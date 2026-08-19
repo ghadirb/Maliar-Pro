@@ -3,184 +3,41 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp">
-
         <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp">
-
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/reminderTitleInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="عنوان یادآوری"
-                android:inputType="text" />
-
+                android:id="@+id/reminderTitleInput" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:hint="عنوان یادآوری" android:inputType="text" />
         </com.google.android.material.textfield.TextInputLayout>
-
         <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp">
-
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/reminderDescriptionInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="توضیحات"
-                android:inputType="textMultiLine"
-                android:minLines="2" />
-
+                android:id="@+id/reminderDescriptionInput" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:hint="توضیحات" android:inputType="textMultiLine" android:minLines="2" />
         </com.google.android.material.textfield.TextInputLayout>
-
-        <Spinner
-            android:id="@+id/categorySpinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
-
-            <Button
-                android:id="@+id/reminderDateButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:text="انتخاب تاریخ" />
-
-            <Button
-                android:id="@+id/reminderTimeButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:text="انتخاب ساعت" />
-
+        <Spinner android:id="@+id/categorySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="8dp">
+            <Button android:id="@+id/reminderDateButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="انتخاب تاریخ" />
+            <Button android:id="@+id/reminderTimeButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="4dp" android:text="انتخاب ساعت" />
         </LinearLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="اولویت:"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="8dp" />
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/priorityChipGroup"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            app:singleSelection="true">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipLowPriority"
-                style="@style/MaliarPro.Chip.Selectable"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="کم"
-                android:checkable="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipMediumPriority"
-                style="@style/MaliarPro.Chip.Selectable"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="متوسط"
-                android:checked="true"
-                android:checkable="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipHighPriority"
-                style="@style/MaliarPro.Chip.Selectable"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="زیاد"
-                android:checkable="true" />
-
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="اولویت:" android:textSize="14sp" android:textStyle="bold" android:layout_marginTop="8dp" />
+        <com.google.android.material.chip.ChipGroup android:id="@+id/priorityChipGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" app:singleSelection="true">
+            <com.google.android.material.chip.Chip android:id="@+id/chipLowPriority" style="@style/MaliarPro.Chip.Selectable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="کم" android:checkable="true" />
+            <com.google.android.material.chip.Chip android:id="@+id/chipMediumPriority" style="@style/MaliarPro.Chip.Selectable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="متوسط" android:checked="true" android:checkable="true" />
+            <com.google.android.material.chip.Chip android:id="@+id/chipHighPriority" style="@style/MaliarPro.Chip.Selectable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="زیاد" android:checkable="true" />
         </com.google.android.material.chip.ChipGroup>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="نوع هشدار:"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="8dp" />
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/alertTypeChipGroup"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            app:singleSelection="true">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipAlertNotification"
-                style="@style/MaliarPro.Chip.Selectable"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="نوتیفیکیشن"
-                android:checked="true"
-                android:checkable="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipAlertFullScreen"
-                style="@style/MaliarPro.Chip.Selectable"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="تمام صفحه"
-                android:checkable="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipAlertSmart"
-                style="@style/MaliarPro.Chip.Selectable"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="هوشمند"
-                android:checkable="true" />
-
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="نوع هشدار:" android:textSize="14sp" android:textStyle="bold" android:layout_marginTop="8dp" />
+        <com.google.android.material.chip.ChipGroup android:id="@+id/alertTypeChipGroup" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" app:singleSelection="true">
+            <com.google.android.material.chip.Chip android:id="@+id/chipAlertNotification" style="@style/MaliarPro.Chip.Selectable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="نوتیفیکیشن" android:checked="true" android:checkable="true" />
+            <com.google.android.material.chip.Chip android:id="@+id/chipAlertFullScreen" style="@style/MaliarPro.Chip.Selectable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="تمام صفحه" android:checkable="true" />
+            <com.google.android.material.chip.Chip android:id="@+id/chipAlertSmart" style="@style/MaliarPro.Chip.Selectable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="هوشمند" android:checkable="true" />
         </com.google.android.material.chip.ChipGroup>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="تکرار:"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="8dp" />
-
-        <Spinner
-            android:id="@+id/repeatPatternSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="مخاطب برای تماس (اختیاری - در حالت نوتیفیکیشن «با اکشن» دکمه تماس اضافه می‌شود):"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginTop="8dp" />
-
-        <Button
-            android:id="@+id/reminderContactButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="انتخاب مخاطب" />
-
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="تکرار:" android:textSize="14sp" android:textStyle="bold" android:layout_marginTop="8dp" />
+        <Spinner android:id="@+id/repeatPatternSpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" />
     </LinearLayout>
-
 </ScrollView>
