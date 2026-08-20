@@ -4,8 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -13,8 +11,6 @@ import androidx.navigation.fragment.findNavController
 import com.maliar.pro.R
 import com.maliar.pro.databinding.FragmentAccountingBinding
 import com.maliar.pro.database.AccountingManager
-import com.maliar.pro.database.BankAccount
-import com.maliar.pro.database.BankAccountManager
 import com.maliar.pro.dialogs.AddIncomeDialog
 import com.maliar.pro.dialogs.AddExpenseDialog
 import com.maliar.pro.dialogs.AddCheckDialog
@@ -29,8 +25,6 @@ class AccountingFragment : Fragment() {
     private val viewModel: AccountingViewModel by viewModels {
         AccountingViewModelFactory(AccountingManager(requireContext()))
     }
-    private val bankAccountManager by lazy { BankAccountManager(requireContext()) }
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -44,7 +38,6 @@ class AccountingFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupUI()
         observeViewModel()
-        observeBankAccounts()
     }
 
     private fun setupUI() {
@@ -145,36 +138,6 @@ class AccountingFragment : Fragment() {
                 val count = viewModel.activeInstallmentsCount.value
                 binding.monthlyInstallmentsSummary.text = "$count قسط · ${formatCurrency(total)}"
             }
-        }
-    }
-
-    private fun observeBankAccounts() {
-        lifecycleScope.launch {
-            bankAccountManager.getAllBankAccounts().collect { accounts ->
-                renderBankAccounts(accounts)
-            }
-        }
-    }
-
-    private fun renderBankAccounts(accounts: List<BankAccount>) {
-        binding.bankAccountsContainer.removeAllViews()
-        binding.bankAccountsHint.visibility = if (accounts.isEmpty()) View.VISIBLE else View.GONE
-
-        accounts.forEach { account ->
-            val label = buildString {
-                append(account.bankName)
-                if (account.lastDigits.isNotBlank()) append(" - ${account.lastDigits}")
-            }
-            val row = TextView(requireContext()).apply {
-                text = "$label: ${formatCurrency(account.balance)}"
-                textSize = 14f
-                setPadding(0, 8, 0, 8)
-                isClickable = true
-                setOnClickListener {
-                    Toast.makeText(requireContext(), "$label: ${formatCurrency(account.balance)}", Toast.LENGTH_SHORT).show()
-                }
-            }
-            binding.bankAccountsContainer.addView(row)
         }
     }
 

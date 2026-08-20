@@ -20,7 +20,6 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_BACKUP_URI = "last_backup_uri"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
-        private const val KEY_SMS_READING_ENABLED = "sms_reading_enabled"
 
         // --- Subscription / entitlement ---
         private const val KEY_DEVICE_ID = "device_id"
@@ -187,11 +186,4 @@ class PreferencesManager(context: Context) {
         prefs.edit().putString(KEY_LAST_STORE_CHANNEL, channel).apply()
     }
 
-    // --- Bank SMS reading (opt-in) ---
-
-    fun isSmsReadingEnabled(): Boolean = prefs.getBoolean(KEY_SMS_READING_ENABLED, false)
-
-    fun setSmsReadingEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_SMS_READING_ENABLED, enabled).apply()
-    }
 }

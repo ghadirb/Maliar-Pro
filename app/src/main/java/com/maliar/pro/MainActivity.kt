@@ -35,11 +35,11 @@ class MainActivity : AppCompatActivity() {
         }
 
     /**
-     * The assistant's "call so-and-so" command and the notification action buttons need
-     * CALL_PHONE / READ_CONTACTS at runtime (declaring them in the manifest alone does
-     * nothing on Android 6+). Without this, VoiceCallHelper.makeCall() throws a
-     * SecurityException every single time and the assistant silently "does nothing" when
-     * asked to call someone - which is exactly the symptom being reported.
+     * The assistant's contact matching and the notification action buttons need
+     * READ_CONTACTS at runtime (declaring it in the manifest alone does nothing on
+     * Android 6+). This Play-Safe test build intentionally never requests CALL_PHONE, so
+     * VoiceCallHelper always falls back to opening the dialer (ACTION_DIAL) instead of
+     * placing a call directly (ACTION_CALL).
      */
     private val assistantPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -48,7 +48,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestAssistantActionPermissions() {
         val needed = listOf(
-            android.Manifest.permission.CALL_PHONE,
             android.Manifest.permission.READ_CONTACTS,
             // Needed for the assistant's voice-command notification and for smart
             // reminders' spoken "انجام شد" voice-response detection.

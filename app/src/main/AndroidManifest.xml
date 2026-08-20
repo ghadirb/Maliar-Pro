@@ -6,9 +6,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -34,11 +32,6 @@
             <action android:name="ir.cafebazaar.pardakht.InAppBillingService.BIND" />
         </intent>
     </queries>
-
-    <!-- Opt-in only (see PreferencesManager.isSmsReadingEnabled, off by default) - lets the
-         app recognize bank transaction SMS and auto-record them as accounting entries. -->
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
 
     <!-- Needed so the app can keep a foreground service (persistent notification)
          alive to keep smart reminders / assistant features responsive in the background. -->
@@ -71,8 +64,10 @@
         </activity>
 
         <!-- Records a short voice command (e.g. "به علی زنگ بزن"), transcribes it, and
-             after a plain confirmation dialog places a real call to the matched contact.
-             Launched from the persistent background notification's action button. -->
+             after a plain confirmation dialog opens the dialer pre-filled with the matched
+             contact's number (this Play-Safe test build never requests CALL_PHONE, so no
+             call is ever placed directly - see VoiceCallHelper). Launched from the
+             persistent background notification's action button. -->
         <activity
             android:name=".ui.assistant.VoiceCommandActivity"
             android:exported="false"
@@ -110,19 +105,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Opt-in (Settings toggle) bank-transaction SMS reader - see SmsReceiver.kt.
-             android:permission restricts who can even trigger this broadcast to the
-             platform itself, on top of the runtime-permission and Settings-toggle checks
-             already inside the receiver. -->
-        <receiver
-            android:name=".receivers.SmsReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_SMS">
-            <intent-filter android:priority="500">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
 
