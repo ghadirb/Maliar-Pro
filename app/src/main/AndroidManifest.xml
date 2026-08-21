@@ -62,16 +62,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Records a short voice command (e.g. "به علی زنگ بزن"), transcribes it, and
-             after a plain confirmation dialog opens the dialer pre-filled with the matched
-             contact's number (this Play-Safe test build never requests CALL_PHONE, so no
-             call is ever placed directly - see VoiceCallHelper). Launched from the
-             persistent background notification's action button. -->
-        <activity
-            android:name=".ui.assistant.VoiceCommandActivity"
-            android:exported="false"
-            android:theme="@style/Theme.MaliarPro" />
-
         <!-- Subscription / premium upgrade screen -->
         <activity
             android:name=".ui.profile.SubscriptionActivity"

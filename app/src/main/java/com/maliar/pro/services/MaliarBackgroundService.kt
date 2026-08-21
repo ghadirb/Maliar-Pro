@@ -71,20 +71,6 @@ class MaliarBackgroundService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // "Run a real command from the notification" - the specific capability that was
-        // missing: tapping this opens a tiny recorder that transcribes a spoken command
-        // (e.g. "به علی زنگ بزن"), matches it to a saved contact, asks for confirmation,
-        // and only then places a real call - all without opening the full app first.
-        val voiceCommandIntent = Intent(this, com.maliar.pro.ui.assistant.VoiceCommandActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        val voiceCommandPendingIntent = PendingIntent.getActivity(
-            this,
-            1,
-            voiceCommandIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
         return NotificationCompat.Builder(this, MaliarProApplication.BACKGROUND_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("مالیار پرو در حال اجراست")
@@ -93,7 +79,6 @@ class MaliarBackgroundService : Service() {
             .setOngoing(true)
             .setSilent(true)
             .setContentIntent(contentPendingIntent)
-            .addAction(R.drawable.ic_notification, "🎙️ دستور صوتی", voiceCommandPendingIntent)
             .build()
     }
 

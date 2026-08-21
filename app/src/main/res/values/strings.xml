@@ -31,10 +31,5 @@
     <string name="reminder_title">عنوان یادآوری</string>
     <string name="reminder_time">زمان یادآوری</string>
     <string name="add_reminder">افزودن یادآوری</string>
-    <string name="voice_command">دستور صوتی</string>
-    <string name="say_contact_name">نام مخاطب را بگویید</string>
-    <string name="say_contact_number">شماره مخاطب را بگویید</string>
-    <string name="say_contact_row">شماره ردیف را بگویید</string>
-    <string name="confirm_call">تأیید تماس</string>
     <string name="call_with">تماس با</string>
 </resources>

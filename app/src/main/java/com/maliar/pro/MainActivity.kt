@@ -44,11 +44,12 @@ class MainActivity : AppCompatActivity() {
      * permission was unnecessary and has been dropped entirely rather than added to the
      * Manifest.
      *
-     * RECORD_AUDIO is also intentionally not requested here for this build: it isn't
-     * declared in the Manifest right now (removed to unblock Bazaar review), so
-     * VoiceCommandActivity's own in-place permission check handles that separately and
-     * degrades gracefully (shows a "microphone access required" message) instead of
-     * prompting for it on every app launch.
+     * RECORD_AUDIO and the whole voice-command feature (VoiceCommandActivity, its
+     * notification action button, and its Manifest entry) have been temporarily removed
+     * for this store submission to unblock Bazaar/Myket review. Nothing here requests
+     * that permission anymore. The feature's code isn't deleted from history - just
+     * pulled out of this build - so it can be reintroduced later alongside a proper
+     * Data Safety / permission-usage explanation for the stores.
      *
      * This Play-Safe test build also intentionally never requests CALL_PHONE, so
      * VoiceCallHelper always falls back to opening the dialer (ACTION_DIAL) instead of
