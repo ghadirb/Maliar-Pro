@@ -35,31 +35,27 @@ class MainActivity : AppCompatActivity() {
         }
 
     /**
-     * The assistant's contact matching and the notification action buttons need
-     * READ_CONTACTS at runtime (declaring it in the manifest alone does nothing on
-     * Android 6+). This Play-Safe test build intentionally never requests CALL_PHONE, so
+     * Fixed store-review bug: this used to request android.permission.READ_CONTACTS at
+     * runtime even though it was never declared in the Manifest (a request for an
+     * undeclared permission is always auto-denied, and Play/Myket review flags the
+     * inconsistency). In practice the assistant's contact matching only ever reads the
+     * app's own local Contact table (see ContactManager/ContactDao, a Room database) and
+     * never touches the device's real ContactsContract, so the real Android contacts
+     * permission was unnecessary and has been dropped entirely rather than added to the
+     * Manifest.
+     *
+     * RECORD_AUDIO is also intentionally not requested here for this build: it isn't
+     * declared in the Manifest right now (removed to unblock Bazaar review), so
+     * VoiceCommandActivity's own in-place permission check handles that separately and
+     * degrades gracefully (shows a "microphone access required" message) instead of
+     * prompting for it on every app launch.
+     *
+     * This Play-Safe test build also intentionally never requests CALL_PHONE, so
      * VoiceCallHelper always falls back to opening the dialer (ACTION_DIAL) instead of
      * placing a call directly (ACTION_CALL).
      */
-    private val assistantPermissionsLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            checkExactAlarmPermission()
-        }
-
     private fun requestAssistantActionPermissions() {
-        val needed = listOf(
-            android.Manifest.permission.READ_CONTACTS,
-            // Needed for the assistant's voice-command notification and for smart
-            // reminders' spoken "انجام شد" voice-response detection.
-            android.Manifest.permission.RECORD_AUDIO
-        ).filter {
-            ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-        if (needed.isNotEmpty()) {
-            assistantPermissionsLauncher.launch(needed.toTypedArray())
-        } else {
-            checkExactAlarmPermission()
-        }
+        checkExactAlarmPermission()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
