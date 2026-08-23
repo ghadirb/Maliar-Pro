@@ -156,6 +156,11 @@ dependencies {
     // The official Myket client is configured per product flavor for both Myket and
     // Cafe Bazaar, as documented by Myket. Each store receives its own signed APK/AAB.
     implementation("com.github.myketstore:myket-billing-client:1.19")
+
+    // Charting for the professional financial reports screen (income/expense trend line).
+    // Hosted on jitpack, which settings.gradle.kts already lists as a repository for the
+    // Myket billing client above - no new repo needed.
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

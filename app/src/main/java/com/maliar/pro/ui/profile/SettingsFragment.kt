@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import com.maliar.pro.databinding.FragmentSettingsBinding
 import com.maliar.pro.utils.AutoBackupWorker
 import com.maliar.pro.utils.BackupManager
+import com.maliar.pro.utils.FinancialInsightWorker
 import com.maliar.pro.utils.PreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -169,6 +170,17 @@ class SettingsFragment : Fragment() {
                 Toast.makeText(requireContext(), "پشتیبان‌گیری خودکار روزانه فعال شد", Toast.LENGTH_SHORT).show()
             } else {
                 AutoBackupWorker.cancel(requireContext())
+            }
+        }
+
+        binding.financialInsightsSwitch.isChecked = prefs.isFinancialInsightsEnabled()
+        binding.financialInsightsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setFinancialInsightsEnabled(isChecked)
+            if (isChecked) {
+                FinancialInsightWorker.schedule(requireContext())
+                Toast.makeText(requireContext(), "پیشنهادهای هوشمند مالی فعال شد", Toast.LENGTH_SHORT).show()
+            } else {
+                FinancialInsightWorker.cancel(requireContext())
             }
         }
     }

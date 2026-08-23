@@ -21,6 +21,53 @@ object NotificationHelper {
     private const val NOTIFICATION_ID_EXPIRY_REMINDER = 5002
     private const val NOTIFICATION_ID_EXPIRED = 5003
 
+    private const val INSIGHT_CHANNEL_ID = "financial_insights_channel"
+    private const val NOTIFICATION_ID_FINANCIAL_INSIGHT = 5010
+
+    private fun ensureInsightChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            val channel = NotificationChannel(
+                INSIGHT_CHANNEL_ID,
+                "تحلیل و پیشنهاد هوشمند مالی",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "مقایسه هزینه‌ها با ماه گذشته و پیش‌بینی وضعیت مالی پایان ماه"
+            }
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    /** Opens the app itself (accounting tab) rather than SubscriptionActivity, since this
+     *  is an analytical nudge, not a billing prompt. */
+    private fun openMainActivityIntent(context: Context): PendingIntent {
+        val intent = Intent(context, com.maliar.pro.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return PendingIntent.getActivity(context, 1, intent, flags)
+    }
+
+    /** One AI/rule-generated insight per day, e.g. "هزینه حمل‌ونقل شما در مرداد نسبت به
+     *  تیر ۲۳٪ افزایش داشته است" or a projected month-end surplus/deficit. */
+    fun notifyFinancialInsight(context: Context, message: String) {
+        ensureInsightChannel(context)
+        val notification = NotificationCompat.Builder(context, INSIGHT_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("💡 تحلیل مالی مالیار")
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setAutoCancel(true)
+            .setContentIntent(openMainActivityIntent(context))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_FINANCIAL_INSIGHT, notification)
+        } catch (e: SecurityException) {
+            android.util.Log.w("NotificationHelper", "Notification permission not granted: ${e.message}")
+        }
+    }
+
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(NotificationManager::class.java)

@@ -43,6 +43,7 @@ class MaliarProApplication : Application() {
         createNotificationChannels()
         initializeDatabase()
         startBackgroundService()
+        scheduleFinancialInsights()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) { startedActivityCount.incrementAndGet() }
             override fun onActivityStopped(activity: Activity) { startedActivityCount.decrementAndGet() }
@@ -150,6 +151,15 @@ class MaliarProApplication : Application() {
             com.maliar.pro.services.MaliarBackgroundService.start(this)
         } catch (e: Exception) {
             Log.w("MaliarProApplication", "⚠️ Could not start background service: ${e.message}")
+        }
+    }
+
+    /** Schedules the daily "پیشنهادهای هوشمند مالی" worker (on by default, see
+     *  PreferencesManager.isFinancialInsightsEnabled) - the worker itself re-checks the
+     *  preference each run and no-ops if it's been turned off since. */
+    private fun scheduleFinancialInsights() {
+        if (com.maliar.pro.utils.PreferencesManager(this).isFinancialInsightsEnabled()) {
+            com.maliar.pro.utils.FinancialInsightWorker.schedule(this)
         }
     }
 }

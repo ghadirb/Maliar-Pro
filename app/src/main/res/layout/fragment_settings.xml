@@ -220,6 +220,46 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💡 پیشنهادهای هوشمند مالی"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/financialInsightsSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:checked="true"
+                    android:text="دریافت تحلیل و پیشنهاد روزانه" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="روزی یک بار، تغییرات هزینه‌ها نسبت به ماه قبل یا پیش‌بینی وضعیت پایان ماه را به‌صورت نوتیفیکیشن دریافت کنید."
+                    android:textSize="12sp"
+                    android:textColor="#757575" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
 
 
     </LinearLayout>

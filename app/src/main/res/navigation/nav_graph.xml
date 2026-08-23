@@ -29,7 +29,57 @@
         <action
             android:id="@+id/action_accountingFragment_to_installmentListFragment"
             app:destination="@id/installmentListFragment" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_dueSoonFragment"
+            app:destination="@id/dueSoonFragment" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_debtorListFragment"
+            app:destination="@id/debtorListFragment" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_financialCalendarFragment"
+            app:destination="@id/financialCalendarFragment" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_financialReportsFragment"
+            app:destination="@id/financialReportsFragment" />
     </fragment>
+
+    <fragment
+        android:id="@+id/dueSoonFragment"
+        android:name="com.maliar.pro.ui.accounting.DueSoonFragment"
+        android:label="نزدیک به سررسید" />
+
+    <fragment
+        android:id="@+id/debtorListFragment"
+        android:name="com.maliar.pro.ui.debtors.DebtorListFragment"
+        android:label="بدهکار و طلبکار">
+
+        <action
+            android:id="@+id/action_debtorListFragment_to_debtorDetailFragment"
+            app:destination="@id/debtorDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/debtorDetailFragment"
+        android:name="com.maliar.pro.ui.debtors.DebtorDetailFragment"
+        android:label="جزئیات">
+        <argument
+            android:name="debtorId"
+            app:argType="long" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/financialCalendarFragment"
+        android:name="com.maliar.pro.ui.calendar.FinancialCalendarFragment"
+        android:label="تقویم مالی" />
+
+    <fragment
+        android:id="@+id/financialReportsFragment"
+        android:name="com.maliar.pro.ui.reports.FinancialReportsFragment"
+        android:label="گزارش‌های مالی" />
 
     <fragment
         android:id="@+id/incomeListFragment"

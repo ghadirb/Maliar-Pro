@@ -19,6 +19,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_BACKGROUND_SERVICE_ENABLED = "background_service_enabled"
         private const val KEY_LAST_BACKUP_URI = "last_backup_uri"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
+        private const val KEY_FINANCIAL_INSIGHTS_ENABLED = "financial_insights_enabled"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
 
         // --- Subscription / entitlement ---
@@ -102,6 +103,17 @@ class PreferencesManager(context: Context) {
     }
 
     fun isAutoBackupEnabled(): Boolean = prefs.getBoolean(KEY_AUTO_BACKUP_ENABLED, false)
+
+    // --- AI financial insights ---
+
+    /** Whether the daily "پیشنهادهای هوشمند مالی" notification worker is allowed to run -
+     *  on by default since the feature is purely local-analysis-first and only degrades
+     *  gracefully (no AI key just means a slightly less polished sentence, not a failure). */
+    fun setFinancialInsightsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_FINANCIAL_INSIGHTS_ENABLED, enabled).apply()
+    }
+
+    fun isFinancialInsightsEnabled(): Boolean = prefs.getBoolean(KEY_FINANCIAL_INSIGHTS_ENABLED, true)
 
     // --- Startup announcement ---
 

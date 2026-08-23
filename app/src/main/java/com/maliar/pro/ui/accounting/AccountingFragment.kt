@@ -11,12 +11,16 @@ import androidx.navigation.fragment.findNavController
 import com.maliar.pro.R
 import com.maliar.pro.databinding.FragmentAccountingBinding
 import com.maliar.pro.database.AccountingManager
+import com.maliar.pro.database.DebtorManager
+import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.dialogs.AddIncomeDialog
 import com.maliar.pro.dialogs.AddExpenseDialog
 import com.maliar.pro.dialogs.AddCheckDialog
 import com.maliar.pro.dialogs.AddInstallmentDialog
 import com.maliar.pro.viewmodels.AccountingViewModel
 import com.maliar.pro.viewmodels.AccountingViewModelFactory
+import com.maliar.pro.viewmodels.DueSoonViewModel
+import com.maliar.pro.viewmodels.DueSoonViewModelFactory
 import kotlinx.coroutines.launch
 
 class AccountingFragment : Fragment() {
@@ -24,6 +28,13 @@ class AccountingFragment : Fragment() {
     private lateinit var binding: FragmentAccountingBinding
     private val viewModel: AccountingViewModel by viewModels {
         AccountingViewModelFactory(AccountingManager(requireContext()))
+    }
+    private val dueSoonViewModel: DueSoonViewModel by viewModels {
+        DueSoonViewModelFactory(
+            AccountingManager(requireContext()),
+            FinancialStatusManager(requireContext()),
+            DebtorManager(requireContext())
+        )
     }
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -71,6 +82,22 @@ class AccountingFragment : Fragment() {
 
         binding.addInstallmentButton.setOnClickListener {
             showAddInstallmentDialog()
+        }
+
+        binding.dueSoonCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_dueSoonFragment)
+        }
+
+        binding.debtorsCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_debtorListFragment)
+        }
+
+        binding.financialCalendarCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_financialCalendarFragment)
+        }
+
+        binding.financialReportsCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_financialReportsFragment)
         }
     }
 
@@ -137,6 +164,25 @@ class AccountingFragment : Fragment() {
             viewModel.activeInstallmentsMonthlyTotal.collect { total ->
                 val count = viewModel.activeInstallmentsCount.value
                 binding.monthlyInstallmentsSummary.text = "$count قسط · ${formatCurrency(total)}"
+            }
+        }
+
+        // Due-soon widget: only shown once there's actually something due within a week,
+        // so it never occupies space with an empty state on a quiet week.
+        lifecycleScope.launch {
+            dueSoonViewModel.dueItems.collect {
+                val soon = dueSoonViewModel.itemsDueWithin(7)
+                if (soon.isEmpty()) {
+                    binding.dueSoonCard.visibility = View.GONE
+                } else {
+                    binding.dueSoonCard.visibility = View.VISIBLE
+                    val overdue = soon.count { it.isOverdue }
+                    binding.dueSoonSubtitle.text = if (overdue > 0) {
+                        "${soon.size} مورد · $overdue مورد سررسید گذشته!"
+                    } else {
+                        "${soon.size} مورد در ۷ روز آینده"
+                    }
+                }
             }
         }
     }

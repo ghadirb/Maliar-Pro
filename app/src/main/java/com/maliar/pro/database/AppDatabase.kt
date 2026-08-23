@@ -8,8 +8,8 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [Contact::class, Income::class, Expense::class, Check::class, Installment::class, Reminder::class, 
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
-               ReminderEntity::class],
-    version = 4,
+               ReminderEntity::class, Debtor::class, DebtorPayment::class],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -19,6 +19,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun reminderDao(): ReminderDao
     abstract fun financialStatusDao(): FinancialStatusDao
     abstract fun reminderEntityDao(): ReminderEntityDao
+    abstract fun debtorDao(): DebtorDao
     
     companion object {
         @Volatile
