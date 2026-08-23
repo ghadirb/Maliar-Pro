@@ -17,6 +17,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+/** [revision] increments on every [FinancialCalendarViewModel.loadMonth] call so the state
+ *  flow always emits a genuinely new value, even when navigating between two months that
+ *  both happen to have zero events - `emptyMap() == emptyMap()` is true, and a
+ *  MutableStateFlow silently drops emissions whose new value equals the old one, which
+ *  otherwise made the prev/next-month buttons look completely broken on a test/empty
+ *  dataset (the month number changed internally but the UI never re-collected). */
+data class CalendarUiState(
+    val year: Int,
+    val month: Int,
+    val eventsByDay: Map<Int, List<CalendarEvent>>,
+    val revision: Long
+)
+
 /**
  * Backs the "تقویم مالی" screen: for whatever Jalali (year, month) is currently displayed,
  * builds a day -> events map covering installments, checks, debts, person debtors and
@@ -30,33 +43,34 @@ class FinancialCalendarViewModel(
 ) : ViewModel() {
 
     private val today = PersianCalendarHelper.getCurrentJalaliDate()
+    private var revisionCounter = 0L
 
-    private val _year = MutableStateFlow(today.first)
-    val year = _year.asStateFlow()
-
-    private val _month = MutableStateFlow(today.second)
-    val month = _month.asStateFlow()
-
-    private val _eventsByDay = MutableStateFlow<Map<Int, List<CalendarEvent>>>(emptyMap())
-    val eventsByDay = _eventsByDay.asStateFlow()
+    private val _uiState = MutableStateFlow(CalendarUiState(today.first, today.second, emptyMap(), revisionCounter))
+    val uiState = _uiState.asStateFlow()
 
     init {
         loadMonth(today.first, today.second)
     }
 
     fun nextMonth() {
-        val (y, m) = if (_month.value == 12) _year.value + 1 to 1 else _year.value to _month.value + 1
+        val current = _uiState.value
+        val (y, m) = if (current.month == 12) current.year + 1 to 1 else current.year to current.month + 1
         loadMonth(y, m)
     }
 
     fun previousMonth() {
-        val (y, m) = if (_month.value == 1) _year.value - 1 to 12 else _year.value to _month.value - 1
+        val current = _uiState.value
+        val (y, m) = if (current.month == 1) current.year - 1 to 12 else current.year to current.month - 1
         loadMonth(y, m)
     }
 
     fun loadMonth(year: Int, month: Int) {
-        _year.value = year
-        _month.value = month
+        // Bump year/month immediately (with the previous events cleared) so the header and
+        // grid respond the instant a nav button/swipe is triggered, without waiting on the
+        // DB queries below - the day dots/event list simply fill in a moment later.
+        revisionCounter++
+        _uiState.value = CalendarUiState(year, month, emptyMap(), revisionCounter)
+
         viewModelScope.launch {
             val events = mutableMapOf<Int, MutableList<CalendarEvent>>()
 
@@ -99,7 +113,11 @@ class FinancialCalendarViewModel(
                 add(d, CalendarEvent(reminder.title, reminder.description, null, CalendarEventType.REMINDER, reminder.triggerTime))
             }
 
-            _eventsByDay.value = events
+            // Only commit if this is still the most recent request - guards against a slow
+            // query for month A finishing after the user has already swiped on to month B.
+            if (revisionCounter == _uiState.value.revision) {
+                _uiState.value = CalendarUiState(year, month, events, revisionCounter)
+            }
         }
     }
 }
