@@ -62,6 +62,15 @@ jobs:
           flavor="$(tr '[:lower:]' '[:upper:]' <<< "${store:0:1}")${store:1}"
           ./gradlew ":app:assemble${flavor}Release" ":app:bundle${flavor}Release" --no-daemon
 
+      - name: Print artifact and signing fingerprints
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'release' }}
+        run: |
+          set -e
+          apk="app/build/outputs/apk/${{ matrix.store }}/release/"*.apk
+          sha256sum $apk
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          "$apksigner" verify --verbose --print-certs $apk
+
       - name: Upload release APK
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'release' }}
         uses: actions/upload-artifact@v4
