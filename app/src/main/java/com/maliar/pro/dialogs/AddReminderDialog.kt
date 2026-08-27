@@ -32,7 +32,8 @@ private val REPEAT_PATTERN_LABELS = linkedMapOf(
     RepeatPattern.MONTHLY to "ماهانه",
     RepeatPattern.YEARLY to "سالانه",
     RepeatPattern.WEEKDAYS to "روزهای کاری",
-    RepeatPattern.WEEKENDS to "آخر هفته"
+    RepeatPattern.WEEKENDS to "آخر هفته",
+    RepeatPattern.CUSTOM to "هر چند روز"
 )
 
 /**
@@ -64,6 +65,7 @@ class AddReminderDialog(
         val priorityChipGroup = view.findViewById<ChipGroup>(R.id.priorityChipGroup)
         val alertTypeChipGroup = view.findViewById<ChipGroup>(R.id.alertTypeChipGroup)
         val repeatPatternSpinner = view.findViewById<Spinner>(R.id.repeatPatternSpinner)
+        val repeatIntervalInput = view.findViewById<TextInputEditText>(R.id.repeatIntervalInput)
         val contactButton = view.findViewById<Button>(R.id.reminderContactButton)
         val soundButton = view.findViewById<Button>(R.id.reminderSoundButton)
         var selectedSound = ReminderSound.DEFAULT_ALARM
@@ -166,6 +168,9 @@ class AddReminderDialog(
                 }
                 val repeatPattern = REPEAT_PATTERN_LABELS.keys.toList()
                     .getOrElse(repeatPatternSpinner.selectedItemPosition) { RepeatPattern.ONCE }
+                val repeatIntervalDays = if (repeatPattern == RepeatPattern.CUSTOM) {
+                    repeatIntervalInput.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                } else 0
 
                 val dateMillis = PersianCalendarHelper.jalaliToGregorianMillis(jalaliYear, jalaliMonth, jalaliDay)
                 val cal = Calendar.getInstance().apply {
@@ -183,6 +188,7 @@ class AddReminderDialog(
                     alertType = alertType.name,
                     triggerTime = cal.timeInMillis,
                     repeatPattern = repeatPattern.name,
+                    repeatIntervalDays = repeatIntervalDays,
                     category = category,
                     contactName = selectedContact?.name.orEmpty(),
                     contactPhoneNumber = selectedContact?.phoneNumber.orEmpty(),

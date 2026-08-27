@@ -26,6 +26,7 @@ class RemindersFragment : Fragment() {
     private lateinit var adapter: RemindersAdapter
     private lateinit var activeCountText: TextView
     private lateinit var nextReminderText: TextView
+    private lateinit var reminderPeriodSummaryText: TextView
     private var pendingAudioSelection: ((String) -> Unit)? = null
     private val deviceAudioPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@registerForActivityResult
@@ -54,6 +55,7 @@ class RemindersFragment : Fragment() {
         smartReminderManager = SmartReminderManager(requireContext())
         activeCountText = view.findViewById(R.id.activeRemindersCountText)
         nextReminderText = view.findViewById(R.id.nextReminderText)
+        reminderPeriodSummaryText = view.findViewById(R.id.reminderPeriodSummaryText)
 
         val recyclerView: RecyclerView = view.findViewById(R.id.remindersRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -124,6 +126,18 @@ class RemindersFragment : Fragment() {
             } else {
                 nextReminderText.visibility = View.GONE
             }
+
+            val now = System.currentTimeMillis()
+            val startOfToday = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val endOfToday = startOfToday + 24 * 60 * 60 * 1000L
+            val endOfWeek = startOfToday + 7 * 24 * 60 * 60 * 1000L
+            val overdue = active.count { it.triggerTime < now }
+            val today = active.count { it.triggerTime in startOfToday until endOfToday }
+            val thisWeek = active.count { it.triggerTime in endOfToday until endOfWeek }
+            reminderPeriodSummaryText.text = "🔴 $overdue سررسیدشده   🟠 $today امروز   🔵 $thisWeek این هفته"
         }
     }
 }

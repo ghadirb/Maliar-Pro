@@ -74,7 +74,7 @@ class SmartReminderManager(private val context: Context) {
             val nextTime = calculateNextTriggerTime(
                 reminder.triggerTime,
                 RepeatPattern.valueOf(reminder.repeatPattern),
-                parseCustomDays(reminder.customRepeatDays)
+                parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays
             )
             val updated = reminder.copy(
                 triggerTime = nextTime,
@@ -175,7 +175,7 @@ class SmartReminderManager(private val context: Context) {
                 triggerTime = calculateNextTriggerTime(
                     triggerTime,
                     RepeatPattern.valueOf(reminder.repeatPattern),
-                    parseCustomDays(reminder.customRepeatDays)
+                    parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays
                 )
             } else if (triggerTime < now) {
                 triggerTime = now + 1000
@@ -255,18 +255,18 @@ class SmartReminderManager(private val context: Context) {
      * in the past and re-fire immediately/incorrectly. This now keeps stepping forward
      * until the result is actually in the future.
      */
-    fun calculateNextTriggerTime(currentTime: Long, pattern: RepeatPattern, customDays: List<Int> = emptyList()): Long {
+    fun calculateNextTriggerTime(currentTime: Long, pattern: RepeatPattern, customDays: List<Int> = emptyList(), repeatIntervalDays: Int = 0): Long {
         if (pattern == RepeatPattern.ONCE) return currentTime
-        var next = advanceOnce(currentTime, pattern, customDays)
+        var next = advanceOnce(currentTime, pattern, customDays, repeatIntervalDays)
         var guard = 0
         while (next <= System.currentTimeMillis() && guard < 1000) {
-            next = advanceOnce(next, pattern, customDays)
+            next = advanceOnce(next, pattern, customDays, repeatIntervalDays)
             guard += 1
         }
         return next
     }
 
-    private fun advanceOnce(currentTime: Long, pattern: RepeatPattern, customDays: List<Int>): Long {
+    private fun advanceOnce(currentTime: Long, pattern: RepeatPattern, customDays: List<Int>, repeatIntervalDays: Int): Long {
         val calendar = Calendar.getInstance()
         calendar.timeInMillis = currentTime
 
@@ -306,7 +306,7 @@ class SmartReminderManager(private val context: Context) {
                         val dayOfWeek = (calendar.get(Calendar.DAY_OF_WEEK) + 1) % 7 // Convert to 0-6 where 0=Saturday
                     } while (dayOfWeek !in customDays)
                 } else {
-                    calendar.add(Calendar.WEEK_OF_YEAR, 1)
+                    calendar.add(Calendar.DAY_OF_MONTH, repeatIntervalDays.coerceAtLeast(1))
                 }
                 calendar.timeInMillis
             }

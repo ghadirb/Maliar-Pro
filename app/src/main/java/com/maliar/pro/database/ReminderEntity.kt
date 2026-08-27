@@ -14,6 +14,8 @@ data class ReminderEntity(
     val alertType: String = AlertType.NOTIFICATION.name,
     val triggerTime: Long,
     val repeatPattern: String = RepeatPattern.ONCE.name,
+    /** Used when repeatPattern is CUSTOM: run again after this many calendar days. */
+    val repeatIntervalDays: Int = 0,
     val customRepeatDays: String = "", // comma-separated: "0,1,2,3,4,5,6"
     val locationLat: Double? = null,
     val locationLng: Double? = null,
