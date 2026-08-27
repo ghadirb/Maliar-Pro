@@ -51,6 +51,7 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupSubscriptionSetting()
         setupNotificationSettings()
+        setupBackgroundServiceSetting()
         setupBackupSettings()
     }
 
@@ -78,6 +79,21 @@ class SettingsFragment : Fragment() {
             else -> {
                 val remaining = com.maliar.pro.utils.SubscriptionManager.remainingFreeLifetime(context)
                 "$remaining از ${com.maliar.pro.utils.SubscriptionManager.FREE_AI_LIFETIME_LIMIT} پیام رایگان اولیه باقی مانده"
+            }
+        }
+    }
+
+    /** This is intentionally opt-in: no automatic start on app launch or device boot. */
+    private fun setupBackgroundServiceSetting() {
+        binding.backgroundServiceSwitch.isChecked = prefs.isBackgroundServiceEnabled()
+        binding.backgroundServiceSwitch.setOnCheckedChangeListener { _, enabled ->
+            prefs.setBackgroundServiceEnabled(enabled)
+            if (enabled) {
+                com.maliar.pro.services.MaliarBackgroundService.start(requireContext())
+                Toast.makeText(requireContext(), "حالت پایداری یادآوری فعال شد", Toast.LENGTH_SHORT).show()
+            } else {
+                com.maliar.pro.services.MaliarBackgroundService.stop(requireContext())
+                Toast.makeText(requireContext(), "حالت پایداری یادآوری غیرفعال شد", Toast.LENGTH_SHORT).show()
             }
         }
     }

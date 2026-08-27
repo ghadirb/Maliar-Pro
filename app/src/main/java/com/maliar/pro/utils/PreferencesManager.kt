@@ -75,13 +75,11 @@ class PreferencesManager(context: Context) {
 
     /**
      * Whether MaliarBackgroundService (the persistent, silent "app is running"
-     * notification) is allowed to run. Defaults to true because it measurably helps smart
-     * reminders fire reliably on aggressive OEMs - but AlarmManager-scheduled alarms still
-     * work without it (just somewhat less reliably on some devices), so it's safe for the
-     * person to turn off if they'd rather not see that notification at all.
+     * notification) is allowed to run. It defaults to false and is only enabled after an
+     * explicit choice in Settings; alarms still work without it.
      */
     fun isBackgroundServiceEnabled(): Boolean {
-        return prefs.getBoolean(KEY_BACKGROUND_SERVICE_ENABLED, true)
+        return prefs.getBoolean(KEY_BACKGROUND_SERVICE_ENABLED, false)
     }
 
     fun setBackgroundServiceEnabled(enabled: Boolean) {
