@@ -31,7 +31,12 @@ class RemindersAdapter(
         fun bind(reminder: ReminderEntity) {
             binding.titleText.text = reminder.title
             binding.descriptionText.text = reminder.description
-            binding.timeText.text = formatTime(reminder.triggerTime)
+            val isOverdue = !reminder.isCompleted && reminder.triggerTime < System.currentTimeMillis()
+            binding.timeText.text = if (isOverdue) {
+                "⚠️ عقب‌افتاده — ${formatTime(reminder.triggerTime)}"
+            } else {
+                formatTime(reminder.triggerTime)
+            }
             binding.categoryText.text = reminder.category
 
             // Previously this badge only ever changed color while its text stayed the

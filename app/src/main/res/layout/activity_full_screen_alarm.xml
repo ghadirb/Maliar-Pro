@@ -118,6 +118,15 @@
     </FrameLayout>
 
     <com.google.android.material.button.MaterialButton
+        android:id="@+id/snoozeOptionsButton"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="زمان تعویق را انتخاب کنید"
+        android:textColor="#FFD54F" />
+
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/completeButton"
         style="@style/Widget.Material3.Button.TextButton"
         android:layout_width="wrap_content"

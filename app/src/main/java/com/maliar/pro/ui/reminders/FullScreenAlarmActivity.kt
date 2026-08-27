@@ -1,6 +1,7 @@
 package com.maliar.pro.ui.reminders
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
@@ -72,6 +73,9 @@ class FullScreenAlarmActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.completeButton).setOnClickListener {
             completeReminder()
+        }
+        findViewById<View>(R.id.snoozeOptionsButton).setOnClickListener {
+            showSnoozeChoices()
         }
 
         setupSlideGesture()
@@ -165,7 +169,7 @@ class FullScreenAlarmActivity : AppCompatActivity() {
                     when {
                         maxDrag <= 0f -> view.animate().translationX(0f).setDuration(150).start()
                         view.translationX >= threshold -> finishSlide(view, maxDrag) { dismissAlarm() }
-                        view.translationX <= -threshold -> finishSlide(view, -maxDrag) { snoozeAlarm() }
+                        view.translationX <= -threshold -> finishSlide(view, -maxDrag) { showSnoozeChoices() }
                         else -> view.animate()
                             .translationX(0f)
                             .setInterpolator(OvershootInterpolator())
@@ -200,11 +204,21 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun snoozeAlarm() {
+    private fun showSnoozeChoices() {
+        val options = arrayOf("۵ دقیقه", "۱۰ دقیقه", "۳۰ دقیقه", "۱ ساعت")
+        val minutes = intArrayOf(5, 10, 30, 60)
+        AlertDialog.Builder(this)
+            .setTitle("تعویق یادآوری")
+            .setItems(options) { _, which -> snoozeAlarm(minutes[which]) }
+            .setNegativeButton("لغو", null)
+            .show()
+    }
+
+    private fun snoozeAlarm(minutes: Int) {
         stopAlarm()
         CoroutineScope(Dispatchers.IO).launch {
             if (reminderId > 0) {
-                SmartReminderManager(this@FullScreenAlarmActivity).snoozeReminder(reminderId, 10)
+                SmartReminderManager(this@FullScreenAlarmActivity).snoozeReminder(reminderId, minutes)
             }
         }
         finish()
