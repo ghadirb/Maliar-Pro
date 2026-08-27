@@ -4,12 +4,14 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Contact::class, Income::class, Expense::class, Check::class, Installment::class, Reminder::class, 
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
                ReminderEntity::class, Debtor::class, DebtorPayment::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,6 +24,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun debtorDao(): DebtorDao
     
     companion object {
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE advanced_reminders ADD COLUMN soundUri TEXT NOT NULL DEFAULT 'DEFAULT_ALARM'")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -36,7 +43,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).fallbackToDestructiveMigration()
+                ).addMigrations(MIGRATION_5_6)
+                 .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance
                 instance

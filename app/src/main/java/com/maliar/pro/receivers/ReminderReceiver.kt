@@ -1,17 +1,21 @@
 package com.maliar.pro.receivers
 
 import android.app.NotificationManager
+import android.app.NotificationChannel
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.RingtoneManager
+import android.media.AudioAttributes
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.maliar.pro.MaliarProApplication
 import com.maliar.pro.R
 import com.maliar.pro.database.AlertType
 import com.maliar.pro.ui.reminders.FullScreenAlarmActivity
 import com.maliar.pro.utils.PreferencesManager
+import com.maliar.pro.utils.ReminderSound
 
 /**
  * Fires when a reminder's alarm time arrives.
@@ -37,6 +41,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val alertType = intent.getStringExtra("alert_type") ?: AlertType.NOTIFICATION.name
         val contactName = intent.getStringExtra("contact_name") ?: ""
         val contactPhone = intent.getStringExtra("contact_phone") ?: ""
+        val soundValue = intent.getStringExtra("sound_uri") ?: ReminderSound.DEFAULT_ALARM
 
         when (alertType) {
             AlertType.SMART.name -> {
@@ -45,7 +50,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 com.maliar.pro.receivers.SmartReminderTtsService.start(context, reminderId, title, description)
             }
             AlertType.FULL_SCREEN.name -> {
-                showFullScreenIntentNotification(context, reminderId, title, description)
+                showFullScreenIntentNotification(context, reminderId, title, description, soundValue)
             }
             else -> {
                 val prefs = PreferencesManager(context)
@@ -54,7 +59,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     // The whole point of this mode: no notification UI at all.
                     return
                 }
-                showPlainNotification(context, title, description, reminderId, notificationMode, contactName, contactPhone)
+                showPlainNotification(context, title, description, reminderId, notificationMode, contactName, contactPhone, soundValue)
             }
         }
     }
@@ -80,7 +85,8 @@ class ReminderReceiver : BroadcastReceiver() {
         context: Context,
         reminderId: Long,
         title: String,
-        description: String
+        description: String,
+        soundValue: String
     ) {
         val alarmIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -88,6 +94,7 @@ class ReminderReceiver : BroadcastReceiver() {
             putExtra("reminder_title", title)
             putExtra("reminder_description", description)
             putExtra("alert_type", AlertType.FULL_SCREEN.name)
+            putExtra("sound_uri", soundValue)
         }
 
         if (MaliarProApplication.isAppInForeground()) {
@@ -101,7 +108,7 @@ class ReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val notification = NotificationCompat.Builder(context, MaliarProApplication.REMINDER_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, channelIdFor(context, reminderId, soundValue))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(description)
@@ -122,7 +129,8 @@ class ReminderReceiver : BroadcastReceiver() {
         reminderId: Long,
         notificationMode: String,
         contactName: String,
-        contactPhone: String
+        contactPhone: String,
+        soundValue: String
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -131,6 +139,7 @@ class ReminderReceiver : BroadcastReceiver() {
             putExtra("reminder_id", reminderId)
             putExtra("reminder_title", title)
             putExtra("reminder_description", message)
+            putExtra("sound_uri", soundValue)
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -151,14 +160,15 @@ class ReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val builder = NotificationCompat.Builder(context, MaliarProApplication.REMINDER_CHANNEL_ID)
+        val soundUri = ReminderSound.toUri(context, soundValue)
+        val builder = NotificationCompat.Builder(context, channelIdFor(context, reminderId, soundValue))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(message)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setDeleteIntent(dismissPendingIntent)
-            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+            .setSound(soundUri ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
 
         if (notificationMode == "action") {
@@ -206,5 +216,23 @@ class ReminderReceiver : BroadcastReceiver() {
         }
 
         notificationManager.notify(reminderId.toInt(), builder.build())
+    }
+
+    /** Android 8+ locks a channel sound after creation; use one stable channel per reminder. */
+    private fun channelIdFor(context: Context, reminderId: Long, soundValue: String): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return MaliarProApplication.REMINDER_CHANNEL_ID
+        val channelId = "reminder_$reminderId"
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (manager.getNotificationChannel(channelId) == null) {
+            val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build()
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "یادآوری: $reminderId", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "صدای انتخاب شده برای این یادآوری"
+                    setSound(ReminderSound.toUri(context, soundValue), attributes)
+                    enableVibration(true)
+                }
+            )
+        }
+        return channelId
     }
 }

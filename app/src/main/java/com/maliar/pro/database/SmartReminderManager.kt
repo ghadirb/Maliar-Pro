@@ -43,6 +43,12 @@ class SmartReminderManager(private val context: Context) {
     suspend fun updateReminder(reminder: ReminderEntity) {
         dao.updateReminder(reminder)
         cancelAlarm(reminder.id)
+        // Notification channels are immutable on Android 8+. Removing this reminder's
+        // private channel lets the new sound take effect the next time it fires.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val notifications = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notifications.deleteNotificationChannel("reminder_${reminder.id}")
+        }
         if (reminder.triggerTime > 0) {
             scheduleAlarm(reminder)
         }
@@ -151,6 +157,7 @@ class SmartReminderManager(private val context: Context) {
             putExtra("reminder_type", reminder.reminderType)
             putExtra("contact_name", reminder.contactName)
             putExtra("contact_phone", reminder.contactPhoneNumber)
+            putExtra("sound_uri", reminder.soundUri)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -182,6 +189,7 @@ class SmartReminderManager(private val context: Context) {
                     putExtra("reminder_description", reminder.description)
                     putExtra("reminder_priority", reminder.priority)
                     putExtra("alert_type", reminder.alertType)
+                    putExtra("sound_uri", reminder.soundUri)
                 }
                 val showPendingIntent = PendingIntent.getActivity(
                     context,

@@ -34,7 +34,9 @@ data class ReminderEntity(
     // real "call" button (dials the exact person picked from the app's own Contacts tab,
     // instead of only "done"/"snooze").
     val contactName: String = "",
-    val contactPhoneNumber: String = ""
+    val contactPhoneNumber: String = "",
+    /** Per-reminder sound: DEFAULT_ALARM, RAW:<resource name>, or a persisted content URI. */
+    val soundUri: String = "DEFAULT_ALARM"
 )
 
 enum class ReminderType {

@@ -1,11 +1,13 @@
 package com.maliar.pro.ui.reminders
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -24,6 +26,25 @@ class RemindersFragment : Fragment() {
     private lateinit var adapter: RemindersAdapter
     private lateinit var activeCountText: TextView
     private lateinit var nextReminderText: TextView
+    private var pendingAudioSelection: ((String) -> Unit)? = null
+    private val deviceAudioPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@registerForActivityResult
+        try {
+            requireContext().contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            pendingAudioSelection?.invoke(uri.toString())
+        } catch (_: SecurityException) {
+            // Some providers expose a readable URI without a persistable grant; it will
+            // still work for the current installation and the app never requests storage access.
+            pendingAudioSelection?.invoke(uri.toString())
+        } finally {
+            pendingAudioSelection = null
+        }
+    }
+
+    private fun requestDeviceAudio(onPicked: (String) -> Unit) {
+        pendingAudioSelection = onPicked
+        deviceAudioPicker.launch(arrayOf("audio/*"))
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -39,9 +60,9 @@ class RemindersFragment : Fragment() {
 
         adapter = RemindersAdapter(
             onItemClick = { reminder ->
-                EditReminderDialog(requireContext(), smartReminderManager, reminder) {
+                EditReminderDialog(requireContext(), smartReminderManager, reminder, {
                     loadReminders()
-                }.show()
+                }, ::requestDeviceAudio).show()
             },
             onDeleteClick = { reminder ->
                 lifecycleScope.launch {
@@ -60,9 +81,9 @@ class RemindersFragment : Fragment() {
 
         val fab: FloatingActionButton = view.findViewById(R.id.addReminderButton)
         fab.setOnClickListener {
-            AddReminderDialog(requireContext(), smartReminderManager) {
+            AddReminderDialog(requireContext(), smartReminderManager, {
                 loadReminders()
-            }.show()
+            }, ::requestDeviceAudio).show()
         }
 
         loadReminders()

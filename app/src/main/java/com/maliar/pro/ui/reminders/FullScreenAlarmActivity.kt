@@ -21,6 +21,7 @@ import com.google.android.material.card.MaterialCardView
 import com.maliar.pro.R
 import com.maliar.pro.database.AlertType
 import com.maliar.pro.database.SmartReminderManager
+import com.maliar.pro.utils.ReminderSound
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,7 +65,7 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         wakeLock?.acquire(10 * 60 * 1000L) // 10 minutes max
 
         // Play sound
-        playAlarmSound()
+        playAlarmSound(intent.getStringExtra("sound_uri"))
 
         // Vibrate
         vibrate()
@@ -86,9 +87,10 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         }
     }
 
-    private fun playAlarmSound() {
+    private fun playAlarmSound(soundValue: String?) {
         try {
-            val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            val alarmUri = ReminderSound.toUri(this, soundValue)
+                ?: throw IllegalStateException("No alarm sound is available")
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(this@FullScreenAlarmActivity, alarmUri)
                 isLooping = true

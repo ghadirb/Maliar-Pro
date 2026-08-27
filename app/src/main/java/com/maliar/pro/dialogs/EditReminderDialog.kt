@@ -18,6 +18,7 @@ import com.maliar.pro.database.RepeatPattern
 import com.maliar.pro.database.SmartReminderManager
 import com.maliar.pro.ui.common.PersianDatePickerDialog
 import com.maliar.pro.utils.PersianCalendarHelper
+import com.maliar.pro.utils.ReminderSound
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,7 +38,8 @@ class EditReminderDialog(
     private val context: Context,
     private val smartReminderManager: SmartReminderManager,
     private val reminder: ReminderEntity,
-    private val onSaved: () -> Unit
+    private val onSaved: () -> Unit,
+    private val requestDeviceAudio: ((onPicked: (String) -> Unit) -> Unit)? = null
 ) {
     private val initialJalali = PersianCalendarHelper.gregorianMillisToJalali(reminder.triggerTime)
     private var jalaliYear = initialJalali.first
@@ -64,6 +66,19 @@ class EditReminderDialog(
         val alertTypeChipGroup = view.findViewById<ChipGroup>(R.id.alertTypeChipGroup)
         val repeatPatternSpinner = view.findViewById<Spinner>(R.id.repeatPatternSpinner)
         val contactButton = view.findViewById<Button>(R.id.reminderContactButton)
+        val soundButton = view.findViewById<Button>(R.id.reminderSoundButton)
+        var selectedSound = reminder.soundUri
+        fun refreshSoundButtonText() { soundButton.text = ReminderSound.labelFor(selectedSound) }
+        refreshSoundButtonText()
+        soundButton.setOnClickListener {
+            val labels = ReminderSound.builtIns.map { it.label }.toMutableList().apply { add("انتخاب فایل یا موسیقی از گوشی") }
+            AlertDialog.Builder(context).setTitle("انتخاب صدای یادآوری").setItems(labels.toTypedArray()) { _, which ->
+                if (which < ReminderSound.builtIns.size) {
+                    selectedSound = ReminderSound.builtIns[which].value
+                    refreshSoundButtonText()
+                } else requestDeviceAudio?.invoke { uri -> selectedSound = uri; refreshSoundButtonText() }
+            }.show()
+        }
 
         var selectedContact: Contact? = if (reminder.contactPhoneNumber.isNotBlank()) {
             Contact(rowNumber = 0, name = reminder.contactName, phoneNumber = reminder.contactPhoneNumber)
@@ -189,7 +204,8 @@ class EditReminderDialog(
                     repeatPattern = repeatPattern.name,
                     category = category,
                     contactName = selectedContact?.name.orEmpty(),
-                    contactPhoneNumber = selectedContact?.phoneNumber.orEmpty()
+                    contactPhoneNumber = selectedContact?.phoneNumber.orEmpty(),
+                    soundUri = selectedSound
                 )
 
                 CoroutineScope(Dispatchers.Main).launch {
