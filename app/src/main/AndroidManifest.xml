@@ -7,9 +7,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
@@ -32,15 +30,6 @@
         </intent>
     </queries>
 
-    <!-- Needed so the app can keep a foreground service (persistent notification)
-         alive to keep smart reminders / assistant features responsive in the background. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-
-    <!-- Lets a smart-reminder alarm launch its full-screen activity immediately when it
-         fires, even if the app is in the background - the same mechanism real alarm-clock
-         and incoming-call apps use to bypass the background-activity-start restriction. -->
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:name=".MaliarProApplication"
@@ -96,32 +85,6 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
-
-        <!-- Keeps the process alive in the background with a persistent, low-priority
-             notification so smart reminders / assistant features keep working reliably
-             even when the app UI isn't open. -->
-        <service
-            android:name=".services.MaliarBackgroundService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps smart reminders and the assistant responsive in the background" />
-        </service>
-
-        <!-- Speaks a smart reminder aloud (TTS) the instant its alarm fires, and repeats
-             it until the person marks it done - see SmartReminderTtsService for details.
-             Uses "specialUse" (the same type MaliarBackgroundService above already uses
-             successfully) rather than "mediaPlayback", which has stricter and less
-             predictable enforcement across Android versions/OEMs. -->
-        <service
-            android:name=".receivers.SmartReminderTtsService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Speaks a smart reminder aloud and repeats it until dismissed" />
-        </service>
 
     </application>
 

@@ -44,7 +44,6 @@ class ReminderActionReceiver : BroadcastReceiver() {
         // has responded - stop the repeating TTS voice immediately regardless of which
         // action they picked.
         if (action == "complete" || action == "snooze" || action == "dismiss") {
-            SmartReminderTtsService.stop(reminderId)
         }
 
         val manager = SmartReminderManager(context)

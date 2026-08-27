@@ -44,14 +44,8 @@ class ReminderReceiver : BroadcastReceiver() {
         val soundValue = intent.getStringExtra("sound_uri") ?: ReminderSound.DEFAULT_ALARM
 
         when (alertType) {
-            AlertType.SMART.name -> {
-                // Speaks the reminder aloud immediately and repeats until dismissed -
-                // independent of whatever the FullScreenAlarmActivity does visually.
-                com.maliar.pro.receivers.SmartReminderTtsService.start(context, reminderId, title, description)
-            }
-            AlertType.FULL_SCREEN.name -> {
-                showFullScreenIntentNotification(context, reminderId, title, description, soundValue)
-            }
+            AlertType.SMART.name, AlertType.FULL_SCREEN.name ->
+                showPlainNotification(context, title, description, reminderId, "action", contactName, contactPhone, soundValue)
             else -> {
                 val prefs = PreferencesManager(context)
                 val notificationMode = prefs.getNotificationMode()

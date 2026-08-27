@@ -112,39 +112,6 @@ class MainActivity : AppCompatActivity() {
                 return
             }
         }
-        checkBatteryOptimization()
-    }
-
-    /**
-     * Many OEMs (Xiaomi/MIUI, Huawei/EMUI, Oppo/ColorOS, Samsung, etc.) aggressively kill
-     * background apps and silently prevent scheduled alarms/notifications from firing at all,
-     * even when POST_NOTIFICATIONS and SCHEDULE_EXACT_ALARM are both granted, unless the app
-     * is explicitly excluded from battery optimization. This is one of the most common
-     * real-world reasons reminders "just don't do anything" on real devices.
-     */
-    private fun checkBatteryOptimization() {
-        val powerManager = getSystemService(POWER_SERVICE) as android.os.PowerManager
-        if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
-            AlertDialog.Builder(this)
-                .setTitle("بهینه‌سازی باتری")
-                .setMessage("برخی گوشی‌ها برنامه‌های در پس‌زمینه را می‌بندند و مانع نمایش یادآوری‌ها می‌شوند. برای جلوگیری از این مشکل، مالیار پرو را از بهینه‌سازی باتری مستثنی کنید.")
-                .setPositiveButton("رفتن به تنظیمات") { _, _ ->
-                    try {
-                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:$packageName")
-                        }
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        try {
-                            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                        } catch (e2: Exception) {
-                            // Ignore if neither is available on this device
-                        }
-                    }
-                }
-                .setNegativeButton("بعداً", null)
-                .show()
-        }
         showRemoteAnnouncementIfAny()
     }
 

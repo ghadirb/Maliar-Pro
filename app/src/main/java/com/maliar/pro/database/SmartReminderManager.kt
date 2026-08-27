@@ -143,8 +143,9 @@ class SmartReminderManager(private val context: Context) {
         // due (an alarm-clock style alarm survives Doze better than a plain exact alarm),
         // regardless of priority - ReminderReceiver is what actually decides what each
         // alertType looks like/does when it fires, not this scheduling choice.
-        val useAlarm = reminder.alertType == AlertType.FULL_SCREEN.name ||
-                      reminder.alertType == AlertType.SMART.name
+        // A normal exact alarm plus a high-priority notification is reliable enough for
+        // reminders and avoids full-screen intent behavior reserved for alarm/call apps.
+        val useAlarm = false
 
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra("reminder_id", reminder.id)

@@ -254,10 +254,6 @@ class FullScreenAlarmActivity : AppCompatActivity() {
             android.util.Log.e("FullScreenAlarm", "Error releasing wake lock", e)
         }
 
-        if (reminderId > 0) {
-            com.maliar.pro.receivers.SmartReminderTtsService.stop(reminderId)
-        }
-
         val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         vibrator.cancel()
     }

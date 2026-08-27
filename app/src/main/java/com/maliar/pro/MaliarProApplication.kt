@@ -42,7 +42,6 @@ class MaliarProApplication : Application() {
         instance = this
         createNotificationChannels()
         initializeDatabase()
-        startBackgroundService()
         scheduleFinancialInsights()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) { startedActivityCount.incrementAndGet() }
@@ -121,28 +120,6 @@ class MaliarProApplication : Application() {
         // that would need to change if that ever changes back.
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             com.maliar.pro.utils.AutoProvisioningManager.autoProvision(this@MaliarProApplication)
-        }
-    }
-
-    /**
-     * Starts the background keep-alive foreground service so smart reminders and the
-     * assistant stay responsive even when the app UI isn't in the foreground - unless the
-     * person has explicitly turned this off in Settings, in which case its persistent
-     * notification never appears at all. Wrapped in try/catch because starting a
-     * foreground service from Application.onCreate can throw on some OEM/Android versions
-     * if background-start restrictions apply; in that case the app still works, it just
-     * loses some background reliability instead of crashing.
-     */
-    private fun startBackgroundService() {
-        val enabled = com.maliar.pro.utils.PreferencesManager(this).isBackgroundServiceEnabled()
-        if (!enabled) {
-            Log.d("MaliarProApplication", "Background service disabled in Settings, not starting it")
-            return
-        }
-        try {
-            com.maliar.pro.services.MaliarBackgroundService.start(this)
-        } catch (e: Exception) {
-            Log.w("MaliarProApplication", "⚠️ Could not start background service: ${e.message}")
         }
     }
 
