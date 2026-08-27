@@ -88,18 +88,18 @@ class APIKeysFragment : Fragment() {
     }
 
     private fun runAutoProvisioning() {
-        Toast.makeText(requireContext(), "در حال بررسی کلیدهای رایگان...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(requireContext(), "در حال بررسی دسترسی رایگان...", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
-            val result = AutoProvisioningManager.autoProvision(requireContext())
-            if (result.isSuccess) {
-                Toast.makeText(requireContext(), "کلیدها با موفقیت دریافت شدند", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(
-                    requireContext(),
-                    "دریافت کلیدهای رایگان ناموفق بود؛ اتصال اینترنت را بررسی کنید",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+            // Shared/free AI access no longer needs a locally-downloaded key at all - it
+            // goes through a secure server-side proxy automatically the next time you use
+            // the assistant, as long as you have an internet connection. This just
+            // confirms that (nothing to actually "receive" or store on this screen).
+            AutoProvisioningManager.autoProvision(requireContext())
+            Toast.makeText(
+                requireContext(),
+                "دستیار رایگان از طریق سرور امن در دسترس است؛ نیازی به دریافت کلید نیست",
+                Toast.LENGTH_LONG
+            ).show()
             refreshList()
         }
     }

@@ -115,20 +115,12 @@ class MaliarProApplication : Application() {
             }
         }
         
-        // Initialize API Keys
+        // Shared/free AI access goes through AIBackendClient's server-side proxy now, not
+        // a locally-downloaded key - see AutoProvisioningManager for why. Nothing to do
+        // here at startup anymore; kept as a no-op call only so this stays the one place
+        // that would need to change if that ever changes back.
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-            try {
-                Log.d("MaliarProApplication", "🔄 Auto-provisioning API keys...")
-                val result = com.maliar.pro.utils.AutoProvisioningManager.autoProvision(this@MaliarProApplication)
-                if (result.isSuccess) {
-                    val keys = result.getOrNull() ?: emptyList()
-                    Log.d("MaliarProApplication", "✅ ${keys.size} API keys auto-provisioned and activated")
-                } else {
-                    Log.w("MaliarProApplication", "⚠️ Auto-provisioning failed: ${result.exceptionOrNull()?.message}")
-                }
-            } catch (e: Exception) {
-                Log.e("MaliarProApplication", "❌ Error in auto-provisioning", e)
-            }
+            com.maliar.pro.utils.AutoProvisioningManager.autoProvision(this@MaliarProApplication)
         }
     }
 

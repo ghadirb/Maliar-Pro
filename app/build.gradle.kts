@@ -7,6 +7,15 @@ fun projectSetting(name: String): String =
 fun buildConfigString(value: String): String =
     "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
+// Dedicated Google Apps Script Web App for AI proxy requests (chat/STT/TTS). The real
+// GAPGPT_API_KEY/LIARA_API_KEY never ship in the APK - they live only in this script's
+// own Script Properties, server-side; the app only ever knows this URL, which is not a
+// secret (it's just an endpoint, same as any other API base URL). Payment URLs remain
+// separately configured in SubscriptionManager.kt.
+val aiBackendUrl = projectSetting("AI_BACKEND_URL").ifBlank {
+    "https://script.google.com/macros/s/AKfycbyknX6jghzFv6Ofm1t5MgU0reB2UpEht2j0cyEfJbDFOdCA2YlVD0R9cQVbyUjONGI/exec"
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -36,8 +45,9 @@ android {
         applicationId = "com.maliar.pro"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 4
+        versionName = "1.3"
+        buildConfigField("String", "AI_BACKEND_URL", buildConfigString(aiBackendUrl))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

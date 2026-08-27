@@ -16,7 +16,6 @@ import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.maliar.pro.databinding.ActivityMainBinding
 import com.maliar.pro.utils.AnnouncementManager
-import com.maliar.pro.utils.KeyManager
 import com.maliar.pro.utils.PreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,15 +63,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Load encrypted keys at startup
-        lifecycleScope.launch {
-            try {
-                KeyManager.loadKeys(this@MainActivity)
-                // Initialize AI services with keys
-            } catch (e: Exception) {
-                // Handle key loading error
-            }
-        }
+        // Shared/free AI access goes through a server-side proxy now (AIBackendClient),
+        // not a locally-decrypted key file - see AutoProvisioningManager for why. Nothing
+        // to load here at startup anymore.
 
         setupNavigation()
         ensureNotificationPermissions()

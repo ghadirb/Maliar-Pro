@@ -79,39 +79,31 @@ class AssistantViewModel(
             // App-related commands are still executed locally above, but general questions
             // are now allowed to reach the online model as long as quota/subscription allows it.
 
-            // Try online AI with priority: GAPGPT -> Liara -> local processing
+            // Try online AI: the user's own personal key first if they've added one
+            // (Settings -> کلیدهای هوش مصنوعی), otherwise the shared/free tier via
+            // AIBackendClient - a server-side proxy that holds the real provider key in
+            // Google Apps Script's Script Properties and never ships it in the APK. See
+            // AutoProvisioningManager for why this replaced a local downloaded-key flow.
             val response = try {
                 if (!com.maliar.pro.utils.SubscriptionManager.canUseAi(appContext)) {
-                    // Only the shared/free key is metered (see SubscriptionManager) - anyone
+                    // Only the shared/free tier is metered (see SubscriptionManager) - anyone
                     // with their own key or an active premium subscription never lands here.
                     com.maliar.pro.utils.SubscriptionManager.upgradeMessage(appContext)
                 } else {
-                var keys = getActiveKeys()
-                if (keys.isEmpty()) {
-                    // Keys may not have finished auto-provisioning yet (it runs in the
-                    // background from Application.onCreate); try once more before giving up
-                    // so a slow network doesn't silently look like "the AI doesn't work".
-                    com.maliar.pro.utils.AutoProvisioningManager.autoProvision(appContext)
-                    keys = getActiveKeys()
-                }
-
-                if (keys.isEmpty()) {
-                    "⚠️ هیچ کلید API فعالی پیدا نشد، برای همین دستیار آنلاین در دسترس نیست.\n" +
-                        "لطفاً اتصال اینترنت را بررسی کنید یا از بخش تنظیمات → کلیدهای هوش مصنوعی، یک کلید معتبر اضافه کنید.\n\n" +
-                        processCommand(message)
-                } else {
-                    val gapgptResponse = callGapgptAI(message)
-                    val aiReply = if (gapgptResponse != null) gapgptResponse
-                    else {
-                        val liaraResponse = callLiaraAI(message)
-                        liaraResponse ?: ("⚠️ اتصال به سرویس‌های هوش مصنوعی آنلاین برقرار نشد (شبکه یا کلید نامعتبر است).\n\n" + processCommand(message))
+                    val personalKeys = getActiveKeys()
+                    val aiReply = if (personalKeys.isNotEmpty()) {
+                        val gapgptResponse = callGapgptAI(message)
+                        gapgptResponse ?: callLiaraAI(message)
+                        ?: ("⚠️ اتصال به سرویس‌های هوش مصنوعی آنلاین برقرار نشد (شبکه یا کلید نامعتبر است).\n\n" + processCommand(message))
+                    } else {
+                        callSharedProxyAI(message)
+                            ?: ("⚠️ اتصال به دستیار آنلاین برقرار نشد. اتصال اینترنت را بررسی کنید، یا از بخش تنظیمات → کلیدهای هوش مصنوعی، کلید شخصی خودتان را اضافه کنید.\n\n" + processCommand(message))
                     }
-                    // Only meters usage of the shared/free key - SubscriptionManager itself
+                    // Only meters usage of the shared/free tier - SubscriptionManager itself
                     // no-ops this for premium/personal-key users, so it's safe to call
                     // unconditionally on every attempt that reaches this branch.
                     com.maliar.pro.utils.SubscriptionManager.recordAiUsage(appContext)
                     aiReply
-                }
                 }
             } catch (e: Exception) {
                 "⚠️ خطا در ارتباط با دستیار آنلاین: ${e.message}\n\n" + processCommand(message)
@@ -531,6 +523,71 @@ class AssistantViewModel(
         }
     }
 
+    /**
+     * Shared/free tier: builds the same financial-context system prompt as the personal-key
+     * path below, but sends it to [com.maliar.pro.utils.AIBackendClient] instead of calling
+     * GapGPT/Liara directly - the server-side Apps Script proxy holds the real provider key
+     * and picks the provider/model from its own Script Properties, so nothing secret ever
+     * needs to live on the device for this path.
+     */
+    private suspend fun callSharedProxyAI(message: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val systemPrompt = buildAssistantSystemPrompt()
+            val messages = JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", message)
+                })
+            }
+            com.maliar.pro.utils.AIBackendClient.chat(appContext, messages)
+        } catch (e: Exception) {
+            android.util.Log.e("AssistantVM", "Error calling shared AI proxy", e)
+            null
+        }
+    }
+
+    /** Shared by [callSharedProxyAI] and the personal-key GapGPT/Liara calls below, so the
+     *  assistant is equally aware of accounting, reminders, and financial-status data
+     *  regardless of which path answers the message. */
+    private suspend fun buildAssistantSystemPrompt(): String {
+        val balance = accountingManager.getBalance()
+        val totalIncome = accountingManager.getTotalIncome()
+        val totalExpense = accountingManager.getTotalExpense()
+        val monthlyIncome = accountingManager.getMonthlyIncome()
+        val monthlyExpense = accountingManager.getMonthlyExpense()
+        val activeReminders = reminderManager.getActiveRemindersList()
+        val uncashedChecks = accountingManager.getUncashedChecks()
+        val activeInstallments = accountingManager.getActiveInstallments()
+        val totalAssets = financialManager.getTotalAssets()
+        val totalDebts = financialManager.getTotalUnpaidDebts()
+        val activeGoals = financialManager.getActiveGoals()
+
+        return """
+            شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
+            اطلاعات کاربر:
+            - تراز کل: ${String.format("%,.0f", balance)} تومان
+            - کل درآمد: ${String.format("%,.0f", totalIncome)} تومان
+            - کل هزینه: ${String.format("%,.0f", totalExpense)} تومان
+            - درآمد این ماه: ${String.format("%,.0f", monthlyIncome)} تومان
+            - هزینه این ماه: ${String.format("%,.0f", monthlyExpense)} تومان
+            - یادآوری‌های فعال: ${activeReminders.size} عدد
+            - چک‌های وصول نشده: ${uncashedChecks.size} عدد
+            - اقساط فعال: ${activeInstallments.size} عدد
+            - کل دارایی‌ها (وضعیت مالی): ${String.format("%,.0f", totalAssets)} تومان
+            - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${String.format("%,.0f", totalDebts)} تومان
+            - اهداف مالی فعال: ${activeGoals.size} عدد${if (activeGoals.isNotEmpty()) " (" + activeGoals.joinToString("، ") { it.title } + ")" else ""}
+
+            شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید.
+
+            نکته‌ی بسیار مهم: شما توانایی فنی نوشتن یا ذخیره کردن هیچ‌چیزی در دیتابیس برنامه را ندارید (نه یادآوری، نه هزینه/درآمد، نه دارایی/بدهی/هدف). اگر همین پیام کاربر به این مکالمه رسیده، یعنی سیستم داخلی برنامه آن را به‌عنوان یک دستور اجرایی (ثبت یادآوری/هزینه/درآمد/دارایی/بدهی/هدف) تشخیص نداده است. پس هرگز عباراتی مثل «ثبت شد»، «یادآوری تنظیم شد»، «ذخیره کردم» را به‌کار نبرید، چون واقعاً چیزی ذخیره نشده و کاربر را گمراه می‌کند. در عوض، اگر پیام کاربر به‌نظر یک درخواست ثبت/یادآوری است، از او بخواهید دقیق‌تر و ساده‌تر بنویسد (مثلاً «یادآوری کن فردا ساعت ۵ ...» یا «۵۰ هزار تومان هزینه»)، تا سیستم داخلی بتواند آن را تشخیص دهد.
+            لطفاً به زبان فارسی پاسخ دهید.
+        """.trimIndent()
+    }
+
     private suspend fun callGapgptAI(message: String): String? = withContext(Dispatchers.IO) {
         try {
             val keys = getActiveKeys()
@@ -549,43 +606,7 @@ class AssistantViewModel(
             connection.readTimeout = 30000
 
             val model = getPreferredModelForProvider(gapgptKey.first)
-
-            val balance = accountingManager.getBalance()
-            val totalIncome = accountingManager.getTotalIncome()
-            val totalExpense = accountingManager.getTotalExpense()
-            val monthlyIncome = accountingManager.getMonthlyIncome()
-            val monthlyExpense = accountingManager.getMonthlyExpense()
-            val activeReminders = reminderManager.getActiveRemindersList()
-            val uncashedChecks = accountingManager.getUncashedChecks()
-            val activeInstallments = accountingManager.getActiveInstallments()
-
-            // Pull data from the "Financial Status" tab too (assets, debts, goals) - not
-            // just accounting/reminders - so an analysis/summary request the user makes in
-            // the assistant tab can actually see across all tabs instead of only two of them.
-            val totalAssets = financialManager.getTotalAssets()
-            val totalDebts = financialManager.getTotalUnpaidDebts()
-            val activeGoals = financialManager.getActiveGoals()
-
-            val systemPrompt = """
-                شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
-                اطلاعات کاربر:
-                - تراز کل: ${String.format("%,.0f", balance)} تومان
-                - کل درآمد: ${String.format("%,.0f", totalIncome)} تومان
-                - کل هزینه: ${String.format("%,.0f", totalExpense)} تومان
-                - درآمد این ماه: ${String.format("%,.0f", monthlyIncome)} تومان
-                - هزینه این ماه: ${String.format("%,.0f", monthlyExpense)} تومان
-                - یادآوری‌های فعال: ${activeReminders.size} عدد
-                - چک‌های وصول نشده: ${uncashedChecks.size} عدد
-                - اقساط فعال: ${activeInstallments.size} عدد
-                - کل دارایی‌ها (وضعیت مالی): ${String.format("%,.0f", totalAssets)} تومان
-                - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${String.format("%,.0f", totalDebts)} تومان
-                - اهداف مالی فعال: ${activeGoals.size} عدد${if (activeGoals.isNotEmpty()) " (" + activeGoals.joinToString("، ") { it.title } + ")" else ""}
-                
-                شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید.
-
-                نکته‌ی بسیار مهم: شما توانایی فنی نوشتن یا ذخیره کردن هیچ‌چیزی در دیتابیس برنامه را ندارید (نه یادآوری، نه هزینه/درآمد، نه دارایی/بدهی/هدف). اگر همین پیام کاربر به این مکالمه رسیده، یعنی سیستم داخلی برنامه آن را به‌عنوان یک دستور اجرایی (ثبت یادآوری/هزینه/درآمد/دارایی/بدهی/هدف) تشخیص نداده است. پس هرگز عباراتی مثل «ثبت شد»، «یادآوری تنظیم شد»، «ذخیره کردم» را به‌کار نبرید، چون واقعاً چیزی ذخیره نشده و کاربر را گمراه می‌کند. در عوض، اگر پیام کاربر به‌نظر یک درخواست ثبت/یادآوری است، از او بخواهید دقیق‌تر و ساده‌تر بنویسد (مثلاً «یادآوری کن فردا ساعت ۵ ...» یا «۵۰ هزار تومان هزینه»)، تا سیستم داخلی بتواند آن را تشخیص دهد.
-                لطفاً به زبان فارسی پاسخ دهید.
-            """.trimIndent()
+            val systemPrompt = buildAssistantSystemPrompt()
 
             val requestBody = JSONObject().apply {
                 put("model", model)
@@ -640,31 +661,10 @@ class AssistantViewModel(
             connection.connectTimeout = 30000
             connection.readTimeout = 30000
 
-            // Same cross-tab context as the GAPGPT path, so Liara answers are equally
-            // aware of accounting, reminders, and financial-status data instead of
+            // Same shared prompt builder as the GAPGPT and proxy paths, so Liara answers are
+            // equally aware of accounting, reminders, and financial-status data instead of
             // falling back to a context-free generic prompt.
-            val balance = accountingManager.getBalance()
-            val totalIncome = accountingManager.getTotalIncome()
-            val totalExpense = accountingManager.getTotalExpense()
-            val activeReminders = reminderManager.getActiveRemindersList()
-            val totalAssets = financialManager.getTotalAssets()
-            val totalDebts = financialManager.getTotalUnpaidDebts()
-            val activeGoals = financialManager.getActiveGoals()
-
-            val systemPrompt = """
-                شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
-                اطلاعات کاربر:
-                - تراز کل: ${String.format("%,.0f", balance)} تومان
-                - کل درآمد: ${String.format("%,.0f", totalIncome)} تومان
-                - کل هزینه: ${String.format("%,.0f", totalExpense)} تومان
-                - یادآوری‌های فعال: ${activeReminders.size} عدد
-                - کل دارایی‌ها (وضعیت مالی): ${String.format("%,.0f", totalAssets)} تومان
-                - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${String.format("%,.0f", totalDebts)} تومان
-                - اهداف مالی فعال: ${activeGoals.size} عدد
-
-                نکته‌ی بسیار مهم: شما توانایی فنی نوشتن یا ذخیره کردن هیچ‌چیزی در دیتابیس برنامه را ندارید. اگر همین پیام به این مکالمه رسیده، یعنی سیستم داخلی آن را به‌عنوان دستور اجرایی تشخیص نداده. هرگز نگویید «ثبت شد» یا «یادآوری تنظیم شد» - در عوض از کاربر بخواهید ساده‌تر و دقیق‌تر بنویسد.
-                لطفاً به زبان فارسی پاسخ دهید.
-            """.trimIndent()
+            val systemPrompt = buildAssistantSystemPrompt()
 
             val requestBody = JSONObject().apply {
                 put("model", "openai/gpt-4o-mini")
