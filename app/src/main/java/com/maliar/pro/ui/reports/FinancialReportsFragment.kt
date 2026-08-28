@@ -35,7 +35,10 @@ class FinancialReportsFragment : Fragment() {
     private lateinit var topIncomesAdapter: ReportRowAdapter
 
     private val viewModel: FinancialReportsViewModel by viewModels {
-        FinancialReportsViewModelFactory(AccountingManager(requireContext()))
+        FinancialReportsViewModelFactory(
+            AccountingManager(requireContext()),
+            com.maliar.pro.utils.PreferencesManager(requireContext())
+        )
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {

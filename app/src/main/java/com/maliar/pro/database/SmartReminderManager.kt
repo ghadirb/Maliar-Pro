@@ -43,12 +43,10 @@ class SmartReminderManager(private val context: Context) {
     suspend fun updateReminder(reminder: ReminderEntity) {
         dao.updateReminder(reminder)
         cancelAlarm(reminder.id)
-        // Notification channels are immutable on Android 8+. Removing this reminder's
-        // private channel lets the new sound take effect the next time it fires.
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val notifications = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            notifications.deleteNotificationChannel("reminder_${reminder.id}")
-        }
+        // No manual notification-channel cleanup needed here: ReminderReceiver.channelIdFor()
+        // now folds the sound value into the channel ID itself, so a changed sound
+        // automatically gets its own fresh channel (and prunes this reminder's old
+        // channel(s)) the next time it actually fires - see that function for why.
         if (reminder.triggerTime > 0) {
             scheduleAlarm(reminder)
         }

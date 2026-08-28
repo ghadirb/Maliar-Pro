@@ -72,13 +72,11 @@ class AddReminderDialog(
         fun refreshSoundButtonText() { soundButton.text = ReminderSound.labelFor(selectedSound) }
         refreshSoundButtonText()
         soundButton.setOnClickListener {
-            val labels = ReminderSound.builtIns.map { it.label }.toMutableList().apply { add("انتخاب فایل یا موسیقی از گوشی") }
-            AlertDialog.Builder(context).setTitle("انتخاب صدای یادآوری").setItems(labels.toTypedArray()) { _, which ->
-                if (which < ReminderSound.builtIns.size) {
-                    selectedSound = ReminderSound.builtIns[which].value
-                    refreshSoundButtonText()
-                } else requestDeviceAudio?.invoke { uri -> selectedSound = uri; refreshSoundButtonText() }
-            }.show()
+            SoundPickerDialog.show(
+                context,
+                onDeviceAudioRequested = { onPicked -> requestDeviceAudio?.invoke(onPicked) },
+                onSelected = { value -> selectedSound = value; refreshSoundButtonText() }
+            )
         }
 
         var selectedContact: Contact? = null

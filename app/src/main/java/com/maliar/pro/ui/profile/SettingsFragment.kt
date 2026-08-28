@@ -176,6 +176,52 @@ class SettingsFragment : Fragment() {
                 FinancialInsightWorker.cancel(requireContext())
             }
         }
+
+        setupAutoDueReminders()
+        setupFinancialPeriodStartDay()
+    }
+
+    private fun setupAutoDueReminders() {
+        binding.autoDueRemindersSwitch.isChecked = prefs.isAutoDueRemindersEnabled()
+        binding.autoDueReminderDaysInput.setText(prefs.getAutoDueReminderDaysBefore().toString())
+
+        binding.autoDueRemindersSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setAutoDueRemindersEnabled(isChecked)
+            if (isChecked) {
+                com.maliar.pro.utils.DueDateReminderWorker.schedule(requireContext())
+                Toast.makeText(requireContext(), "یادآوری خودکار سررسیدها فعال شد", Toast.LENGTH_SHORT).show()
+            } else {
+                com.maliar.pro.utils.DueDateReminderWorker.cancel(requireContext())
+            }
+        }
+
+        binding.autoDueReminderDaysInput.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) return@setOnFocusChangeListener
+            val days = binding.autoDueReminderDaysInput.text.toString().toIntOrNull()
+            if (days != null) {
+                prefs.setAutoDueReminderDaysBefore(days)
+            } else {
+                binding.autoDueReminderDaysInput.setText(prefs.getAutoDueReminderDaysBefore().toString())
+            }
+        }
+    }
+
+    private fun setupFinancialPeriodStartDay() {
+        binding.financialPeriodStartDayInput.setText(prefs.getFinancialPeriodStartDay().toString())
+        binding.savePeriodStartDayButton.setOnClickListener {
+            val day = binding.financialPeriodStartDayInput.text.toString().toIntOrNull()
+            if (day == null || day !in 1..31) {
+                Toast.makeText(requireContext(), "روز باید بین ۱ تا ۳۱ باشد", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            prefs.setFinancialPeriodStartDay(day)
+            val message = if (day == 1) {
+                "دوره مالی از اول هر ماه شمسی محاسبه می‌شود"
+            } else {
+                "دوره مالی از روز $day هر ماه شمسی محاسبه می‌شود"
+            }
+            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun performBackup(uri: Uri) {

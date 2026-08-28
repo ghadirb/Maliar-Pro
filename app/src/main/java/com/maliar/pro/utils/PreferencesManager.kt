@@ -20,6 +20,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_BACKUP_URI = "last_backup_uri"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
         private const val KEY_FINANCIAL_INSIGHTS_ENABLED = "financial_insights_enabled"
+        private const val KEY_AUTO_DUE_REMINDERS_ENABLED = "auto_due_reminders_enabled"
+        private const val KEY_AUTO_DUE_REMINDER_DAYS_BEFORE = "auto_due_reminder_days_before"
+        private const val KEY_FINANCIAL_PERIOD_START_DAY = "financial_period_start_day"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
 
         // --- Subscription / entitlement ---
@@ -112,6 +115,34 @@ class PreferencesManager(context: Context) {
     }
 
     fun isFinancialInsightsEnabled(): Boolean = prefs.getBoolean(KEY_FINANCIAL_INSIGHTS_ENABLED, true)
+
+    // --- Automatic due-date reminders (checks/installments/debts/debtors) ---
+
+    fun setAutoDueRemindersEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_DUE_REMINDERS_ENABLED, enabled).apply()
+    }
+
+    fun isAutoDueRemindersEnabled(): Boolean = prefs.getBoolean(KEY_AUTO_DUE_REMINDERS_ENABLED, true)
+
+    /** How many days before a check/installment/debt/debtor due date to auto-create a
+     *  reminder, if the person hasn't already made one for it themselves. */
+    fun setAutoDueReminderDaysBefore(days: Int) {
+        prefs.edit().putInt(KEY_AUTO_DUE_REMINDER_DAYS_BEFORE, days.coerceIn(0, 30)).apply()
+    }
+
+    fun getAutoDueReminderDaysBefore(): Int = prefs.getInt(KEY_AUTO_DUE_REMINDER_DAYS_BEFORE, 1)
+
+    // --- Custom financial period (for monthly balance/report calculations) ---
+
+    /** Which Jalali day-of-month a "month" starts on for balance/report purposes - e.g. 15
+     *  means the period runs from the 15th of one month to the 14th of the next, for
+     *  people whose income/expense cycle doesn't follow the calendar month (paid on the
+     *  15th, rent due on the 15th, etc). 1 (the actual 1st) is the default/no-op value. */
+    fun setFinancialPeriodStartDay(day: Int) {
+        prefs.edit().putInt(KEY_FINANCIAL_PERIOD_START_DAY, day.coerceIn(1, 31)).apply()
+    }
+
+    fun getFinancialPeriodStartDay(): Int = prefs.getInt(KEY_FINANCIAL_PERIOD_START_DAY, 1)
 
     // --- Startup announcement ---
 

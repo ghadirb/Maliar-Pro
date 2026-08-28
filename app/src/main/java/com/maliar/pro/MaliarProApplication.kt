@@ -43,6 +43,7 @@ class MaliarProApplication : Application() {
         createNotificationChannels()
         initializeDatabase()
         scheduleFinancialInsights()
+        scheduleDueDateReminders()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) { startedActivityCount.incrementAndGet() }
             override fun onActivityStopped(activity: Activity) { startedActivityCount.decrementAndGet() }
@@ -129,6 +130,15 @@ class MaliarProApplication : Application() {
     private fun scheduleFinancialInsights() {
         if (com.maliar.pro.utils.PreferencesManager(this).isFinancialInsightsEnabled()) {
             com.maliar.pro.utils.FinancialInsightWorker.schedule(this)
+        }
+    }
+
+    /** Schedules the daily "یادآوری خودکار سررسیدها" worker (on by default, see
+     *  PreferencesManager.isAutoDueRemindersEnabled) - same re-check-every-run pattern as
+     *  scheduleFinancialInsights() above. */
+    private fun scheduleDueDateReminders() {
+        if (com.maliar.pro.utils.PreferencesManager(this).isAutoDueRemindersEnabled()) {
+            com.maliar.pro.utils.DueDateReminderWorker.schedule(this)
         }
     }
 }

@@ -30,7 +30,10 @@ data class FinancialReport(
  * Pure computation over in-memory lists so it works the same regardless of which period is
  * currently selected on screen.
  */
-class FinancialReportManager(private val accountingManager: AccountingManager) {
+class FinancialReportManager(
+    private val accountingManager: AccountingManager,
+    private val periodStartDay: Int = 1
+) {
 
     suspend fun buildReport(period: ReportPeriod, topN: Int = 5, trendBuckets: Int = 7): FinancialReport {
         val allExpenses = accountingManager.getAllExpensesList()
@@ -61,7 +64,7 @@ class FinancialReportManager(private val accountingManager: AccountingManager) {
     /** Returns the epoch-millis start of the given [period]'s current window, e.g. start of
      *  today for DAILY, start of this Jalali week/month/year otherwise. */
     private fun periodRange(period: ReportPeriod): Pair<Long, Long> {
-        val (jy, jm, jd) = PersianCalendarHelper.getCurrentJalaliDate()
+        val (jy, _, _) = PersianCalendarHelper.getCurrentJalaliDate()
         val now = System.currentTimeMillis()
         val start = when (period) {
             ReportPeriod.DAILY -> {
@@ -71,7 +74,7 @@ class FinancialReportManager(private val accountingManager: AccountingManager) {
                 cal.timeInMillis
             }
             ReportPeriod.WEEKLY -> now - 7L * 24 * 60 * 60 * 1000
-            ReportPeriod.MONTHLY -> PersianCalendarHelper.jalaliToGregorianMillis(jy, jm, 1)
+            ReportPeriod.MONTHLY -> PersianCalendarHelper.currentFinancialPeriodStartMillis(periodStartDay)
             ReportPeriod.YEARLY -> PersianCalendarHelper.jalaliToGregorianMillis(jy, 1, 1)
         }
         return start to now

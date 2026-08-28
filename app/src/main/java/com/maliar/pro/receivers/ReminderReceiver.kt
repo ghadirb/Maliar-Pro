@@ -212,10 +212,14 @@ class ReminderReceiver : BroadcastReceiver() {
         notificationManager.notify(reminderId.toInt(), builder.build())
     }
 
-    /** Android 8+ locks a channel sound after creation; use one stable channel per reminder. */
+    /** Android 8+ locks a channel's sound the moment it's created and never lets it change
+     *  afterwards - not even the OS itself can update an existing channel's sound. Folding
+     *  [soundValue] into the channel ID means picking a different sound for this reminder
+     *  (e.g. editing it later) naturally produces a fresh channel instead of silently
+     *  reusing the old, now-stale one with yesterday's sound still locked in. */
     private fun channelIdFor(context: Context, reminderId: Long, soundValue: String): String {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return MaliarProApplication.REMINDER_CHANNEL_ID
-        val channelId = "reminder_$reminderId"
+        val channelId = "reminder_${reminderId}_${soundValue.hashCode()}"
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (manager.getNotificationChannel(channelId) == null) {
             val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build()
@@ -226,6 +230,17 @@ class ReminderReceiver : BroadcastReceiver() {
                     enableVibration(true)
                 }
             )
+            // Best-effort cleanup: remove this reminder's previous sound-specific channel(s)
+            // now that a fresh one exists, so Settings > App notifications doesn't slowly
+            // accumulate one stale channel per sound the person has ever tried for it.
+            try {
+                val prefix = "reminder_${reminderId}_"
+                manager.notificationChannels
+                    .filter { it.id.startsWith(prefix) && it.id != channelId }
+                    .forEach { manager.deleteNotificationChannel(it.id) }
+            } catch (e: Exception) {
+                // Non-fatal: worst case a harmless old channel lingers.
+            }
         }
         return channelId
     }

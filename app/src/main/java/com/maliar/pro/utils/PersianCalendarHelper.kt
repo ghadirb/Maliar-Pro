@@ -108,6 +108,28 @@ object PersianCalendarHelper {
         )
     }
 
+    /**
+     * Start (epoch millis, local midnight) of the current "financial month" - normally the
+     * 1st of the current Jalali month, but if [periodStartDay] is e.g. 15 (for someone
+     * paid on the 15th), the period instead runs 15th-to-14th: still inside the *previous*
+     * Jalali month's cycle until the day-of-month catches up to 15 again. Used by
+     * AccountingManager's "این ماه" totals and FinancialReportManager's MONTHLY report so
+     * both agree with whatever the person configured in Settings -> شروع دوره مالی.
+     */
+    fun currentFinancialPeriodStartMillis(periodStartDay: Int = 1): Long {
+        val (y, m, d) = getCurrentJalaliDate()
+        if (periodStartDay <= 1) return jalaliToGregorianMillis(y, m, 1)
+
+        val startDayThisMonth = periodStartDay.coerceAtMost(daysInJalaliMonth(y, m))
+        return if (d >= startDayThisMonth) {
+            jalaliToGregorianMillis(y, m, startDayThisMonth)
+        } else {
+            val (py, pm) = if (m == 1) (y - 1) to 12 else y to (m - 1)
+            val startDayPrevMonth = periodStartDay.coerceAtMost(daysInJalaliMonth(py, pm))
+            jalaliToGregorianMillis(py, pm, startDayPrevMonth)
+        }
+    }
+
     /** Converts a Gregorian epoch millis timestamp to (year, month 1-12, day) Jalali. */
     fun gregorianMillisToJalali(millis: Long): Triple<Int, Int, Int> {
         val cal = Calendar.getInstance()

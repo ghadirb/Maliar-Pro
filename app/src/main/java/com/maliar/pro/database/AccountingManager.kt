@@ -4,7 +4,8 @@ import android.content.Context
 import kotlinx.coroutines.flow.Flow
 
 class AccountingManager(context: Context) {
-    
+
+    private val appContext = context.applicationContext
     private val database = AppDatabase.getDatabase(context)
     private val accountingDao = database.accountingDao()
     
@@ -118,16 +119,14 @@ class AccountingManager(context: Context) {
     }
 
     suspend fun getMonthlyIncome(): Double {
-        val cal = java.util.Calendar.getInstance()
-        cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
-        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
-        return accountingDao.getMonthlyIncome(cal.timeInMillis) ?: 0.0
+        val periodStartDay = com.maliar.pro.utils.PreferencesManager(appContext).getFinancialPeriodStartDay()
+        val start = com.maliar.pro.utils.PersianCalendarHelper.currentFinancialPeriodStartMillis(periodStartDay)
+        return accountingDao.getMonthlyIncome(start) ?: 0.0
     }
 
     suspend fun getMonthlyExpense(): Double {
-        val cal = java.util.Calendar.getInstance()
-        cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
-        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
-        return accountingDao.getMonthlyExpense(cal.timeInMillis) ?: 0.0
+        val periodStartDay = com.maliar.pro.utils.PreferencesManager(appContext).getFinancialPeriodStartDay()
+        val start = com.maliar.pro.utils.PersianCalendarHelper.currentFinancialPeriodStartMillis(periodStartDay)
+        return accountingDao.getMonthlyExpense(start) ?: 0.0
     }
 }
