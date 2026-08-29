@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FFBB86FC</color>
+    <color name="purple_700">#FF6200EE</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF03DAC5</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- App Colors (dark variants) -->
+    <color name="primary">#BB86FC</color>
+    <color name="primary_dark">#3700B3</color>
+    <color name="accent">#03DAC5</color>
+    <color name="background">#121212</color>
+    <color name="surface">#1E1E1E</color>
+    <color name="card_background">#1E1E1E</color>
+    <color name="text_primary">#EDEDED</color>
+    <color name="text_secondary">#AAAAAA</color>
+    <color name="divider">#3A3A3A</color>
+
+    <color name="nav_item_color">@color/primary</color>
+
+    <!-- Status colors stay recognizable/legible on dark surfaces too - slightly desaturated
+         from the light-mode versions so they don't glare on a black background. -->
+    <color name="success">#66BB6A</color>
+    <color name="warning">#FFA726</color>
+    <color name="error">#EF5350</color>
+    <color name="info">#42A5F5</color>
+
+    <color name="priority_high">#FF8A80</color>
+    <color name="priority_medium">#FFE082</color>
+    <color name="priority_low">#A5D6A7</color>
+
+    <color name="alarm_background">#FF1A1A2E</color>
+</resources>

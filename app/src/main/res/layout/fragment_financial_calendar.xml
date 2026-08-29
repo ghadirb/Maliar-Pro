@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@android:color/white">
+    android:background="@color/background">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -92,14 +92,28 @@
         android:layout_weight="1"
         android:paddingHorizontal="16dp" />
 
-    <TextView
+    <LinearLayout
         android:id="@+id/noEventsText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="24dp"
+        android:orientation="vertical"
         android:gravity="center"
-        android:text="رویدادی در این روز نیست"
-        android:textColor="@color/text_secondary"
-        android:visibility="gone" />
+        android:padding="24dp"
+        android:visibility="gone">
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎉"
+            android:textSize="32sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="رویدادی در این روز نیست"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+    </LinearLayout>
 </LinearLayout>

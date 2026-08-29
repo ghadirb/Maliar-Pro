@@ -8,7 +8,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="@android:color/white">
+        android:background="@color/background">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -70,15 +70,39 @@
             android:paddingHorizontal="16dp"
             android:clipToPadding="false" />
 
-        <TextView
+        <LinearLayout
             android:id="@+id/emptyStateText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="32dp"
+            android:orientation="vertical"
             android:gravity="center"
-            android:text="هنوز بدهکار یا طلبکاری ثبت نشده است"
-            android:textColor="@color/text_secondary"
-            android:visibility="gone" />
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🤝"
+                android:textSize="40sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="هنوز بدهکار یا طلبکاری ثبت نشده"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="با دکمه + یک شخص اضافه کنید تا بدهی یا طلبتان را پیگیری کنید"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:gravity="center" />
+
+        </LinearLayout>
 
     </LinearLayout>
 

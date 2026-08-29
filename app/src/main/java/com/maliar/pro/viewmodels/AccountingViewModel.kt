@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 /**
  * All numbers on this screen are now derived reactively from Room's Flow<List<...>>
@@ -29,14 +28,15 @@ import java.util.Calendar
  */
 class AccountingViewModel(private val accountingManager: AccountingManager) : ViewModel() {
 
+    /** Same bug class as the one fixed in AccountingManager.getMonthlyIncome/Expense: this
+     *  used to compare against the Gregorian calendar month, silently wrong for most of the
+     *  year in a Persian-calendar app. Now uses the actual Jalali month boundary (custom
+     *  financial-period-start-day isn't threaded through here since this ViewModel has no
+     *  Context/PreferencesManager access - AccountingManager's version is the one that
+     *  respects that setting). */
     private fun isThisMonth(timestamp: Long): Boolean {
-        val startOfMonth = Calendar.getInstance().apply {
-            set(Calendar.DAY_OF_MONTH, 1)
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val (y, m, _) = com.maliar.pro.utils.PersianCalendarHelper.getCurrentJalaliDate()
+        val startOfMonth = com.maliar.pro.utils.PersianCalendarHelper.jalaliToGregorianMillis(y, m, 1)
         return timestamp >= startOfMonth
     }
 

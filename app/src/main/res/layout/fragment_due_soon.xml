@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@android:color/white">
+    android:background="@color/background">
 
     <TextView
         android:layout_width="match_parent"
@@ -21,15 +21,31 @@
         android:paddingHorizontal="16dp"
         android:clipToPadding="false" />
 
-    <TextView
+    <LinearLayout
         android:id="@+id/emptyStateText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:padding="32dp"
+        android:orientation="vertical"
         android:gravity="center"
-        android:text="در حال حاضر چک یا قسطی نزدیک به سررسید نیست 🎉"
-        android:textColor="@color/text_secondary"
-        android:visibility="gone" />
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎉"
+            android:textSize="40sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="در حال حاضر چک یا قسطی نزدیک به سررسید نیست"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:gravity="center" />
+
+    </LinearLayout>
 
 </LinearLayout>
