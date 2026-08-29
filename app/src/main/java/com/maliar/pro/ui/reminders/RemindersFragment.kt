@@ -14,10 +14,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.maliar.pro.R
 import com.maliar.pro.adapters.RemindersAdapter
+import com.maliar.pro.adapters.ReminderListItem
+import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.database.SmartReminderManager
 import com.maliar.pro.dialogs.AddReminderDialog
 import com.maliar.pro.dialogs.EditReminderDialog
 import com.maliar.pro.utils.PersianCalendarHelper
+import com.maliar.pro.utils.PreferencesManager
 import kotlinx.coroutines.launch
 
 class RemindersFragment : Fragment() {
@@ -100,8 +103,24 @@ class RemindersFragment : Fragment() {
     private fun loadReminders() {
         lifecycleScope.launch {
             val reminders = smartReminderManager.getAllRemindersList()
-            adapter.submitList(reminders)
+            adapter.submitList(groupByCategory(reminders))
             updateHeader()
+        }
+    }
+
+    /** Groups reminders under a section header per category (فهرست دسته‌های شناخته‌شده‌ی
+     *  AddReminderDialog، به همان ترتیب، به‌علاوه یک گروه "بدون دسته" برای موارد قدیمی/خالی
+     *  در انتها) - within each group, reminders stay time-sorted exactly as the DAO already
+     *  returns them. */
+    private fun groupByCategory(reminders: List<ReminderEntity>): List<ReminderListItem> {
+        val categoryOrder = listOf("عمومی", "مالی", "کاری", "شخصی", "سلامت", "خانواده")
+        val grouped = reminders.groupBy { it.category.ifBlank { "بدون دسته" } }
+        val orderedCategories = categoryOrder.filter { grouped.containsKey(it) } +
+            grouped.keys.filter { it !in categoryOrder }.sorted()
+
+        return orderedCategories.flatMap { category ->
+            val items = grouped[category].orEmpty()
+            listOf(ReminderListItem.Header(category, items.size)) + items.map { ReminderListItem.Item(it) }
         }
     }
 

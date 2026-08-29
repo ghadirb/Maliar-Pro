@@ -8,23 +8,59 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.maliar.pro.database.ReminderEntity
 import com.maliar.pro.databinding.ItemReminderBinding
+import com.maliar.pro.databinding.ItemReminderCategoryHeaderBinding
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+/** One row of the (optionally category-grouped) reminder list - either a section header or
+ *  an actual reminder. Grouping is entirely a display-time concern built by whoever calls
+ *  [RemindersAdapter.submitList]; the adapter itself doesn't know or care whether grouping
+ *  is on. */
+sealed class ReminderListItem {
+    data class Header(val category: String, val count: Int) : ReminderListItem()
+    data class Item(val reminder: ReminderEntity) : ReminderListItem()
+}
 
 class RemindersAdapter(
     private val onItemClick: (ReminderEntity) -> Unit,
     private val onDeleteClick: (ReminderEntity) -> Unit,
     private val onCompleteClick: (ReminderEntity) -> Unit
-) : ListAdapter<ReminderEntity, RemindersAdapter.ReminderViewHolder>(ReminderDiffCallback()) {
+) : ListAdapter<ReminderListItem, RecyclerView.ViewHolder>(ReminderListDiffCallback()) {
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ReminderViewHolder {
-        val binding = ItemReminderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return ReminderViewHolder(binding)
+    /** Convenience for callers that don't need grouping - wraps each reminder as a plain
+     *  [ReminderListItem.Item] with no headers, matching the adapter's old flat behavior. */
+    fun submitReminders(reminders: List<ReminderEntity>) {
+        submitList(reminders.map { ReminderListItem.Item(it) })
     }
 
-    override fun onBindViewHolder(holder: ReminderViewHolder, position: Int) {
-        holder.bind(getItem(position))
+    override fun getItemViewType(position: Int): Int = when (getItem(position)) {
+        is ReminderListItem.Header -> VIEW_TYPE_HEADER
+        is ReminderListItem.Item -> VIEW_TYPE_REMINDER
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        return if (viewType == VIEW_TYPE_HEADER) {
+            val binding = ItemReminderCategoryHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            HeaderViewHolder(binding)
+        } else {
+            val binding = ItemReminderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            ReminderViewHolder(binding)
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (val item = getItem(position)) {
+            is ReminderListItem.Header -> (holder as HeaderViewHolder).bind(item)
+            is ReminderListItem.Item -> (holder as ReminderViewHolder).bind(item.reminder)
+        }
+    }
+
+    class HeaderViewHolder(private val binding: ItemReminderCategoryHeaderBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(header: ReminderListItem.Header) {
+            binding.categoryHeaderText.text = header.category
+            binding.categoryHeaderCountText.text = "${header.count} مورد"
+        }
     }
 
     inner class ReminderViewHolder(private val binding: ItemReminderBinding) : RecyclerView.ViewHolder(binding.root) {
@@ -39,9 +75,6 @@ class RemindersAdapter(
             }
             binding.categoryText.text = reminder.category
 
-            // Previously this badge only ever changed color while its text stayed the
-            // fixed placeholder word "اولویت" - so the actual chosen priority (کم/متوسط/
-            // زیاد) was never visible on the list, only inferable from a color swatch.
             val prio = reminder.priority
             val (priorityLabel, priorityColor) = when {
                 prio.contains("HIGH", ignoreCase = true) -> "زیاد" to 0xFFFF6B6B.toInt()
@@ -51,8 +84,6 @@ class RemindersAdapter(
             binding.priorityBadge.text = priorityLabel
             binding.priorityBadge.setBackgroundColor(priorityColor)
 
-            // The alert-type chosen when creating/editing the reminder (نوتیفیکیشن/تمام
-            // صفحه/هوشمند) previously wasn't shown anywhere on the list at all.
             val alertType = reminder.alertType
             binding.alertTypeBadge.text = when {
                 alertType.contains("FULL_SCREEN", ignoreCase = true) -> "📱 تمام صفحه"
@@ -79,13 +110,22 @@ class RemindersAdapter(
         }
     }
 
-    class ReminderDiffCallback : DiffUtil.ItemCallback<ReminderEntity>() {
-        override fun areItemsTheSame(oldItem: ReminderEntity, newItem: ReminderEntity): Boolean {
-            return oldItem.id == newItem.id
+    class ReminderListDiffCallback : DiffUtil.ItemCallback<ReminderListItem>() {
+        override fun areItemsTheSame(oldItem: ReminderListItem, newItem: ReminderListItem): Boolean {
+            return when {
+                oldItem is ReminderListItem.Header && newItem is ReminderListItem.Header -> oldItem.category == newItem.category
+                oldItem is ReminderListItem.Item && newItem is ReminderListItem.Item -> oldItem.reminder.id == newItem.reminder.id
+                else -> false
+            }
         }
 
-        override fun areContentsTheSame(oldItem: ReminderEntity, newItem: ReminderEntity): Boolean {
+        override fun areContentsTheSame(oldItem: ReminderListItem, newItem: ReminderListItem): Boolean {
             return oldItem == newItem
         }
+    }
+
+    companion object {
+        private const val VIEW_TYPE_HEADER = 0
+        private const val VIEW_TYPE_REMINDER = 1
     }
 }

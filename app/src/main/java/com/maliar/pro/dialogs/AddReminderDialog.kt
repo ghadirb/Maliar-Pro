@@ -3,9 +3,11 @@ package com.maliar.pro.dialogs
 import android.app.AlertDialog
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.Spinner
+import android.widget.TextView
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
 import com.maliar.pro.R
@@ -115,9 +117,20 @@ class AddReminderDialog(
         val categories = listOf("عمومی", "مالی", "کاری", "شخصی", "سلامت", "خانواده")
         categorySpinner.adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, categories)
 
+        val repeatIntervalLayout = view.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.repeatIntervalLayout)
+        val repeatIntervalCaption = view.findViewById<TextView>(R.id.repeatIntervalCaption)
+
         repeatPatternSpinner.adapter = ArrayAdapter(
             context, android.R.layout.simple_spinner_dropdown_item, REPEAT_PATTERN_LABELS.values.toList()
         )
+        repeatPatternSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view2: android.view.View?, position: Int, id: Long) {
+                val isCustom = REPEAT_PATTERN_LABELS.keys.toList().getOrNull(position) == RepeatPattern.CUSTOM
+                repeatIntervalLayout.visibility = if (isCustom) View.VISIBLE else View.GONE
+                repeatIntervalCaption.visibility = if (isCustom) View.VISIBLE else View.GONE
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
 
         fun refreshDateButtonText() {
             dateButton.text = PersianCalendarHelper.formatJalali(jalaliYear, jalaliMonth, jalaliDay)

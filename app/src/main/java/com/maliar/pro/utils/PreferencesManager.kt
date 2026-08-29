@@ -23,6 +23,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_AUTO_DUE_REMINDERS_ENABLED = "auto_due_reminders_enabled"
         private const val KEY_AUTO_DUE_REMINDER_DAYS_BEFORE = "auto_due_reminder_days_before"
         private const val KEY_FINANCIAL_PERIOD_START_DAY = "financial_period_start_day"
+        private const val KEY_QUIET_HOURS_ENABLED = "quiet_hours_enabled"
+        private const val KEY_QUIET_HOURS_START_MINUTES = "quiet_hours_start_minutes"
+        private const val KEY_QUIET_HOURS_END_MINUTES = "quiet_hours_end_minutes"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
 
         // --- Subscription / entitlement ---
@@ -143,6 +146,45 @@ class PreferencesManager(context: Context) {
     }
 
     fun getFinancialPeriodStartDay(): Int = prefs.getInt(KEY_FINANCIAL_PERIOD_START_DAY, 1)
+
+    // --- Quiet hours (سکوت شبانه) ---
+    // Deliberately NOT implemented via Android's Do Not Disturb / notification-listener
+    // APIs - reading DND state or other apps' notifications requires the
+    // BIND_NOTIFICATION_LISTENER_SERVICE permission, which is exactly the kind of
+    // heavily-scrutinized, spyware-adjacent permission that risks a repeat of the Play
+    // Protect "harmful" flag this project has already been through (it grants a special
+    // service the ability to read every notification on the device, from every app).
+    // Instead, this is a simple local time-window check consulted only when *this app's
+    // own* already-scheduled reminder alarm fires - no new permission, no listener
+    // service, nothing running that isn't already part of the existing reminder flow.
+
+    fun setQuietHoursEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_QUIET_HOURS_ENABLED, enabled).apply()
+    }
+
+    fun isQuietHoursEnabled(): Boolean = prefs.getBoolean(KEY_QUIET_HOURS_ENABLED, false)
+
+    /** Both as minutes-since-midnight (0-1439), local device time. */
+    fun setQuietHoursRange(startMinutes: Int, endMinutes: Int) {
+        prefs.edit()
+            .putInt(KEY_QUIET_HOURS_START_MINUTES, startMinutes.coerceIn(0, 1439))
+            .putInt(KEY_QUIET_HOURS_END_MINUTES, endMinutes.coerceIn(0, 1439))
+            .apply()
+    }
+
+    fun getQuietHoursStartMinutes(): Int = prefs.getInt(KEY_QUIET_HOURS_START_MINUTES, 23 * 60) // 23:00
+    fun getQuietHoursEndMinutes(): Int = prefs.getInt(KEY_QUIET_HOURS_END_MINUTES, 7 * 60) // 07:00
+
+    /** True right now if quiet hours are on and the current time falls in the configured
+     *  window - correctly handles a window that crosses midnight (e.g. 23:00 to 07:00). */
+    fun isWithinQuietHoursNow(): Boolean {
+        if (!isQuietHoursEnabled()) return false
+        val cal = java.util.Calendar.getInstance()
+        val nowMinutes = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+        val start = getQuietHoursStartMinutes()
+        val end = getQuietHoursEndMinutes()
+        return if (start <= end) nowMinutes in start until end else nowMinutes >= start || nowMinutes < end
+    }
 
     // --- Startup announcement ---
 

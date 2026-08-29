@@ -3,9 +3,11 @@ package com.maliar.pro.dialogs
 import android.app.AlertDialog
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.Spinner
+import android.widget.TextView
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
 import com.maliar.pro.R
@@ -126,6 +128,20 @@ class EditReminderDialog(
         val currentPattern = runCatching { RepeatPattern.valueOf(reminder.repeatPattern) }.getOrDefault(RepeatPattern.ONCE)
         repeatPatternSpinner.setSelection(repeatKeys.indexOf(currentPattern).coerceAtLeast(0))
         if (reminder.repeatIntervalDays > 0) repeatIntervalInput.setText(reminder.repeatIntervalDays.toString())
+
+        val repeatIntervalLayout = view.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.repeatIntervalLayout)
+        val repeatIntervalCaption = view.findViewById<TextView>(R.id.repeatIntervalCaption)
+        fun refreshIntervalFieldVisibility(isCustom: Boolean) {
+            repeatIntervalLayout.visibility = if (isCustom) View.VISIBLE else View.GONE
+            repeatIntervalCaption.visibility = if (isCustom) View.VISIBLE else View.GONE
+        }
+        refreshIntervalFieldVisibility(currentPattern == RepeatPattern.CUSTOM)
+        repeatPatternSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view2: View?, position: Int, id: Long) {
+                refreshIntervalFieldVisibility(repeatKeys.getOrNull(position) == RepeatPattern.CUSTOM)
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
 
         titleInput.setText(reminder.title)
         descriptionInput.setText(reminder.description)

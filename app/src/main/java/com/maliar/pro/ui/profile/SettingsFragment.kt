@@ -179,6 +179,7 @@ class SettingsFragment : Fragment() {
 
         setupAutoDueReminders()
         setupFinancialPeriodStartDay()
+        setupQuietHours()
     }
 
     private fun setupAutoDueReminders() {
@@ -221,6 +222,36 @@ class SettingsFragment : Fragment() {
                 "دوره مالی از روز $day هر ماه شمسی محاسبه می‌شود"
             }
             Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun setupQuietHours() {
+        fun formatMinutes(minutes: Int): String = String.format("%02d:%02d", minutes / 60, minutes % 60)
+
+        binding.quietHoursSwitch.isChecked = prefs.isQuietHoursEnabled()
+        binding.quietHoursStartButton.text = "از ${formatMinutes(prefs.getQuietHoursStartMinutes())}"
+        binding.quietHoursEndButton.text = "تا ${formatMinutes(prefs.getQuietHoursEndMinutes())}"
+
+        binding.quietHoursSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setQuietHoursEnabled(isChecked)
+        }
+
+        binding.quietHoursStartButton.setOnClickListener {
+            val current = prefs.getQuietHoursStartMinutes()
+            com.maliar.pro.ui.common.MaliarTimePickerDialog.show(requireContext(), current / 60, current % 60) { hour, minute ->
+                val newStart = hour * 60 + minute
+                prefs.setQuietHoursRange(newStart, prefs.getQuietHoursEndMinutes())
+                binding.quietHoursStartButton.text = "از ${formatMinutes(newStart)}"
+            }
+        }
+
+        binding.quietHoursEndButton.setOnClickListener {
+            val current = prefs.getQuietHoursEndMinutes()
+            com.maliar.pro.ui.common.MaliarTimePickerDialog.show(requireContext(), current / 60, current % 60) { hour, minute ->
+                val newEnd = hour * 60 + minute
+                prefs.setQuietHoursRange(prefs.getQuietHoursStartMinutes(), newEnd)
+                binding.quietHoursEndButton.text = "تا ${formatMinutes(newEnd)}"
+            }
         }
     }
 

@@ -182,10 +182,11 @@
             android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/repeatIntervalLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="فاصله تکرار به روز (فقط برای «هر چند روز»)"
-            android:layout_marginBottom="8dp">
+            android:hint="فاصله تکرار (روز)"
+            android:visibility="gone">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/repeatIntervalInput"
@@ -194,6 +195,16 @@
                 android:inputType="number"
                 android:hint="مثلاً ۱۴" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:id="@+id/repeatIntervalCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="هر چند روز یک‌بار تکرار شود - مثلاً ۱۴ یعنی هر دو هفته یک‌بار"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
 
         <TextView
             android:layout_width="wrap_content"

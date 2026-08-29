@@ -39,15 +39,36 @@ class ReminderReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra("reminder_title") ?: "یادآوری"
         val description = intent.getStringExtra("reminder_description") ?: ""
         val alertType = intent.getStringExtra("alert_type") ?: AlertType.NOTIFICATION.name
+        val priority = intent.getStringExtra("reminder_priority") ?: ""
         val contactName = intent.getStringExtra("contact_name") ?: ""
         val contactPhone = intent.getStringExtra("contact_phone") ?: ""
         val soundValue = intent.getStringExtra("sound_uri") ?: ReminderSound.DEFAULT_ALARM
 
+        val prefs = PreferencesManager(context)
+
+        // Quiet hours: only downgrades non-urgent reminders (HIGH priority always alerts
+        // normally - e.g. a check due today shouldn't stay silent just because it's late).
+        // See PreferencesManager.isWithinQuietHoursNow for why this is a plain local time
+        // check rather than anything touching Android's Do Not Disturb / notification-
+        // listener APIs.
+        if (prefs.isWithinQuietHoursNow() && !priority.contains("HIGH", ignoreCase = true)) {
+            showQuietNotification(context, title, description, reminderId)
+            return
+        }
+
         when (alertType) {
-            AlertType.SMART.name, AlertType.FULL_SCREEN.name ->
+            // Previously FULL_SCREEN silently fell through to the exact same plain
+            // actionable notification as SMART, so choosing "تمام صفحه" when creating a
+            // reminder never actually produced a true full-screen wake-the-lock-screen
+            // alarm - showFullScreenIntentNotification() existed but nothing ever called
+            // it. SMART no longer has a distinct spoken-TTS behavior to fall back to
+            // (that service was removed for Play Protect safety), so it still uses the
+            // same actionable notification as before.
+            AlertType.FULL_SCREEN.name ->
+                showFullScreenIntentNotification(context, reminderId, title, description, soundValue)
+            AlertType.SMART.name ->
                 showPlainNotification(context, title, description, reminderId, "action", contactName, contactPhone, soundValue)
             else -> {
-                val prefs = PreferencesManager(context)
                 val notificationMode = prefs.getNotificationMode()
                 if (notificationMode == "none") {
                     // The whole point of this mode: no notification UI at all.
@@ -56,6 +77,46 @@ class ReminderReceiver : BroadcastReceiver() {
                 showPlainNotification(context, title, description, reminderId, notificationMode, contactName, contactPhone, soundValue)
             }
         }
+    }
+
+    /** Quiet-hours fallback: a minimal, genuinely silent notification (own low-importance
+     *  channel, no sound/vibration, no full-screen takeover) - the person still sees it
+     *  when they check their phone, without being woken up. */
+    private fun showQuietNotification(context: Context, title: String, message: String, reminderId: Long) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "reminder_quiet_hours"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager.getNotificationChannel(channelId) == null) {
+            notificationManager.createNotificationChannel(
+                NotificationChannel(channelId, "یادآوری‌ها (ساعات سکوت)", NotificationManager.IMPORTANCE_LOW).apply {
+                    description = "یادآوری‌هایی که در بازه سکوت شبانه بی‌صدا نمایش داده می‌شوند"
+                    setSound(null, null)
+                    enableVibration(false)
+                }
+            )
+        }
+
+        val intent = Intent(context, FullScreenAlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("reminder_id", reminderId)
+            putExtra("reminder_title", title)
+            putExtra("reminder_description", message)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, reminderId.toInt(), intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setSilent(true)
+            .build()
+
+        notificationManager.notify(reminderId.toInt(), notification)
     }
 
     /**
