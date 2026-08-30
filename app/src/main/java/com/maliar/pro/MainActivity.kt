@@ -60,6 +60,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (!PreferencesManager(this).isOnboardingCompleted()) {
+            startActivity(Intent(this, com.maliar.pro.ui.onboarding.OnboardingActivity::class.java))
+            finish()
+            return
+        }
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

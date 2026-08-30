@@ -26,6 +26,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_QUIET_HOURS_ENABLED = "quiet_hours_enabled"
         private const val KEY_QUIET_HOURS_START_MINUTES = "quiet_hours_start_minutes"
         private const val KEY_QUIET_HOURS_END_MINUTES = "quiet_hours_end_minutes"
+        private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
 
         // --- Subscription / entitlement ---
@@ -184,6 +185,12 @@ class PreferencesManager(context: Context) {
         val start = getQuietHoursStartMinutes()
         val end = getQuietHoursEndMinutes()
         return if (start <= end) nowMinutes in start until end else nowMinutes >= start || nowMinutes < end
+    }
+
+    fun isOnboardingCompleted(): Boolean = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
     }
 
     // --- Startup announcement ---

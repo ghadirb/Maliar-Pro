@@ -54,6 +54,13 @@
             </intent-filter>
         </activity>
 
+        <!-- First-launch intro shown once (MainActivity redirects here until
+             PreferencesManager.isOnboardingCompleted() is true) -->
+        <activity
+            android:name=".ui.onboarding.OnboardingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MaliarPro" />
+
         <!-- Subscription / premium upgrade screen -->
         <activity
             android:name=".ui.profile.SubscriptionActivity"
