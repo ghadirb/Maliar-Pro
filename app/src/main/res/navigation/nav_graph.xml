@@ -16,35 +16,67 @@
 
         <action
             android:id="@+id/action_accountingFragment_to_incomeListFragment"
-            app:destination="@id/incomeListFragment" />
+            app:destination="@id/incomeListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_accountingFragment_to_expenseListFragment"
-            app:destination="@id/expenseListFragment" />
+            app:destination="@id/expenseListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_accountingFragment_to_checkListFragment"
-            app:destination="@id/checkListFragment" />
+            app:destination="@id/checkListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_accountingFragment_to_installmentListFragment"
-            app:destination="@id/installmentListFragment" />
+            app:destination="@id/installmentListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_accountingFragment_to_dueSoonFragment"
-            app:destination="@id/dueSoonFragment" />
+            app:destination="@id/dueSoonFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_accountingFragment_to_debtorListFragment"
-            app:destination="@id/debtorListFragment" />
+            app:destination="@id/debtorListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_accountingFragment_to_financialCalendarFragment"
-            app:destination="@id/financialCalendarFragment" />
+            app:destination="@id/financialCalendarFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_accountingFragment_to_financialReportsFragment"
-            app:destination="@id/financialReportsFragment" />
+            app:destination="@id/financialReportsFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
     </fragment>
 
     <fragment
@@ -59,7 +91,11 @@
 
         <action
             android:id="@+id/action_debtorListFragment_to_debtorDetailFragment"
-            app:destination="@id/debtorDetailFragment" />
+            app:destination="@id/debtorDetailFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
     </fragment>
 
     <fragment
@@ -118,15 +154,27 @@
 
         <action
             android:id="@+id/action_financialStatusFragment_to_accountingFragment"
-            app:destination="@id/accountingFragment" />
+            app:destination="@id/accountingFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_financialStatusFragment_to_assistantFragment"
-            app:destination="@id/assistantFragment" />
+            app:destination="@id/assistantFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
 
         <action
             android:id="@+id/action_financialStatusFragment_to_apiKeysFragment"
-            app:destination="@id/apiKeysFragment" />
+            app:destination="@id/apiKeysFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
     </fragment>
 
     <fragment
