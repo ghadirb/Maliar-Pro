@@ -23,7 +23,9 @@ class AccountingManager(context: Context) {
     }
     
     suspend fun addIncome(income: Income): Long {
-        return accountingDao.insertIncome(income)
+        val id = accountingDao.insertIncome(income)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
+        return id
     }
     
     suspend fun updateIncome(income: Income) {
@@ -48,7 +50,9 @@ class AccountingManager(context: Context) {
     }
     
     suspend fun addExpense(expense: Expense): Long {
-        return accountingDao.insertExpense(expense)
+        val id = accountingDao.insertExpense(expense)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
+        return id
     }
     
     suspend fun updateExpense(expense: Expense) {
