@@ -24,6 +24,7 @@ import com.maliar.pro.adapters.ReportRowItem
 import com.maliar.pro.viewmodels.FinancialReportsViewModel
 import com.maliar.pro.viewmodels.FinancialReportsViewModelFactory
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** "گزارش‌های مالی حرفه‌ای": period-scoped income/expense totals, biggest individual
  *  expenses/incomes, the category that ate the most money, and an income-vs-expense trend
@@ -33,6 +34,14 @@ class FinancialReportsFragment : Fragment() {
     private lateinit var binding: FragmentFinancialReportsBinding
     private lateinit var topExpensesAdapter: ReportRowAdapter
     private lateinit var topIncomesAdapter: ReportRowAdapter
+
+    private val csvExportLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri -> uri?.let { exportReport(it, isPdf = false) } }
+
+    private val pdfExportLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri -> uri?.let { exportReport(it, isPdf = true) } }
 
     private val viewModel: FinancialReportsViewModel by viewModels {
         FinancialReportsViewModelFactory(
@@ -57,6 +66,15 @@ class FinancialReportsFragment : Fragment() {
         binding.topIncomesRecyclerView.adapter = topIncomesAdapter
 
         setupChart()
+
+        binding.exportCsvButton.setOnClickListener {
+            val period = viewModel.selectedPeriod.value.name.lowercase()
+            csvExportLauncher.launch("maliar-pro-report-$period.csv")
+        }
+        binding.exportPdfButton.setOnClickListener {
+            val period = viewModel.selectedPeriod.value.name.lowercase()
+            pdfExportLauncher.launch("maliar-pro-report-$period.pdf")
+        }
 
         binding.periodChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
@@ -85,6 +103,34 @@ class FinancialReportsFragment : Fragment() {
             xAxis.granularity = 1f
             setTouchEnabled(true)
             setPinchZoom(true)
+        }
+    }
+
+    private fun exportReport(uri: android.net.Uri, isPdf: Boolean) {
+        val report = viewModel.report.value
+        if (report == null) {
+            android.widget.Toast.makeText(requireContext(), "گزارشی برای خروجی گرفتن وجود ندارد", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val periodLabel = when (viewModel.selectedPeriod.value) {
+            ReportPeriod.DAILY -> "روزانه"
+            ReportPeriod.WEEKLY -> "هفتگی"
+            ReportPeriod.MONTHLY -> "ماهانه"
+            ReportPeriod.YEARLY -> "سالانه"
+        }
+        lifecycleScope.launch {
+            try {
+                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    if (isPdf) {
+                        com.maliar.pro.utils.ReportExporter.exportPdf(requireContext(), uri, report, periodLabel)
+                    } else {
+                        com.maliar.pro.utils.ReportExporter.exportCsv(requireContext(), uri, report)
+                    }
+                }
+                android.widget.Toast.makeText(requireContext(), "گزارش با موفقیت ذخیره شد", android.widget.Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(requireContext(), "خطا در ذخیره گزارش: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 
