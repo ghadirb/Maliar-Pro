@@ -134,6 +134,38 @@ class FinancialReportsFragment : Fragment() {
         }
     }
 
+    /** Builds one row per category that both has spending this period and a known
+     *  approximate benchmark (see BenchmarkData for why categories without a match are
+     *  skipped rather than guessed at). Simple plain TextViews, not a RecyclerView - at
+     *  most a handful of rows, not worth the extra adapter machinery. */
+    private fun renderBenchmarkSection(report: FinancialReport) {
+        val rows = report.categoryBreakdown.mapNotNull { categoryTotal ->
+            val benchmarkPercent = com.maliar.pro.utils.BenchmarkData.approxPercentFor(categoryTotal.category) ?: return@mapNotNull null
+            if (report.totalExpense <= 0) return@mapNotNull null
+            val userPercent = (categoryTotal.total / report.totalExpense) * 100
+            Triple(categoryTotal.category, userPercent, benchmarkPercent)
+        }
+
+        binding.benchmarkSection.visibility = if (rows.isEmpty()) View.GONE else View.VISIBLE
+        binding.benchmarkRowsContainer.removeAllViews()
+
+        rows.forEach { (category, userPercent, benchmarkPercent) ->
+            val diff = userPercent - benchmarkPercent
+            val (indicator, color) = when {
+                diff > 5 -> "⬆️ بیشتر از میانگین" to "#F44336"
+                diff < -5 -> "⬇️ کمتر از میانگین" to "#4CAF50"
+                else -> "≈ نزدیک به میانگین" to "#757575"
+            }
+            val row = android.widget.TextView(requireContext()).apply {
+                text = String.format("%s: %.0f%% شما - %.0f%% میانگین (%s)", category, userPercent, benchmarkPercent, indicator)
+                textSize = 12f
+                setTextColor(Color.parseColor(color))
+                setPadding(0, 6, 0, 6)
+            }
+            binding.benchmarkRowsContainer.addView(row)
+        }
+    }
+
     private fun renderReport(report: FinancialReport) {
         binding.totalIncomeText.text = String.format("%,.0f", report.totalIncome)
         binding.totalExpenseText.text = String.format("%,.0f", report.totalExpense)
@@ -151,6 +183,8 @@ class FinancialReportsFragment : Fragment() {
         } else {
             binding.topCategoryLabel.visibility = View.GONE
         }
+
+        renderBenchmarkSection(report)
 
         topExpensesAdapter.submitList(report.topExpenses.map {
             ReportRowItem(it.description, it.category, it.date, it.amount)

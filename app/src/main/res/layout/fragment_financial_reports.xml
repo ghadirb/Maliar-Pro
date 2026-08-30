@@ -161,6 +161,38 @@
             android:visibility="gone"
             tools:text="🏷 بیشترین هزینه در دسته «خوراک»: ۲٬۰۰۰٬۰۰۰ تومان" />
 
+        <LinearLayout
+            android:id="@+id/benchmarkSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="⚖️ مقایسه با میانگین تقریبی"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="8dp"
+                android:text="بر اساس تخمین کلی هزینه‌های خانوار، نه داده‌ی واقعی کاربران دیگر"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary" />
+
+            <LinearLayout
+                android:id="@+id/benchmarkRowsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

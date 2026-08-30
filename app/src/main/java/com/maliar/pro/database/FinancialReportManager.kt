@@ -18,7 +18,10 @@ data class FinancialReport(
     val topExpenses: List<Expense>,
     val topIncomes: List<Income>,
     val topExpenseCategory: CategoryTotal?,
-    val trend: List<ReportPoint>
+    val trend: List<ReportPoint>,
+    /** Every category's share of this period's total expense, sorted descending - used for
+     *  the "مقایسه با میانگین" benchmark card, not just the single top category above. */
+    val categoryBreakdown: List<CategoryTotal> = emptyList()
 ) {
     val net: Double get() = totalIncome - totalExpense
 }
@@ -58,7 +61,13 @@ class FinancialReportManager(
 
         val trend = buildTrend(allIncomes, allExpenses, period, trendBuckets)
 
-        return FinancialReport(period, totalIncome, totalExpense, topExpenses, topIncomes, topCategory, trend)
+        val categoryBreakdown = expensesInPeriod
+            .filter { it.category.isNotBlank() }
+            .groupBy { it.category }
+            .map { (category, list) -> CategoryTotal(category, list.sumOf { it.amount }) }
+            .sortedByDescending { it.total }
+
+        return FinancialReport(period, totalIncome, totalExpense, topExpenses, topIncomes, topCategory, trend, categoryBreakdown)
     }
 
     /** Returns the epoch-millis start of the given [period]'s current window, e.g. start of
