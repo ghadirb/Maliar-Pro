@@ -123,14 +123,22 @@ class AccountingManager(context: Context) {
     }
 
     suspend fun getMonthlyIncome(): Double {
-        val periodStartDay = com.maliar.pro.utils.PreferencesManager(appContext).getFinancialPeriodStartDay()
-        val start = com.maliar.pro.utils.PersianCalendarHelper.currentFinancialPeriodStartMillis(periodStartDay)
+        val start = getFinancialPeriodStartMillis()
         return accountingDao.getMonthlyIncome(start) ?: 0.0
     }
 
     suspend fun getMonthlyExpense(): Double {
-        val periodStartDay = com.maliar.pro.utils.PreferencesManager(appContext).getFinancialPeriodStartDay()
-        val start = com.maliar.pro.utils.PersianCalendarHelper.currentFinancialPeriodStartMillis(periodStartDay)
+        val start = getFinancialPeriodStartMillis()
         return accountingDao.getMonthlyExpense(start) ?: 0.0
+    }
+
+    /** Epoch millis for the start of the *current* financial period, based on the
+     *  period-start-day the user picked in the Profile tab (defaults to the 1st of the
+     *  Jalali month when unset). Plain synchronous SharedPreferences + calendar math, so
+     *  it's safe to call from reactive (non-suspend) Flow.map transforms too - see
+     *  AccountingViewModel.isThisPeriod(). */
+    fun getFinancialPeriodStartMillis(): Long {
+        val periodStartDay = com.maliar.pro.utils.PreferencesManager(appContext).getFinancialPeriodStartDay()
+        return com.maliar.pro.utils.PersianCalendarHelper.currentFinancialPeriodStartMillis(periodStartDay)
     }
 }

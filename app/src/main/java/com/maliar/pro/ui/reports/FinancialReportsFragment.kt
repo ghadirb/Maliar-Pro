@@ -69,12 +69,19 @@ class FinancialReportsFragment : Fragment() {
 
         binding.exportCsvButton.setOnClickListener {
             val period = viewModel.selectedPeriod.value.name.lowercase()
-            csvExportLauncher.launch("maliar-pro-report-$period.csv")
+            val offset = viewModel.periodOffset.value
+            val suffix = if (offset > 0) "-${offset}back" else ""
+            csvExportLauncher.launch("maliar-pro-report-$period$suffix.csv")
         }
         binding.exportPdfButton.setOnClickListener {
             val period = viewModel.selectedPeriod.value.name.lowercase()
-            pdfExportLauncher.launch("maliar-pro-report-$period.pdf")
+            val offset = viewModel.periodOffset.value
+            val suffix = if (offset > 0) "-${offset}back" else ""
+            pdfExportLauncher.launch("maliar-pro-report-$period$suffix.pdf")
         }
+
+        binding.periodPrevButton.setOnClickListener { viewModel.goToPreviousPeriod() }
+        binding.periodNextButton.setOnClickListener { viewModel.goToNextPeriod() }
 
         binding.periodChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
@@ -85,6 +92,15 @@ class FinancialReportsFragment : Fragment() {
                 else -> ReportPeriod.MONTHLY
             }
             viewModel.loadReport(period)
+        }
+
+        lifecycleScope.launch {
+            viewModel.rangeLabel.collect { binding.periodRangeLabel.text = it }
+        }
+        lifecycleScope.launch {
+            viewModel.periodOffset.collect { offset ->
+                binding.periodNextButton.isEnabled = offset > 0
+            }
         }
 
         lifecycleScope.launch {
@@ -117,7 +133,7 @@ class FinancialReportsFragment : Fragment() {
             ReportPeriod.WEEKLY -> "هفتگی"
             ReportPeriod.MONTHLY -> "ماهانه"
             ReportPeriod.YEARLY -> "سالانه"
-        }
+        } + " (${viewModel.rangeLabel.value})"
         lifecycleScope.launch {
             try {
                 withContext(kotlinx.coroutines.Dispatchers.IO) {

@@ -102,40 +102,6 @@ class AccountingFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        lifecycleScope.launch {
-            viewModel.monthlyIncome.collect { binding.dashboardIncomeText.text = formatCurrency(it) }
-        }
-        lifecycleScope.launch {
-            viewModel.monthlyExpense.collect { binding.dashboardExpenseText.text = formatCurrency(it) }
-        }
-        lifecycleScope.launch {
-            // Streak: consecutive days (including today) with at least one income or expense
-            // entry - a light, non-punishing nudge toward keeping the books up to date.
-            // Combines both flows so it recomputes whenever either changes, and simply
-            // hides itself at 0/1 days rather than showing a discouraging "۰ روز".
-            kotlinx.coroutines.flow.combine(viewModel.incomeList, viewModel.expenseList) { incomes, expenses ->
-                val entryDays = (incomes.map { it.date } + expenses.map { it.date })
-                    .map { com.maliar.pro.utils.PersianCalendarHelper.gregorianMillisToJalali(it) }
-                    .map { (y, m, d) -> y * 10000 + m * 100 + d }
-                    .toSet()
-                var streak = 0
-                var cursor = System.currentTimeMillis()
-                while (true) {
-                    val (y, m, d) = com.maliar.pro.utils.PersianCalendarHelper.gregorianMillisToJalali(cursor)
-                    if ((y * 10000 + m * 100 + d) !in entryDays) break
-                    streak++
-                    cursor -= 24 * 60 * 60 * 1000
-                }
-                streak
-            }.collect { streak ->
-                if (streak >= 2) {
-                    binding.dashboardStreakBadge.visibility = View.VISIBLE
-                    binding.dashboardStreakBadge.text = "🔥 $streak روز متوالی"
-                } else {
-                    binding.dashboardStreakBadge.visibility = View.GONE
-                }
-            }
-        }
         // Card totals: all-time totals, reactive to Room - updates immediately regardless
         // of whether the write came from this screen's own dialogs or from somewhere else
         // entirely (e.g. the assistant tab actually saving an income/expense).
@@ -152,7 +118,6 @@ class AccountingFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.balance.collect { balance ->
                 binding.balanceAmount.text = formatCurrency(balance)
-                binding.dashboardBalanceText.text = formatCurrency(balance)
             }
         }
         lifecycleScope.launch {

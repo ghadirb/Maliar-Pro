@@ -12,108 +12,6 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Summary dashboard: the first thing the person sees when they open the
-             accounting tab - balance, this-period net, and a light streak badge, before
-             getting into due-soon/installments/reports cards below. -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/primary"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="4dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="خلاصه وضعیت مالی"
-                    android:textColor="#DFFFFFFF"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/dashboardBalanceText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@android:color/white"
-                    android:textStyle="bold"
-                    android:textSize="24sp"
-                    tools:text="۱۲٬۵۰۰٬۰۰۰ تومان" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:orientation="horizontal">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="درآمد این دوره"
-                            android:textColor="#DFFFFFFF"
-                            android:textSize="11sp" />
-                        <TextView
-                            android:id="@+id/dashboardIncomeText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:textColor="@android:color/white"
-                            android:textStyle="bold"
-                            android:textSize="14sp"
-                            android:text="0" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="هزینه این دوره"
-                            android:textColor="#DFFFFFFF"
-                            android:textSize="11sp" />
-                        <TextView
-                            android:id="@+id/dashboardExpenseText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:textColor="@android:color/white"
-                            android:textStyle="bold"
-                            android:textSize="14sp"
-                            android:text="0" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/dashboardStreakBadge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_vertical"
-                        android:background="#33FFFFFF"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="6dp"
-                        android:textColor="@android:color/white"
-                        android:textSize="12sp"
-                        android:visibility="gone"
-                        tools:text="🔥 ۵ روز متوالی"
-                        tools:visibility="visible" />
-
-                </LinearLayout>
-
-            </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
         <!-- Due-soon widget: surfaces the nearest upcoming checks/installments/debts right
              at the top of the tab, above even the balance card, since "what's about to be
              due" is the single most actionable thing on this screen. Hidden entirely when
@@ -184,9 +82,10 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Professional monthly dashboard: total balance + this month's income, expense,
-             uncashed checks and active installments in one place, instead of the old
-             single "تراز کل" number - so the whole month's picture is visible at a glance. -->
+        <!-- Professional dashboard: total balance + this financial period's income, expense,
+             uncashed checks and active installments in one place. "این دوره" starts from the
+             period-start-day the user picked in the Profile tab (PreferencesManager.
+             getFinancialPeriodStartDay), not necessarily the 1st of the calendar month. -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -226,9 +125,10 @@
                     android:background="#33FFFFFF" />
 
                 <TextView
+                    android:id="@+id/periodSummaryLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="خلاصه این ماه"
+                    android:text="خلاصه این دوره"
                     android:textColor="@android:color/white"
                     android:textSize="13sp"
                     android:textStyle="bold" />
@@ -247,7 +147,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="درآمد ماه"
+                            android:text="درآمد دوره"
                             android:textColor="#DFFFFFFF"
                             android:textSize="12sp" />
                         <TextView
@@ -269,7 +169,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="هزینه ماه"
+                            android:text="هزینه دوره"
                             android:textColor="#DFFFFFFF"
                             android:textSize="12sp" />
                         <TextView

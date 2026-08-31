@@ -130,6 +130,33 @@ object PersianCalendarHelper {
         }
     }
 
+    /**
+     * Same idea as [currentFinancialPeriodStartMillis], but lets the caller step back through
+     * *previous* financial periods instead of only ever the current one - powers the
+     * "previous/next period" navigator in the reports screen. [offsetPeriods] = 0 is the
+     * current period, 1 is one period back, 2 is two periods back, etc.
+     */
+    fun financialPeriodStartMillisForOffset(periodStartDay: Int = 1, offsetPeriods: Int = 0): Long {
+        val (y, m, d) = getCurrentJalaliDate()
+        var py: Int
+        var pm: Int
+        if (periodStartDay <= 1) {
+            py = y; pm = m
+        } else {
+            val startDayThisMonth = periodStartDay.coerceAtMost(daysInJalaliMonth(y, m))
+            if (d >= startDayThisMonth) {
+                py = y; pm = m
+            } else {
+                if (m == 1) { py = y - 1; pm = 12 } else { py = y; pm = m - 1 }
+            }
+        }
+        repeat(offsetPeriods) {
+            if (pm == 1) { pm = 12; py -= 1 } else { pm -= 1 }
+        }
+        val startDay = periodStartDay.coerceAtMost(daysInJalaliMonth(py, pm))
+        return jalaliToGregorianMillis(py, pm, startDay)
+    }
+
     /** Converts a Gregorian epoch millis timestamp to (year, month 1-12, day) Jalali. */
     fun gregorianMillisToJalali(millis: Long): Triple<Int, Int, Int> {
         val cal = Calendar.getInstance()

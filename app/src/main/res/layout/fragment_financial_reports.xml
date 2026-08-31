@@ -53,6 +53,43 @@
 
         </com.google.android.material.chip.ChipGroup>
 
+        <!-- Period navigator: lets the person step back through previous days/weeks/
+             financial-periods/years instead of only ever seeing the current one, and
+             whichever period is showing here is exactly what gets exported below. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/periodPrevButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="‹ قبلی" />
+
+            <TextView
+                android:id="@+id/periodRangeLabel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_secondary"
+                tools:text="۱ تا ۳۰ مرداد ۱۴۰۴" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/periodNextButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="بعدی ›" />
+
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
