@@ -99,6 +99,24 @@
             android:layout_marginTop="4dp"
             android:text="+ افزودن مورد سرویس" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/aiTipsButton"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🧠 توصیهٔ هوشمند نگهداری (اختیاری)"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/aiTipsText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:padding="8dp"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="نکته: ابتدا لنت ترمز را سرویس کنید، سپس روغن موتور را در اولین فرصت." />
+
         <!-- Cost summary -->
         <TextView
             android:layout_width="match_parent"

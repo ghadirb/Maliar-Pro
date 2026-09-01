@@ -15,7 +15,9 @@ import com.maliar.pro.database.MealPlanEntry
 import com.maliar.pro.database.MealPlanManager
 import com.maliar.pro.database.ShoppingList
 import com.maliar.pro.databinding.FragmentMealPlanBinding
+import com.maliar.pro.utils.AIHelper
 import com.maliar.pro.utils.MealType
+import com.maliar.pro.utils.PreferencesManager
 import com.maliar.pro.viewmodels.MealPlanViewModel
 import com.maliar.pro.viewmodels.MealPlanViewModelFactory
 import com.maliar.pro.viewmodels.PERSIAN_WEEKDAY_NAMES
@@ -52,10 +54,15 @@ class MealPlanFragment : Fragment() {
             }
         }
 
+        binding.aiTipsButton.setOnClickListener { requestAiTips() }
+
         lifecycleScope.launch {
             viewModel.latestPlan.collect { plan ->
                 binding.budgetInput.setText(if (plan != null && plan.budget > 0) plan.budget.toLong().toString() else "")
                 binding.shoppingListButton.visibility = if (plan != null) View.VISIBLE else View.GONE
+                val hasActiveAiKey = PreferencesManager(requireContext()).getAPIKeys().any { it.isActive }
+                binding.aiTipsButton.visibility = if (plan != null && hasActiveAiKey) View.VISIBLE else View.GONE
+                binding.aiTipsText.visibility = View.GONE
             }
         }
 
@@ -131,6 +138,41 @@ class MealPlanFragment : Fragment() {
                 if (item.unitPrice.isEstimated) "قیمت تقریبی (بدون سابقهٔ خرید)" else "بر اساس آخرین خرید شما"
             row.findViewById<TextView>(R.id.itemCostText).text = formatCurrency(item.totalCost)
             binding.shoppingListContainer.addView(row)
+        }
+    }
+
+    /**
+     * Optional, user-initiated only (never called automatically) AI tips for the current
+     * week's plan. Reuses AIHelper.generateText - the same already-reviewed code path the
+     * in-app assistant uses (the person's own stored API key, or the app's rate-limited
+     * proxy) - rather than adding any new network/key-handling code. Only ever sends the
+     * recipe names, meal types and aggregate costs already visible on this screen - no
+     * personal, financial-account, or location data leaves the device for this feature.
+     */
+    private fun requestAiTips() {
+        val entries = viewModel.entries.value
+        if (entries.isEmpty()) return
+        val budget = viewModel.latestPlan.value?.budget ?: 0.0
+        val totalCost = entries.sumOf { it.estimatedCost }
+
+        binding.aiTipsButton.isEnabled = false
+        binding.aiTipsButton.text = "در حال دریافت نکات..."
+        binding.aiTipsText.visibility = View.GONE
+
+        lifecycleScope.launch {
+            val recipeList = entries.joinToString("، ") { "${MealType.valueOf(it.mealType).label}: ${it.recipeName}" }
+            val budgetLine = if (budget > 0) "بودجهٔ هفتگی: ${formatCurrency(budget)}." else "بودجه‌ای تعیین نشده."
+            val userPrompt = "برنامهٔ غذایی این هفته: $recipeList. هزینهٔ تقریبی کل: ${formatCurrency(totalCost)}. $budgetLine"
+            val systemPrompt = "شما یک دستیار برنامه‌ریزی غذایی خانگی فارسی‌زبان هستید. بر اساس برنامهٔ هفتگی زیر، " +
+                "حداکثر ۳ نکتهٔ خیلی کوتاه (هرکدام یک خط) برای صرفه‌جویی یا تنوع بیشتر پیشنهاد بده. فقط فارسی، بدون مقدمه."
+
+            val result = AIHelper.generateText(requireContext(), systemPrompt, userPrompt)
+
+            binding.aiTipsButton.isEnabled = true
+            binding.aiTipsButton.text = "🧠 نکات هوشمند برای این هفته (اختیاری)"
+            binding.aiTipsText.visibility = View.VISIBLE
+            binding.aiTipsText.text = result
+                ?: "دریافت نکات هوشمند ممکن نشد. لطفاً یک کلید API فعال در پروفایل ← کلیدهای API بررسی کنید."
         }
     }
 

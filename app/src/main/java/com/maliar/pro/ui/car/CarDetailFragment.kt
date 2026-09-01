@@ -21,7 +21,9 @@ import com.maliar.pro.dialogs.AddOdometerDialog
 import com.maliar.pro.dialogs.MarkServiceDoneDialog
 import com.maliar.pro.utils.CarServiceStatus
 import com.maliar.pro.utils.CarServiceUrgency
+import com.maliar.pro.utils.AIHelper
 import com.maliar.pro.utils.PersianCalendarHelper
+import com.maliar.pro.utils.PreferencesManager
 import com.maliar.pro.viewmodels.CarDetailViewModel
 import com.maliar.pro.viewmodels.CarDetailViewModelFactory
 import kotlinx.coroutines.launch
@@ -66,6 +68,8 @@ class CarDetailFragment : Fragment() {
             }.show()
         }
 
+        binding.aiTipsButton.setOnClickListener { requestAiTips() }
+
         lifecycleScope.launch {
             viewModel.car.collect { car ->
                 if (car != null) {
@@ -77,7 +81,12 @@ class CarDetailFragment : Fragment() {
         }
 
         lifecycleScope.launch {
-            viewModel.serviceStatuses.collect { statuses -> renderServiceStatuses(statuses) }
+            viewModel.serviceStatuses.collect { statuses ->
+                renderServiceStatuses(statuses)
+                val hasActiveAiKey = PreferencesManager(requireContext()).getAPIKeys().any { it.isActive }
+                binding.aiTipsButton.visibility = if (statuses.isNotEmpty() && hasActiveAiKey) View.VISIBLE else View.GONE
+                binding.aiTipsText.visibility = View.GONE
+            }
         }
 
         lifecycleScope.launch {
@@ -197,6 +206,49 @@ class CarDetailFragment : Fragment() {
             }
 
             binding.historyContainer.addView(row)
+        }
+    }
+
+    /**
+     * Optional, user-initiated only (never automatic) AI maintenance tips. Reuses
+     * AIHelper.generateText - same reviewed code path as the in-app assistant - and sends
+     * only the car's brand/model/year and its service items' names + urgency + remaining
+     * km/days (all already visible on this screen). Deliberately excludes the plate number
+     * and any cost/financial data - none of that is needed to give maintenance advice.
+     */
+    private fun requestAiTips() {
+        val car = viewModel.car.value ?: return
+        val statuses = viewModel.serviceStatuses.value
+        if (statuses.isEmpty()) return
+
+        binding.aiTipsButton.isEnabled = false
+        binding.aiTipsButton.text = "در حال دریافت توصیه..."
+        binding.aiTipsText.visibility = View.GONE
+
+        lifecycleScope.launch {
+            val carLine = listOfNotNull(car.brand.takeIf { it.isNotBlank() }, car.model.takeIf { it.isNotBlank() }, car.year?.toString())
+                .joinToString(" ").ifBlank { "خودرو" }
+            val itemsLine = statuses.joinToString("، ") { status ->
+                val urgencyLabel = when (status.urgency) {
+                    CarServiceUrgency.OVERDUE -> "از موعد گذشته"
+                    CarServiceUrgency.SOON -> "نزدیک به موعد"
+                    CarServiceUrgency.OK -> "در وضعیت خوب"
+                    CarServiceUrgency.UNSCHEDULED -> "بدون برنامهٔ زمان‌بندی"
+                }
+                "${status.item.name} ($urgencyLabel)"
+            }
+            val userPrompt = "خودرو: $carLine. وضعیت موارد سرویس: $itemsLine."
+            val systemPrompt = "شما یک دستیار نگهداری خودرو فارسی‌زبان هستید. بر اساس وضعیت سرویس‌های زیر، " +
+                "حداکثر ۳ توصیهٔ خیلی کوتاه (هرکدام یک خط) دربارهٔ اولویت انجام کارها یا نکات نگهداری بده. " +
+                "فقط فارسی، بدون مقدمه، و توصیهٔ فنی/ایمنی حساس نده."
+
+            val result = AIHelper.generateText(requireContext(), systemPrompt, userPrompt)
+
+            binding.aiTipsButton.isEnabled = true
+            binding.aiTipsButton.text = "🧠 توصیهٔ هوشمند نگهداری (اختیاری)"
+            binding.aiTipsText.visibility = View.VISIBLE
+            binding.aiTipsText.text = result
+                ?: "دریافت توصیهٔ هوشمند ممکن نشد. لطفاً یک کلید API فعال در پروفایل ← کلیدهای API بررسی کنید."
         }
     }
 

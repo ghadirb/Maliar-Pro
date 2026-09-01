@@ -89,6 +89,25 @@
             android:text="🛒 لیست خرید این هفته"
             android:visibility="gone" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/aiTipsButton"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🧠 نکات هوشمند برای این هفته (اختیاری)"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/aiTipsText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:padding="8dp"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="نکته: می‌توانید عدس پلو را جایگزین یکی از وعده‌های گران‌تر کنید تا هزینهٔ کل کاهش یابد."
+            tools:visibility="visible" />
+
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/shoppingListCard"
             android:layout_width="match_parent"
