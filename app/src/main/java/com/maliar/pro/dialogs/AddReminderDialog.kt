@@ -35,7 +35,8 @@ private val REPEAT_PATTERN_LABELS = linkedMapOf(
     RepeatPattern.YEARLY to "سالانه",
     RepeatPattern.WEEKDAYS to "روزهای کاری",
     RepeatPattern.WEEKENDS to "آخر هفته",
-    RepeatPattern.CUSTOM to "هر چند روز"
+    RepeatPattern.CUSTOM to "روزهای انتخابی",
+    RepeatPattern.CUSTOM_INTERVAL to "هر چند دقیقه"
 )
 
 /**
@@ -68,6 +69,7 @@ class AddReminderDialog(
         val alertTypeChipGroup = view.findViewById<ChipGroup>(R.id.alertTypeChipGroup)
         val repeatPatternSpinner = view.findViewById<Spinner>(R.id.repeatPatternSpinner)
         val repeatIntervalInput = view.findViewById<TextInputEditText>(R.id.repeatIntervalInput)
+        val weekdayIds = listOf(R.id.chipSunday, R.id.chipMonday, R.id.chipTuesday, R.id.chipWednesday, R.id.chipThursday, R.id.chipFriday, R.id.chipSaturday)
         val contactButton = view.findViewById<Button>(R.id.reminderContactButton)
         val soundButton = view.findViewById<Button>(R.id.reminderSoundButton)
         var selectedSound = ReminderSound.DEFAULT_ALARM
@@ -125,7 +127,8 @@ class AddReminderDialog(
         )
         repeatPatternSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view2: android.view.View?, position: Int, id: Long) {
-                val isCustom = REPEAT_PATTERN_LABELS.keys.toList().getOrNull(position) == RepeatPattern.CUSTOM
+                val selected = REPEAT_PATTERN_LABELS.keys.toList().getOrNull(position)
+                val isCustom = selected == RepeatPattern.CUSTOM || selected == RepeatPattern.CUSTOM_INTERVAL
                 repeatIntervalLayout.visibility = if (isCustom) View.VISIBLE else View.GONE
                 repeatIntervalCaption.visibility = if (isCustom) View.VISIBLE else View.GONE
             }
@@ -182,6 +185,12 @@ class AddReminderDialog(
                 val repeatIntervalDays = if (repeatPattern == RepeatPattern.CUSTOM) {
                     repeatIntervalInput.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
                 } else 0
+                val repeatIntervalMinutes = if (repeatPattern == RepeatPattern.CUSTOM_INTERVAL) {
+                    repeatIntervalInput.text?.toString()?.toIntOrNull()?.coerceIn(1, 24 * 60) ?: 60
+                } else 0
+                val customDays = weekdayIds.mapIndexedNotNull { index, id ->
+                    if (view.findViewById<com.google.android.material.chip.Chip>(id).isChecked) index.toString() else null
+                }.joinToString(",")
 
                 val dateMillis = PersianCalendarHelper.jalaliToGregorianMillis(jalaliYear, jalaliMonth, jalaliDay)
                 val cal = Calendar.getInstance().apply {
@@ -200,6 +209,8 @@ class AddReminderDialog(
                     triggerTime = cal.timeInMillis,
                     repeatPattern = repeatPattern.name,
                     repeatIntervalDays = repeatIntervalDays,
+                    repeatIntervalMinutes = repeatIntervalMinutes,
+                    customRepeatDays = customDays,
                     category = category,
                     contactName = selectedContact?.name.orEmpty(),
                     contactPhoneNumber = selectedContact?.phoneNumber.orEmpty(),

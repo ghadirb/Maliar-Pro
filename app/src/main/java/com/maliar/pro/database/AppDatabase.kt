@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
                MealPlan::class, MealPlanEntry::class],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -146,6 +146,11 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE advanced_reminders ADD COLUMN repeatIntervalMinutes INTEGER NOT NULL DEFAULT 0")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -160,7 +165,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

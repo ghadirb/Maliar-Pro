@@ -72,7 +72,7 @@ class SmartReminderManager(private val context: Context) {
             val nextTime = calculateNextTriggerTime(
                 reminder.triggerTime,
                 RepeatPattern.valueOf(reminder.repeatPattern),
-                parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays
+                parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays, reminder.repeatIntervalMinutes
             )
             val updated = reminder.copy(
                 triggerTime = nextTime,
@@ -174,7 +174,7 @@ class SmartReminderManager(private val context: Context) {
                 triggerTime = calculateNextTriggerTime(
                     triggerTime,
                     RepeatPattern.valueOf(reminder.repeatPattern),
-                    parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays
+                    parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays, reminder.repeatIntervalMinutes
                 )
             } else if (triggerTime < now) {
                 triggerTime = now + 1000
@@ -254,18 +254,18 @@ class SmartReminderManager(private val context: Context) {
      * in the past and re-fire immediately/incorrectly. This now keeps stepping forward
      * until the result is actually in the future.
      */
-    fun calculateNextTriggerTime(currentTime: Long, pattern: RepeatPattern, customDays: List<Int> = emptyList(), repeatIntervalDays: Int = 0): Long {
+    fun calculateNextTriggerTime(currentTime: Long, pattern: RepeatPattern, customDays: List<Int> = emptyList(), repeatIntervalDays: Int = 0, repeatIntervalMinutes: Int = 0): Long {
         if (pattern == RepeatPattern.ONCE) return currentTime
-        var next = advanceOnce(currentTime, pattern, customDays, repeatIntervalDays)
+        var next = advanceOnce(currentTime, pattern, customDays, repeatIntervalDays, repeatIntervalMinutes)
         var guard = 0
         while (next <= System.currentTimeMillis() && guard < 1000) {
-            next = advanceOnce(next, pattern, customDays, repeatIntervalDays)
+            next = advanceOnce(next, pattern, customDays, repeatIntervalDays, repeatIntervalMinutes)
             guard += 1
         }
         return next
     }
 
-    private fun advanceOnce(currentTime: Long, pattern: RepeatPattern, customDays: List<Int>, repeatIntervalDays: Int): Long {
+    private fun advanceOnce(currentTime: Long, pattern: RepeatPattern, customDays: List<Int>, repeatIntervalDays: Int, repeatIntervalMinutes: Int): Long {
         val calendar = Calendar.getInstance()
         calendar.timeInMillis = currentTime
 
@@ -289,24 +289,28 @@ class SmartReminderManager(private val context: Context) {
             RepeatPattern.WEEKDAYS -> {
                 do {
                     calendar.add(Calendar.DAY_OF_MONTH, 1)
-                } while (calendar.get(Calendar.DAY_OF_WEEK) in listOf(Calendar.FRIDAY, Calendar.SATURDAY))
+                } while (((calendar.get(Calendar.DAY_OF_WEEK) + 6) % 7) !in listOf(6, 0, 1, 2, 3))
                 calendar.timeInMillis
             }
             RepeatPattern.WEEKENDS -> {
                 do {
                     calendar.add(Calendar.DAY_OF_MONTH, 1)
-                } while (calendar.get(Calendar.DAY_OF_WEEK) !in listOf(Calendar.FRIDAY, Calendar.SATURDAY))
+                } while (((calendar.get(Calendar.DAY_OF_WEEK) + 6) % 7) !in listOf(4, 5))
                 calendar.timeInMillis
             }
             RepeatPattern.CUSTOM -> {
                 if (customDays.isNotEmpty()) {
                     do {
                         calendar.add(Calendar.DAY_OF_MONTH, 1)
-                        val dayOfWeek = (calendar.get(Calendar.DAY_OF_WEEK) + 1) % 7 // Convert to 0-6 where 0=Saturday
+                        val dayOfWeek = (calendar.get(Calendar.DAY_OF_WEEK) + 6) % 7 // 0=Sunday ... 6=Saturday
                     } while (dayOfWeek !in customDays)
                 } else {
                     calendar.add(Calendar.DAY_OF_MONTH, repeatIntervalDays.coerceAtLeast(1))
                 }
+                calendar.timeInMillis
+            }
+            RepeatPattern.CUSTOM_INTERVAL -> {
+                calendar.add(Calendar.MINUTE, repeatIntervalMinutes.coerceAtLeast(1))
                 calendar.timeInMillis
             }
             RepeatPattern.ONCE -> currentTime

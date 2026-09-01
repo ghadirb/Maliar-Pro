@@ -369,8 +369,20 @@ class AssistantViewModel(
 
         val cal = java.util.Calendar.getInstance()
         var matchedSpan: String? = null
+        var repeatPattern = com.maliar.pro.database.RepeatPattern.ONCE.name
+        var repeatIntervalMinutes = 0
+        val weekdayDays = parsePersianWeekdays(normalized)
 
         when {
+            Regex("هر\\s*(?:([0-9]{1,3})\\s*)?(ساعت|دقیقه)").find(normalized) != null -> {
+                val match = Regex("هر\\s*(?:([0-9]{1,3})\\s*)?(ساعت|دقیقه)").find(normalized)!!
+                val amount = match.groupValues[1].toIntOrNull() ?: 1
+                repeatIntervalMinutes = (if (match.groupValues[2] == "ساعت") amount * 60 else amount)
+                    .coerceIn(1, 48 * 60)
+                repeatPattern = com.maliar.pro.database.RepeatPattern.CUSTOM_INTERVAL.name
+                cal.add(java.util.Calendar.MINUTE, repeatIntervalMinutes)
+                matchedSpan = match.value
+            }
             hourMatch != null -> {
                 var hour = hourMatch.groupValues[1].toIntOrNull() ?: return clarifyReminder(message)
                 var minute = hourMatch.groupValues[2].toIntOrNull() ?: 0
@@ -385,7 +397,8 @@ class AssistantViewModel(
                 cal.set(java.util.Calendar.HOUR_OF_DAY, hour)
                 cal.set(java.util.Calendar.MINUTE, minute)
                 cal.set(java.util.Calendar.SECOND, 0)
-                if (cal.timeInMillis <= System.currentTimeMillis()) {
+                if (weekdayDays.isNotEmpty()) moveToNextPersianWeekday(cal, weekdayDays)
+                if (cal.timeInMillis <= System.currentTimeMillis() && weekdayDays.isEmpty()) {
                     cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
                 }
                 matchedSpan = hourMatch.value
@@ -458,7 +471,9 @@ class AssistantViewModel(
             priority = com.maliar.pro.database.Priority.MEDIUM.name,
             alertType = requestedAlertType,
             triggerTime = cal.timeInMillis,
-            repeatPattern = com.maliar.pro.database.RepeatPattern.ONCE.name,
+            repeatPattern = repeatPattern,
+            repeatIntervalMinutes = repeatIntervalMinutes,
+            customRepeatDays = weekdayDays.sorted().joinToString(","),
             category = "دستیار",
             contactName = matchedContactName,
             contactPhoneNumber = matchedContactPhone
@@ -480,11 +495,41 @@ class AssistantViewModel(
         }
     }
 
+    private fun parsePersianWeekdays(text: String): Set<Int> {
+        val names = linkedMapOf(
+            "شنبه" to 6, "یکشنبه" to 0, "دوشنبه" to 1, "سه‌شنبه" to 2,
+            "سه شنبه" to 2, "چهارشنبه" to 3, "پنجشنبه" to 4, "جمعه" to 5
+        )
+        if (text.contains("روزهای کاری") || text.contains("روز کاری")) return setOf(6, 0, 1, 2, 3)
+        if (text.contains("آخر هفته") || text.contains("آخرهفته")) return setOf(4, 5)
+        val range = Regex(
+            "(شنبه|یکشنبه|دوشنبه|سه‌شنبه|سه شنبه|چهارشنبه|پنجشنبه|جمعه)\\s*تا\\s*" +
+                "(شنبه|یکشنبه|دوشنبه|سه‌شنبه|سه شنبه|چهارشنبه|پنجشنبه|جمعه)"
+        ).find(text)
+        if (range != null) {
+            return expandPersianWeekdayRange(names[range.groupValues[1]]!!, names[range.groupValues[2]]!!)
+        }
+        return names.filterKeys { text.contains(it) }.values.toSet()
+    }
+
+    private fun expandPersianWeekdayRange(start: Int, end: Int): Set<Int> {
+        val order = listOf(6, 0, 1, 2, 3, 4, 5)
+        val si = order.indexOf(start)
+        val ei = order.indexOf(end)
+        return if (si <= ei) order.subList(si, ei + 1).toSet()
+        else (order.subList(si, order.size) + order.subList(0, ei + 1)).toSet()
+    }
+
+    private fun moveToNextPersianWeekday(cal: java.util.Calendar, days: Set<Int>) {
+        var guard = 0
+        while (((cal.get(java.util.Calendar.DAY_OF_WEEK) + 6) % 7) !in days && guard++ < 8) {
+            cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+        }
+    }
+
     /**
      * Returned when a reminder was clearly requested but the time couldn't be confidently
-     * parsed, so nothing was saved. Being explicit about this (instead of quietly falling
-     * through to a generic AI reply that might *sound* like it registered something) is
-     * what prevents the "assistant writes a reply but nothing was actually saved" issue.
+     * parsed, so nothing was saved.
      */
     private fun clarifyReminder(message: String): String {
         return "⚠️ متوجه شدم می‌خواهید یادآوری تنظیم کنید، اما نتوانستم زمان دقیق آن را تشخیص دهم.\n" +
