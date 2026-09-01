@@ -68,6 +68,11 @@ data class CarServiceItem(
         else null
 }
 
+/** How a car_service_logs history row should count toward the cost breakdown on the car
+ *  detail screen (سرویس‌ها / تعمیرات / قطعات مصرفی / سایر - item #9 of the spec). Stored
+ *  as its .name String, same convention as ReminderType/Priority/etc elsewhere. */
+enum class CarLogCategory { SERVICE, REPAIR, PART, OTHER }
+
 /** One historical performed-service record for a car. Deliberately independent of
  *  [CarServiceItem] (only loosely referenced via [serviceItemId]) so the full service
  *  history for a car survives even if the tracked item is later renamed, re-scheduled, or
@@ -83,7 +88,9 @@ data class CarServiceLog(
     val odometerKm: Int? = null,
     val cost: Double = 0.0,
     val notes: String = "",
+    val category: String = CarLogCategory.SERVICE.name,
     /** Set once this cost is also recorded in the financial system as an Expense (category
-     *  "خودرو") - the stage-2 link between this module and AccountingManager. */
+     *  "خودرو") - the stage-2 link between this module and AccountingManager. Kept in sync:
+     *  deleting a log with a non-null id here also removes the matching Expense row. */
     val linkedExpenseId: Long? = null
 )

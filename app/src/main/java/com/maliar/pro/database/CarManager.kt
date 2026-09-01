@@ -6,6 +6,13 @@ import kotlinx.coroutines.flow.Flow
 class CarManager(context: Context) {
 
     private val dao = AppDatabase.getDatabase(context).carDao()
+    private val accountingManager = AccountingManager(context)
+
+    /** Category shown in the general Expense list / financial reports for every cost this
+     *  module links there - item #8 of the spec ("در دسته «خودرو» ثبت شود"). */
+    companion object {
+        const val EXPENSE_CATEGORY = "خودرو"
+    }
 
     // Cars
     fun getAllCars(): Flow<List<Car>> = dao.getAllCars()
@@ -62,6 +69,28 @@ class CarManager(context: Context) {
     fun getServiceLogs(carId: Long): Flow<List<CarServiceLog>> = dao.getServiceLogs(carId)
     suspend fun getTotalMaintenanceCostSince(carId: Long, since: Long): Double = dao.getTotalCostSince(carId, since)
 
+    /** Deletes a history row and, if it was linked to a financial Expense, deletes that
+     *  Expense too - keeps the two in sync in both directions. */
+    suspend fun deleteServiceLog(log: CarServiceLog) {
+        dao.deleteServiceLog(log)
+        log.linkedExpenseId?.let { expenseId ->
+            accountingManager.getAllExpensesList().find { it.id == expenseId }?.let {
+                accountingManager.deleteExpense(it)
+            }
+        }
+    }
+
+    /** If [cost] > 0 and [linkToFinance] is true, records the same amount as a general
+     *  Expense (category [EXPENSE_CATEGORY]) so it shows up in the accounting screen and
+     *  financial reports too - item #8 of the spec. Returns the id to store as
+     *  CarServiceLog.linkedExpenseId, or null if nothing was linked. */
+    private suspend fun maybeLinkToFinance(title: String, date: Long, cost: Double, linkToFinance: Boolean): Long? {
+        if (!linkToFinance || cost <= 0) return null
+        return accountingManager.addExpense(
+            Expense(amount = cost, description = title, date = date, category = EXPENSE_CATEGORY)
+        )
+    }
+
     /**
      * The core "انجام شد" action for a tracked service item: writes one history row (today,
      * or the [date]/[odometerKm] the person supplied), then rolls the item's own
@@ -75,11 +104,13 @@ class CarManager(context: Context) {
         date: Long = System.currentTimeMillis(),
         odometerKm: Int? = null,
         cost: Double = 0.0,
-        notes: String = ""
+        notes: String = "",
+        linkToFinance: Boolean = true
     ): Long {
         val car = dao.getCarById(item.carId)
         val effectiveKm = odometerKm ?: car?.currentOdometerKm
 
+        val expenseId = maybeLinkToFinance(item.name, date, cost, linkToFinance)
         val logId = dao.insertServiceLog(
             CarServiceLog(
                 carId = item.carId,
@@ -88,7 +119,9 @@ class CarManager(context: Context) {
                 date = date,
                 odometerKm = effectiveKm,
                 cost = cost,
-                notes = notes
+                notes = notes,
+                category = CarLogCategory.SERVICE.name,
+                linkedExpenseId = expenseId
             )
         )
 
@@ -106,5 +139,33 @@ class CarManager(context: Context) {
         }
 
         return logId
+    }
+
+    /** A one-off cost not tied to any tracked schedule item - a repair, a part bought on
+     *  its own, an insurance payment, etc (item #8 of the spec: "اگر کاربر هزینه‌ای را برای
+     *  خودرو ثبت کند"). Same optional link-to-finance behaviour as [markServiceDone]. */
+    suspend fun addManualCost(
+        carId: Long,
+        title: String,
+        category: CarLogCategory,
+        date: Long = System.currentTimeMillis(),
+        odometerKm: Int? = null,
+        cost: Double = 0.0,
+        notes: String = "",
+        linkToFinance: Boolean = true
+    ): Long {
+        val expenseId = maybeLinkToFinance(title, date, cost, linkToFinance)
+        return dao.insertServiceLog(
+            CarServiceLog(
+                carId = carId,
+                title = title,
+                date = date,
+                odometerKm = odometerKm,
+                cost = cost,
+                notes = notes,
+                category = category.name,
+                linkedExpenseId = expenseId
+            )
+        )
     }
 }

@@ -75,6 +75,9 @@ interface CarDao {
     @Insert
     suspend fun insertServiceLog(log: CarServiceLog): Long
 
+    @Delete
+    suspend fun deleteServiceLog(log: CarServiceLog)
+
     @Query("SELECT COALESCE(SUM(cost), 0) FROM car_service_logs WHERE carId = :carId AND date >= :since")
     suspend fun getTotalCostSince(carId: Long, since: Long): Double
 }

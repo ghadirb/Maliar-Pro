@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -109,6 +109,13 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+        /** Stage 2 (اتصال خودرو به سیستم مالی): one new nullable-with-default column so
+         *  existing history rows are unaffected - see CarLogCategory / CarManager. */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE car_service_logs ADD COLUMN category TEXT NOT NULL DEFAULT 'SERVICE'")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -123,7 +130,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

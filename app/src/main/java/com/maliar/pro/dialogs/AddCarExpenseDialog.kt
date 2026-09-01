@@ -4,19 +4,26 @@ import android.app.AlertDialog
 import android.content.Context
 import android.text.InputType
 import android.view.Gravity
+import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
-import com.maliar.pro.database.CarServiceItem
+import android.widget.Spinner
+import com.maliar.pro.database.CarLogCategory
 
-/** "انجام شد" flow: confirms the odometer reading and cost for a service that was just
- *  performed, then hands off to CarDetailViewModel.markServiceDone which writes the
- *  history row and rolls the item's schedule forward. */
-class MarkServiceDoneDialog(
+private val CATEGORY_LABELS = linkedMapOf(
+    CarLogCategory.SERVICE to "سرویس",
+    CarLogCategory.REPAIR to "تعمیر",
+    CarLogCategory.PART to "قطعه مصرفی",
+    CarLogCategory.OTHER to "سایر (بیمه، جریمه، ...)"
+)
+
+/** "ثبت هزینه خودرو" for a cost that isn't tied to any tracked service schedule - a
+ *  repair, a spare part bought on its own, insurance, a fine, etc (spec item #8). */
+class AddCarExpenseDialog(
     private val context: Context,
-    private val item: CarServiceItem,
     private val currentOdometerKm: Int,
-    private val onConfirm: (odometerKm: Int?, cost: Double, notes: String, linkToFinance: Boolean) -> Unit
+    private val onSave: (title: String, category: CarLogCategory, odometerKm: Int?, cost: Double, notes: String, linkToFinance: Boolean) -> Unit
 ) {
     fun show() {
         val padding = (16 * context.resources.displayMetrics.density).toInt()
@@ -25,8 +32,20 @@ class MarkServiceDoneDialog(
             setPadding(padding, padding, padding, padding)
         }
 
+        val titleInput = EditText(context).apply {
+            hint = "عنوان (مثلاً: تعویض دیسک ترمز)"
+            gravity = Gravity.RIGHT
+        }
+        container.addView(titleInput)
+
+        val categoryLabels = CATEGORY_LABELS.values.toTypedArray()
+        val categorySpinner = Spinner(context).apply {
+            adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, categoryLabels)
+        }
+        container.addView(categorySpinner)
+
         val kmInput = EditText(context).apply {
-            hint = "کیلومتر انجام سرویس"
+            hint = "کیلومتر (اختیاری)"
             inputType = InputType.TYPE_CLASS_NUMBER
             gravity = Gravity.RIGHT
             setText(currentOdometerKm.toString())
@@ -37,7 +56,6 @@ class MarkServiceDoneDialog(
             hint = "هزینه (تومان)"
             inputType = InputType.TYPE_CLASS_NUMBER
             gravity = Gravity.RIGHT
-            setText(if (item.lastCost > 0) item.lastCost.toLong().toString() else "")
         }
         container.addView(costInput)
 
@@ -54,10 +72,15 @@ class MarkServiceDoneDialog(
         container.addView(linkCheckbox)
 
         AlertDialog.Builder(context)
-            .setTitle("انجام شد: ${item.name}")
+            .setTitle("ثبت هزینه خودرو")
             .setView(container)
-            .setPositiveButton("ثبت") { _, _ ->
-                onConfirm(
+            .setPositiveButton("ذخیره") { _, _ ->
+                val title = titleInput.text.toString().trim()
+                if (title.isBlank()) return@setPositiveButton
+                val category = CATEGORY_LABELS.keys.toList()[categorySpinner.selectedItemPosition]
+                onSave(
+                    title,
+                    category,
                     kmInput.text.toString().toIntOrNull(),
                     costInput.text.toString().toDoubleOrNull() ?: 0.0,
                     notesInput.text.toString().trim(),

@@ -15,6 +15,7 @@ import com.maliar.pro.database.CarManager
 import com.maliar.pro.database.CarServiceLog
 import com.maliar.pro.databinding.FragmentCarDetailBinding
 import com.maliar.pro.dialogs.AddCarDialog
+import com.maliar.pro.dialogs.AddCarExpenseDialog
 import com.maliar.pro.dialogs.AddCarServiceItemDialog
 import com.maliar.pro.dialogs.AddOdometerDialog
 import com.maliar.pro.dialogs.MarkServiceDoneDialog
@@ -58,6 +59,13 @@ class CarDetailFragment : Fragment() {
             AddCarServiceItemDialog(requireContext(), carId, km) { item -> viewModel.addServiceItem(item) }.show()
         }
 
+        binding.addExpenseButton.setOnClickListener {
+            val km = viewModel.car.value?.currentOdometerKm ?: 0
+            AddCarExpenseDialog(requireContext(), km) { title, category, odometerKm, cost, notes, linkToFinance ->
+                viewModel.addManualCost(title, category, odometerKm, cost, notes, linkToFinance)
+            }.show()
+        }
+
         lifecycleScope.launch {
             viewModel.car.collect { car ->
                 if (car != null) {
@@ -75,8 +83,13 @@ class CarDetailFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.costSummary.collect { summary ->
                 binding.costThisMonthText.text = formatCurrency(summary.thisMonth)
+                binding.costThisQuarterText.text = formatCurrency(summary.thisQuarter)
                 binding.costThisYearText.text = formatCurrency(summary.thisYear)
                 binding.costTotalText.text = formatCurrency(summary.total)
+                binding.costAverageMonthlyText.text = formatCurrency(summary.averageMonthly)
+                binding.costBreakdownText.text =
+                    "سرویس‌ها: ${formatCurrency(summary.serviceCost)} · تعمیرات: ${formatCurrency(summary.repairCost)} · " +
+                        "قطعات: ${formatCurrency(summary.partCost)} · سایر: ${formatCurrency(summary.otherCost)}"
             }
         }
 
@@ -109,8 +122,8 @@ class CarDetailFragment : Fragment() {
             }
 
             row.findViewById<MaterialButton>(R.id.markDoneButton).setOnClickListener {
-                MarkServiceDoneDialog(requireContext(), status.item, currentKm) { km, cost, notes ->
-                    viewModel.markServiceDone(status.item, km, cost, notes)
+                MarkServiceDoneDialog(requireContext(), status.item, currentKm) { km, cost, notes, linkToFinance ->
+                    viewModel.markServiceDone(status.item, km, cost, notes, linkToFinance)
                 }.show()
             }
 
@@ -169,6 +182,19 @@ class CarDetailFragment : Fragment() {
                 "${PersianCalendarHelper.formatJalali(y, m, d)}$kmPart"
             row.findViewById<TextView>(R.id.logCostText).text =
                 if (log.cost > 0) formatCurrency(log.cost) else ""
+
+            row.setOnLongClickListener {
+                android.app.AlertDialog.Builder(requireContext())
+                    .setTitle("حذف سابقه")
+                    .setMessage(
+                        "«${log.title}» حذف شود؟" +
+                            if (log.linkedExpenseId != null) "\nهزینهٔ متناظر آن در بخش مالی هم حذف خواهد شد." else ""
+                    )
+                    .setPositiveButton("حذف") { _, _ -> viewModel.deleteServiceLog(log) }
+                    .setNegativeButton("لغو", null)
+                    .show()
+                true
+            }
 
             binding.historyContainer.addView(row)
         }
