@@ -37,4 +37,5 @@
 
     <!-- Alarm Colors -->
     <color name="alarm_background">#FF1A1A2E</color>
+    <color name="widget_background">#FF4B1FA8</color>
 </resources>

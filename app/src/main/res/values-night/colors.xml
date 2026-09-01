@@ -33,4 +33,5 @@
     <color name="priority_low">#A5D6A7</color>
 
     <color name="alarm_background">#FF1A1A2E</color>
+    <color name="widget_background">#FF2D146B</color>
 </resources>
