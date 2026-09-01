@@ -85,6 +85,14 @@
             app:exitAnim="@anim/nav_fade_out"
             app:popEnterAnim="@anim/nav_fade_in"
             app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_mealPlanFragment"
+            app:destination="@id/mealPlanFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
     </fragment>
 
     <fragment
@@ -212,5 +220,10 @@
             android:name="carId"
             app:argType="long" />
     </fragment>
+
+    <fragment
+        android:id="@+id/mealPlanFragment"
+        android:name="com.maliar.pro.ui.mealplan.MealPlanFragment"
+        android:label="برنامه غذایی" />
 
 </navigation>

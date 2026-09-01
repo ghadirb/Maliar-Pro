@@ -11,8 +11,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     entities = [Contact::class, Income::class, Expense::class, Check::class, Installment::class, Reminder::class, 
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
-               Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class],
-    version = 10,
+               Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
+               MealPlan::class, MealPlanEntry::class],
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun reminderEntityDao(): ReminderEntityDao
     abstract fun debtorDao(): DebtorDao
     abstract fun carDao(): CarDao
+    abstract fun mealPlanDao(): MealPlanDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -116,6 +118,34 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE car_service_logs ADD COLUMN category TEXT NOT NULL DEFAULT 'SERVICE'")
             }
         }
+        /** Stage 3 (برنامه غذایی پایه): two new, independent tables - nothing existing
+         *  touched, same additive pattern as MIGRATION_8_9. */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `meal_plans` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `weekStartDate` INTEGER NOT NULL,
+                        `budget` REAL NOT NULL DEFAULT 0,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `meal_plan_entries` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `mealPlanId` INTEGER NOT NULL,
+                        `dayOfWeek` INTEGER NOT NULL,
+                        `mealType` TEXT NOT NULL,
+                        `recipeName` TEXT NOT NULL,
+                        `estimatedCost` REAL NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -130,7 +160,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance
