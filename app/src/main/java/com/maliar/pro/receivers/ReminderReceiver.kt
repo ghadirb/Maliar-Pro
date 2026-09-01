@@ -16,6 +16,9 @@ import com.maliar.pro.database.AlertType
 import com.maliar.pro.ui.reminders.FullScreenAlarmActivity
 import com.maliar.pro.utils.PreferencesManager
 import com.maliar.pro.utils.ReminderSound
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Fires when a reminder's alarm time arrives.
@@ -43,6 +46,24 @@ class ReminderReceiver : BroadcastReceiver() {
         val contactName = intent.getStringExtra("contact_name") ?: ""
         val contactPhone = intent.getStringExtra("contact_phone") ?: ""
         val soundValue = intent.getStringExtra("sound_uri") ?: ReminderSound.DEFAULT_ALARM
+
+        // A recurring reminder (DAILY/WEEKLY/CUSTOM/...) must be advanced to its next
+        // occurrence and rescheduled the moment it actually fires - not only when the
+        // person happens to tap a notification action - otherwise it silently fires once
+        // and never again. This has to survive the process potentially being frozen
+        // right after onReceive() returns, hence goAsync().
+        if (reminderId >= 0) {
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    com.maliar.pro.database.SmartReminderManager(context.applicationContext).onFired(reminderId)
+                } catch (e: Exception) {
+                    android.util.Log.e("ReminderReceiver", "Error rescheduling recurring reminder", e)
+                } finally {
+                    pendingResult.finish()
+                }
+            }
+        }
 
         val prefs = PreferencesManager(context)
 

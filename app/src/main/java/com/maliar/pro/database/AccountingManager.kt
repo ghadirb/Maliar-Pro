@@ -30,10 +30,12 @@ class AccountingManager(context: Context) {
     
     suspend fun updateIncome(income: Income) {
         accountingDao.updateIncome(income)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     suspend fun deleteIncome(income: Income) {
         accountingDao.deleteIncome(income)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     // Expense
@@ -57,10 +59,12 @@ class AccountingManager(context: Context) {
     
     suspend fun updateExpense(expense: Expense) {
         accountingDao.updateExpense(expense)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     suspend fun deleteExpense(expense: Expense) {
         accountingDao.deleteExpense(expense)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     // Check

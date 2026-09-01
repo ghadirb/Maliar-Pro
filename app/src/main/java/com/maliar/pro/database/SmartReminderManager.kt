@@ -37,6 +37,7 @@ class SmartReminderManager(private val context: Context) {
         if (reminder.triggerTime > 0) {
             scheduleAlarm(reminder.copy(id = id))
         }
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
         return id
     }
 
@@ -50,16 +51,19 @@ class SmartReminderManager(private val context: Context) {
         if (reminder.triggerTime > 0) {
             scheduleAlarm(reminder)
         }
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
     }
 
     suspend fun deleteReminder(reminder: ReminderEntity) {
         dao.deleteReminder(reminder)
         cancelAlarm(reminder.id)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
     }
 
     suspend fun markAsCompleted(id: Long) {
         dao.markAsCompleted(id)
         cancelAlarm(id)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
     }
 
     suspend fun completeReminder(id: Long) {
@@ -67,20 +71,40 @@ class SmartReminderManager(private val context: Context) {
         if (reminder.repeatPattern == RepeatPattern.ONCE.name) {
             dao.markAsCompleted(id)
             cancelAlarm(id)
-        } else {
-            // Calculate next trigger for recurring
-            val nextTime = calculateNextTriggerTime(
-                reminder.triggerTime,
-                RepeatPattern.valueOf(reminder.repeatPattern),
-                parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays, reminder.repeatIntervalMinutes
-            )
-            val updated = reminder.copy(
-                triggerTime = nextTime,
-                isCompleted = false
-            )
-            dao.updateReminder(updated)
-            scheduleAlarm(updated)
+            com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
         }
+        // Recurring reminders no longer need advancing here: ReminderReceiver.onFired()
+        // already advances + reschedules the very moment the alarm goes off (regardless
+        // of whether the person ever taps a notification action), so doing it again here
+        // would double-advance and skip an occurrence. See onFired() for details.
+    }
+
+    /**
+     * Called by [com.maliar.pro.receivers.ReminderReceiver] every time a reminder's alarm
+     * actually fires - this is what makes recurring reminders (DAILY/WEEKLY/CUSTOM/...)
+     * keep firing on schedule at all. Previously nothing advanced a recurring reminder's
+     * triggerTime unless the person explicitly tapped "انجام شد" on the notification,
+     * so a DAILY reminder that was simply ignored (swiped away, or the notification just
+     * dismissed itself) would only ever fire once, on its very first triggerTime, and
+     * never again.
+     *
+     * ONCE reminders are left untouched here - they still only complete/cancel via an
+     * explicit person action (or stay in the active list forever if ignored), matching
+     * existing behavior.
+     */
+    suspend fun onFired(id: Long) {
+        val reminder = dao.getReminderById(id) ?: return
+        if (reminder.repeatPattern == RepeatPattern.ONCE.name) return
+
+        val nextTime = calculateNextTriggerTime(
+            reminder.triggerTime,
+            RepeatPattern.valueOf(reminder.repeatPattern),
+            parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays, reminder.repeatIntervalMinutes
+        )
+        val updated = reminder.copy(triggerTime = nextTime, isCompleted = false)
+        dao.updateReminder(updated)
+        scheduleAlarm(updated)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
     }
 
     suspend fun snoozeReminder(id: Long, minutes: Int = 10) {
@@ -93,6 +117,7 @@ class SmartReminderManager(private val context: Context) {
         )
         dao.updateReminder(updated)
         scheduleAlarm(updated)
+        com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
     }
 
     // Stats

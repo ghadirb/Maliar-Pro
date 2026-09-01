@@ -121,6 +121,7 @@ class AddReminderDialog(
 
         val repeatIntervalLayout = view.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.repeatIntervalLayout)
         val repeatIntervalCaption = view.findViewById<TextView>(R.id.repeatIntervalCaption)
+        val weekdayChipGroup = view.findViewById<ChipGroup>(R.id.weekdayChipGroup)
 
         repeatPatternSpinner.adapter = ArrayAdapter(
             context, android.R.layout.simple_spinner_dropdown_item, REPEAT_PATTERN_LABELS.values.toList()
@@ -131,6 +132,10 @@ class AddReminderDialog(
                 val isCustom = selected == RepeatPattern.CUSTOM || selected == RepeatPattern.CUSTOM_INTERVAL
                 repeatIntervalLayout.visibility = if (isCustom) View.VISIBLE else View.GONE
                 repeatIntervalCaption.visibility = if (isCustom) View.VISIBLE else View.GONE
+                // Only "روزهای انتخابی" (CUSTOM) actually uses specific weekday chips -
+                // every other pattern (daily/weekly/monthly/custom-interval/...) ignores
+                // them entirely, so showing this row for those was just confusing clutter.
+                weekdayChipGroup.visibility = if (selected == RepeatPattern.CUSTOM) View.VISIBLE else View.GONE
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }

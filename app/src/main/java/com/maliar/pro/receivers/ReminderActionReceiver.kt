@@ -64,7 +64,14 @@ class ReminderActionReceiver : BroadcastReceiver() {
                         }
                     }
                     "dismiss" -> {
-                        manager.markAsCompleted(reminderId)
+                        // Swiping the notification away should behave like "complete":
+                        // for a ONCE reminder that's a real completion, but a recurring
+                        // one (DAILY/WEEKLY/...) must NOT be permanently disabled just
+                        // because the person dismissed a single occurrence's banner - it
+                        // was already advanced to its next occurrence the moment it fired
+                        // (see ReminderReceiver.onFired), so this only needs to finalize
+                        // the ONCE case.
+                        manager.completeReminder(reminderId)
                     }
                 }
             } catch (e: Exception) {

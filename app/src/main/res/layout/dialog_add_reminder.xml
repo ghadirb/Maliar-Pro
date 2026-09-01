@@ -186,6 +186,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
+            android:visibility="gone"
             app:singleSelection="false">
             <com.google.android.material.chip.Chip android:id="@+id/chipSaturday" style="@style/MaliarPro.Chip.Selectable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="شنبه" android:checkable="true" />
             <com.google.android.material.chip.Chip android:id="@+id/chipSunday" style="@style/MaliarPro.Chip.Selectable" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="یکشنبه" android:checkable="true" />
