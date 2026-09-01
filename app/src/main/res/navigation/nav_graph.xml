@@ -77,6 +77,14 @@
             app:exitAnim="@anim/nav_fade_out"
             app:popEnterAnim="@anim/nav_fade_in"
             app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_carListFragment"
+            app:destination="@id/carListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
     </fragment>
 
     <fragment
@@ -181,5 +189,28 @@
         android:id="@+id/apiKeysFragment"
         android:name="com.maliar.pro.ui.profile.APIKeysFragment"
         android:label="کلیدهای API" />
+
+    <fragment
+        android:id="@+id/carListFragment"
+        android:name="com.maliar.pro.ui.car.CarListFragment"
+        android:label="خودروهای من">
+
+        <action
+            android:id="@+id/action_carListFragment_to_carDetailFragment"
+            app:destination="@id/carDetailFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/carDetailFragment"
+        android:name="com.maliar.pro.ui.car.CarDetailFragment"
+        android:label="خودرو">
+        <argument
+            android:name="carId"
+            app:argType="long" />
+    </fragment>
 
 </navigation>

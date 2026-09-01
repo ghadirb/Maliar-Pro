@@ -99,6 +99,10 @@ class AccountingFragment : Fragment() {
         binding.financialReportsCard.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_financialReportsFragment)
         }
+
+        binding.carsCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_carListFragment)
+        }
     }
 
     private fun observeViewModel() {

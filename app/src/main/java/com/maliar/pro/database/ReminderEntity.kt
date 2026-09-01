@@ -37,6 +37,10 @@ data class ReminderEntity(
      *  due item already have a reminder?" without creating duplicates every day. */
     val linkedDebtId: Long? = null,
     val linkedDebtorId: Long? = null,
+    /** Same idea, for CarServiceItem (بخش خودرو) - lets DueDateReminderWorker check "does
+     *  this service item already have an open reminder?" the same way it does for checks/
+     *  installments/debts/debtors. */
+    val linkedCarServiceId: Long? = null,
     /** True only for reminders DueDateReminderWorker created automatically (never set by
      *  the person themselves) - shown with a small badge in the list and safe to silently
      *  clean up if its source check/installment/debt/debtor no longer exists or is settled. */
