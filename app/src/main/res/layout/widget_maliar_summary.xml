@@ -49,12 +49,13 @@
         android:textSize="18sp"
         android:text="۰ تومان" />
 
-    <View
+    <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp"
-        android:background="#33FFFFFF" />
+        android:background="#33FFFFFF"
+        android:contentDescription="@null" />
 
     <TextView
         android:id="@+id/widgetNextReminderText"

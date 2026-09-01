@@ -29,44 +29,56 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
     }
 
     private fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, widgetId: Int) {
-        val views = RemoteViews(context.packageName, R.layout.widget_maliar_summary)
+        try {
+            val views = RemoteViews(context.packageName, R.layout.widget_maliar_summary)
 
-        val openAppIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            setPackage(context.packageName)
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context, widgetId, openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widgetRoot, pendingIntent)
-        views.setOnClickPendingIntent(R.id.widgetBalanceText, pendingIntent)
-        views.setOnClickPendingIntent(R.id.widgetNextReminderText, pendingIntent)
+            val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                setPackage(context.packageName)
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context, widgetId, openAppIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widgetRoot, pendingIntent)
+            views.setOnClickPendingIntent(R.id.widgetBalanceText, pendingIntent)
+            views.setOnClickPendingIntent(R.id.widgetNextReminderText, pendingIntent)
 
-        // Show something immediately (avoids a blank widget while the async load below
-        // finishes), then update again once real data is ready.
-        appWidgetManager.updateAppWidget(widgetId, views)
+            // Show something immediately (avoids a blank widget while the async load below
+            // finishes), then update again once real data is ready.
+            appWidgetManager.updateAppWidget(widgetId, views)
 
-        CoroutineScope(Dispatchers.IO).launch {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val balance = AccountingManager(context).getBalance()
+                    val nextReminder = SmartReminderManager(context).getActiveRemindersList()
+                        .filter { !it.isCompleted }
+                        .minByOrNull { it.triggerTime }
+
+                    views.setTextViewText(R.id.widgetBalanceText, String.format("%,.0f تومان", balance))
+                    views.setTextViewText(
+                        R.id.widgetNextReminderText,
+                        if (nextReminder != null) {
+                            val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(nextReminder.triggerTime)
+                            "⏰ ${nextReminder.title} - ${PersianCalendarHelper.formatJalali(y, m, d)}"
+                        } else {
+                            "یادآوری فعالی وجود ندارد"
+                        }
+                    )
+                    appWidgetManager.updateAppWidget(widgetId, views)
+                } catch (e: Throwable) {
+                    // Widget just keeps showing its last successfully-loaded values; never
+                    // let a data-layer failure surface as a broken/blank widget.
+                }
+            }
+        } catch (e: Throwable) {
+            // Never let a widget-render failure show the system's "problem loading
+            // widget" placeholder - fall back to a minimal static view instead.
+            val fallback = RemoteViews(context.packageName, R.layout.widget_maliar_summary)
             try {
-                val balance = AccountingManager(context).getBalance()
-                val nextReminder = SmartReminderManager(context).getActiveRemindersList()
-                    .filter { !it.isCompleted }
-                    .minByOrNull { it.triggerTime }
-
-                views.setTextViewText(R.id.widgetBalanceText, String.format("%,.0f تومان", balance))
-                views.setTextViewText(
-                    R.id.widgetNextReminderText,
-                    if (nextReminder != null) {
-                        val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(nextReminder.triggerTime)
-                        "⏰ ${nextReminder.title} - ${PersianCalendarHelper.formatJalali(y, m, d)}"
-                    } else {
-                        "یادآوری فعالی وجود ندارد"
-                    }
-                )
-                appWidgetManager.updateAppWidget(widgetId, views)
-            } catch (e: Exception) {
-                // Widget just keeps showing its last successfully-loaded values.
+                appWidgetManager.updateAppWidget(widgetId, fallback)
+            } catch (ignored: Throwable) {
+                // Nothing more we can do here.
             }
         }
     }
