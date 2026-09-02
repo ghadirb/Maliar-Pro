@@ -176,6 +176,29 @@ class AssistantViewModel(
                     "${com.maliar.pro.utils.CurrencyFormatter.format(balance)}. این عدد تخمینی است و تضمین مالی نیست."
             }
         }
+        val asksPurchase = (text.contains("\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645") ||
+            text.contains("\u0645\u06cc\u062e\u0648\u0627\u0645") ||
+            text.contains("\u0645\u06cc \u062e\u0648\u0627\u0647\u0645") ||
+            text.contains("\u0642\u0635\u062f \u062f\u0627\u0631\u0645")) &&
+            (text.contains("\u0628\u062e\u0631\u0645") || text.contains("\u062e\u0631\u06cc\u062f"))
+        if (asksPurchase) {
+            val amount = parsePersianAmount(text)
+            if (amount == null || amount <= 0.0) {
+                return "برای تصمیم‌یار خرید، مبلغ خرید را هم وارد کنید؛ مثلاً «می‌خواهم کالای ۳۰ میلیون تومانی بخرم»."
+            }
+            val balance = accountingManager.getBalance()
+            val after = balance - amount
+            val result = when {
+                balance <= 0.0 -> "با اطلاعات فعلی، موجودی مثبتی برای این خرید دیده نمی‌شود."
+                after < 0.0 -> "این خرید طبق موجودی فعلی فشار مالی ایجاد می‌کند و موجودی را منفی می‌کند."
+                amount > balance * 0.5 -> "این خرید بیش از نیمی از موجودی فعلی را مصرف می‌کند؛ بهتر است زمان یا مبلغ آن را دوباره بررسی کنید."
+                else -> "این خرید از نظر موجودی فعلی قابل انجام به نظر می‌رسد، اما پیشنهاد قطعی مالی نیست."
+            }
+            return "مبلغ خرید: ${com.maliar.pro.utils.CurrencyFormatter.format(amount)}\n" +
+                "موجودی فعلی: ${com.maliar.pro.utils.CurrencyFormatter.format(balance)}\n" +
+                "موجودی پیشنهادی پس از خرید: ${com.maliar.pro.utils.CurrencyFormatter.format(after)}\n" +
+                result
+        }
         val asksScenario = text.contains("\u0627\u06af\u0631") &&
             (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647") ||
                 text.contains("\u062e\u0631\u06cc\u062f"))
