@@ -176,6 +176,33 @@ class AssistantViewModel(
                     "${com.maliar.pro.utils.CurrencyFormatter.format(balance)}. این عدد تخمینی است و تضمین مالی نیست."
             }
         }
+        val asksSavingsPlan = (text.contains("\u067e\u0633\u200c\u0627\u0646\u062f\u0627\u0632") ||
+            text.contains("\u067e\u0633\u0627\u0646\u062f\u0627\u0632")) &&
+            (text.contains("\u0645\u0627\u0647\u0627\u0646\u0647") || text.contains("\u0686\u0642\u062f\u0631") ||
+                text.contains("\u0647\u062f\u0641"))
+        if (asksSavingsPlan) {
+            val goals = financialManager.getActiveGoals()
+            val goal = goals.firstOrNull { goal ->
+                goal.title.isNotBlank() && text.contains(goal.title, ignoreCase = true)
+            } ?: goals.minByOrNull { it.targetDate }
+            if (goal == null) {
+                return "برای محاسبه برنامه پس‌انداز، ابتدا حداقل یک هدف مالی فعال ثبت کنید."
+            }
+            val remaining = (goal.targetAmount - goal.currentProgress).coerceAtLeast(0.0)
+            if (remaining <= 0.0 || goal.isCompleted) {
+                return "هدف «${goal.title}» تکمیل شده است و مبلغ باقی‌مانده‌ای ندارد."
+            }
+            val daysLeft = ((goal.targetDate - System.currentTimeMillis()) /
+                (24L * 60 * 60 * 1000)).toInt()
+            if (daysLeft <= 0) {
+                return "تاریخ هدف «${goal.title}» گذشته یا امروز است؛ لطفاً تاریخ هدف را بررسی کنید."
+            }
+            val monthsLeft = kotlin.math.ceil(daysLeft / 30.44).toInt().coerceAtLeast(1)
+            val monthly = remaining / monthsLeft
+            return "برای هدف «${goal.title}» حدود $monthsLeft ماه زمان باقی مانده است.\n" +
+                "پس‌انداز پیشنهادی ماهانه: ${com.maliar.pro.utils.CurrencyFormatter.format(monthly)}\n" +
+                "این مبلغ تخمینی است و قابل ویرایش توسط شماست."
+        }
         val asksPurchase = (text.contains("\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645") ||
             text.contains("\u0645\u06cc\u062e\u0648\u0627\u0645") ||
             text.contains("\u0645\u06cc \u062e\u0648\u0627\u0647\u0645") ||
