@@ -168,6 +168,27 @@ class AssistantViewModel(
                     "${com.maliar.pro.utils.CurrencyFormatter.format(unusual.amount)} بیش از دو برابر میانگین است و می‌تواند غیرعادی باشد."
             } else "در داده‌های دوره جاری هزینه‌ای بیش از دو برابر میانگین پیدا نشد."
         }
+        val asksDebtScenario = (text.contains("\u0627\u06af\u0631") || text.contains("\u0628\u06cc\u0634\u062a\u0631 \u0628\u067e\u0631\u062f\u0627\u0632\u0645")) &&
+            (text.contains("\u0628\u062f\u0647\u06cc") || text.contains("\u0642\u0633\u0637"))
+        if (asksDebtScenario) {
+            val extra = parsePersianAmount(text)
+            val debts = financialManager.getAllDebtsList().filter { !it.isPaid }
+            val total = debts.sumOf { it.amount }
+            if (debts.isEmpty() || total <= 0.0) return "بدهی پرداخت‌نشده‌ای برای تحلیل ثبت نشده است."
+            if (extra == null || extra <= 0.0) return "مبلغ پرداخت اضافه را هم وارد کنید؛ مثلاً «اگر ماهانه یک میلیون بیشتر بپردازم چه می‌شود؟»."
+            val monthly = debts.mapNotNull { it.installmentAmount }.sum().coerceAtLeast(0.0)
+            val baselineMonths = if (monthly > 0.0) kotlin.math.ceil(total / monthly) else null
+            val acceleratedMonths = if (monthly + extra > 0.0) kotlin.math.ceil(total / (monthly + extra)) else null
+            return if (baselineMonths == null) {
+                "مبلغ قسط فعلی برای بدهی‌ها ثبت نشده است؛ امکان محاسبه سناریوی تسویه وجود ندارد."
+            } else {
+                "بدهی پرداخت‌نشده: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}\n" +
+                    "پرداخت ماهانه فعلی: ${com.maliar.pro.utils.CurrencyFormatter.format(monthly)}\n" +
+                    "با پرداخت اضافه ${com.maliar.pro.utils.CurrencyFormatter.format(extra)}، " +
+                    "زمان تخمینی از حدود $baselineMonths ماه به حدود ${acceleratedMonths ?: baselineMonths} ماه می‌رسد.\n" +
+                    "این سناریو پیشنهادی است و هیچ پرداختی ثبت نمی‌کند."
+            }
+        }
         val asksSavingsDuration = (text.contains("\u0686\u0647 \u0645\u062f\u062a") ||
             text.contains("\u0632\u0645\u0627\u0646 \u0631\u0633\u06cc\u062f\u0646")) &&
             (text.contains("\u067e\u0633\u200c\u0627\u0646\u062f\u0627\u0632") || text.contains("\u0647\u062f\u0641"))
