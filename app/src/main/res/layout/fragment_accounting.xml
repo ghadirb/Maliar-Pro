@@ -103,9 +103,9 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="تراز کل"
-                    android:textColor="@android:color/white"
-                    android:textSize="14sp" />
+                    android:text="تراز کل (همه‌ی ورودی‌ها، بدون توجه به دوره)"
+                    android:textColor="#DFFFFFFF"
+                    android:textSize="11sp" />
 
                 <TextView
                     android:id="@+id/balanceAmount"

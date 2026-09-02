@@ -126,6 +126,13 @@ class AccountingFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.balance.collect { balance ->
                 binding.balanceAmount.text = formatCurrency(balance)
+                // Same red highlight as the period balance below - a plain white "-" on
+                // this dark green card is very easy to miss at a glance, so make a
+                // negative total balance visually unmistakable too.
+                binding.balanceAmount.setTextColor(
+                    if (balance < 0) android.graphics.Color.parseColor("#FFCDD2")
+                    else android.graphics.Color.WHITE
+                )
             }
         }
         lifecycleScope.launch {
