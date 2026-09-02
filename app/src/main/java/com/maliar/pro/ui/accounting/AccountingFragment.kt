@@ -275,6 +275,15 @@ class AccountingFragment : Fragment() {
                 }
             }
         }
+        lifecycleScope.launch {
+            viewModel.expenseAnalysis.collect { analysis ->
+                binding.expenseAnalysisText.text = if (analysis == null) {
+                    "تحلیل هزینه: داده کافی نیست"
+                } else {
+                    "بیشترین دسته: ${analysis.topCategory} (${formatCurrency(analysis.topCategoryAmount)}) · میانگین روزانه: ${formatCurrency(analysis.dailyAverage)}"
+                }
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.

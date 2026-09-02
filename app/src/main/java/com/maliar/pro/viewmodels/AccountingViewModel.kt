@@ -188,6 +188,29 @@ class AccountingViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val expenseAnalysis = expenseList.map { list ->
+        val start = accountingManager.getFinancialPeriodStartMillis()
+        val current = list.filter { it.date >= start }
+        if (current.isEmpty()) null
+        else {
+            val categoryTotals = current.groupBy { it.category.trim().ifBlank { "عمومی" } }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+            val top = categoryTotals.maxByOrNull { it.value }
+            val elapsedDays = ((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000)).toInt() + 1
+            ExpenseAnalysis(
+                topCategory = top?.key ?: "عمومی",
+                topCategoryAmount = top?.value ?: 0.0,
+                dailyAverage = current.sumOf { it.amount } / elapsedDays.coerceAtLeast(1)
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    data class ExpenseAnalysis(
+        val topCategory: String,
+        val topCategoryAmount: Double,
+        val dailyAverage: Double
+    )
+
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
