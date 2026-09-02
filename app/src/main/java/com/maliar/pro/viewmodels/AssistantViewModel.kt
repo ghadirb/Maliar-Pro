@@ -163,6 +163,25 @@ class AssistantViewModel(
         val asksBalance = text.contains("موجودی") || text.contains("مانده") || text.contains("تراز")
         val asksTop = text.contains("بیشترین") && asksExpense
         val asksQuery = text.contains("چقدر") || text.contains("کجا") || text.contains("جمع") || asksTop
+        val asksScenario = text.contains("\u0627\u06af\u0631") &&
+            (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647") ||
+                text.contains("\u062e\u0631\u06cc\u062f"))
+        if (asksScenario) {
+            val amount = parsePersianAmount(text)
+            if (amount == null || amount <= 0.0) return "لطفاً مبلغ خرید یا هزینه را واضح‌تر وارد کنید."
+            val before = accountingManager.getBalance()
+            val after = before - amount
+            val projectedExpense = accountingManager.getMonthlyExpense() + amount
+            val warning = if (after < 0.0) {
+                "هشدار: موجودی پیشنهادی منفی می‌شود."
+            } else {
+                "این فقط یک محاسبه پیشنهادی است و چیزی ثبت نخواهد شد."
+            }
+            return "قبل از هزینه: ${com.maliar.pro.utils.CurrencyFormatter.format(before)}\n" +
+                "پس از هزینه پیشنهادی: ${com.maliar.pro.utils.CurrencyFormatter.format(after)}\n" +
+                "هزینه دوره جاری پس از این سناریو: ${com.maliar.pro.utils.CurrencyFormatter.format(projectedExpense)}\n" +
+                warning
+        }
         if (asksBalance && !asksDebt && !asksExpense && !asksIncome && asksQuery) {
             val balance = accountingManager.getBalance()
             return "موجودی فعلی شما: ${com.maliar.pro.utils.CurrencyFormatter.format(balance)}."
