@@ -155,12 +155,39 @@ class AssistantViewModel(
 
     private suspend fun tryExecuteLocalFinancialQuery(message: String): String? {
         val text = message.trim()
+        val asksToday = text.contains("امروز")
         val asksMonth = text.contains("این ماه") || text.contains("ماه جاری")
         val asksExpense = text.contains("خرج") || text.contains("هزینه")
         val asksIncome = text.contains("درآمد") || text.contains("دریافت")
         val asksTop = text.contains("بیشترین") && asksExpense
         val asksQuery = text.contains("چقدر") || text.contains("کجا") || text.contains("جمع") || asksTop
-        if (!asksMonth || !asksQuery || (asksExpense == asksIncome)) return null
+        if ((!asksMonth && !asksToday) || !asksQuery || (asksExpense == asksIncome)) return null
+
+        if (asksToday) {
+            val dayStartCalendar = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val dayStart = dayStartCalendar.timeInMillis
+            val dayEnd = dayStartCalendar.apply {
+                add(java.util.Calendar.DAY_OF_MONTH, 1)
+            }.timeInMillis
+            return if (asksExpense) {
+                val total = accountingManager.getAllExpensesList()
+                    .asSequence()
+                    .filter { it.date in dayStart until dayEnd }
+                    .sumOf { it.amount }
+                "مجموع هزینه‌های امروز: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}."
+            } else {
+                val total = accountingManager.getAllIncomesList()
+                    .asSequence()
+                    .filter { it.date in dayStart until dayEnd }
+                    .sumOf { it.amount }
+                "مجموع درآمدهای امروز: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}."
+            }
+        }
 
         return when {
             asksTop -> {
