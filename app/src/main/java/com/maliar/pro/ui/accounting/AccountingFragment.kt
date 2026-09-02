@@ -285,6 +285,15 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
+            viewModel.thirtyDayForecast.collect { amount ->
+                binding.thirtyDayForecastText.text = if (amount == null) {
+                    "برآورد ۳۰ روز آینده: داده کافی نیست"
+                } else {
+                    "برآورد تراز ۳۰ روز آینده: ${formatCurrency(amount)} · تخمینی"
+                }
+            }
+        }
+        lifecycleScope.launch {
             viewModel.expenseAnalysis.collect { analysis ->
                 binding.expenseAnalysisText.text = if (analysis == null) {
                     "تحلیل هزینه: داده کافی نیست"

@@ -196,6 +196,16 @@ class AccountingViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val thirtyDayForecast = combine(monthlyIncome, monthlyExpense) { income, expense ->
+        val start = accountingManager.getFinancialPeriodStartMillis()
+        val elapsedDays = ((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000)).toInt() + 1
+        if (elapsedDays < 1 || (income <= 0.0 && expense <= 0.0)) null
+        else {
+            val dailyNet = (income - expense) / elapsedDays
+            (income - expense) + dailyNet * 30.0
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val expenseAnalysis = expenseList.map { list ->
         val start = accountingManager.getFinancialPeriodStartMillis()
         val current = list.filter { it.date >= start }
