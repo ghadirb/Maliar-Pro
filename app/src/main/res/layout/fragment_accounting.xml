@@ -155,6 +155,14 @@
                     android:text="بودجه پیشنهادی ماهانه: داده کافی نیست"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/spendableSuggestionText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="قابل خرج پیشنهادی: داده کافی نیست"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

@@ -223,6 +223,15 @@ class AccountingFragment : Fragment() {
                 }
             }
         }
+        lifecycleScope.launch {
+            viewModel.suggestedSpendableAmount.collect { amount ->
+                binding.spendableSuggestionText.text = if (amount == null) {
+                    "قابل خرج پیشنهادی: داده کافی نیست"
+                } else {
+                    "قابل خرج پیشنهادی تا پایان دوره: ${formatCurrency(amount)}"
+                }
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.

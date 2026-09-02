@@ -131,6 +131,10 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
         if (history.isEmpty()) 0.0 else history.sumOf { it.amount } / 3.0
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
+    val suggestedSpendableAmount = combine(suggestedMonthlyBudget, monthlyExpense) { budget, spent ->
+        if (budget <= 0.0) null else (budget - spent).coerceAtLeast(0.0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
