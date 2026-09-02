@@ -104,6 +104,17 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
 
     val currentPeriodSavings = monthlyBalance
 
+    val financialHealthScore = combine(monthlyIncome, monthlyExpense) { income, expense ->
+        when {
+            income <= 0.0 && expense <= 0.0 -> 0
+            income <= 0.0 -> 25
+            else -> {
+                val ratio = ((income - expense) / income).coerceIn(-1.0, 1.0)
+                (50 + (ratio * 50)).toInt().coerceIn(0, 100)
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 

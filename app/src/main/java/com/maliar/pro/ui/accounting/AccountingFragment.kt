@@ -205,6 +205,15 @@ class AccountingFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.currentPeriodSavings.collect { binding.todaySavingsAmount.text = formatCurrency(it) }
         }
+        lifecycleScope.launch {
+            viewModel.financialHealthScore.collect { score ->
+                binding.financialHealthText.text = if (score == 0) {
+                    "سلامت مالی تقریبی: داده کافی نیست"
+                } else {
+                    "سلامت مالی تقریبی: $score از ۱۰۰ · فقط یک شاخص راهنما"
+                }
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.
