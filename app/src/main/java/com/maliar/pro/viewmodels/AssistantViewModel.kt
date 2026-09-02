@@ -159,8 +159,14 @@ class AssistantViewModel(
         val asksMonth = text.contains("این ماه") || text.contains("ماه جاری")
         val asksExpense = text.contains("خرج") || text.contains("هزینه")
         val asksIncome = text.contains("درآمد") || text.contains("دریافت")
+        val asksDebt = text.contains("بدهی") || text.contains("قسط")
+        val asksBalance = text.contains("موجودی") || text.contains("مانده") || text.contains("تراز")
         val asksTop = text.contains("بیشترین") && asksExpense
         val asksQuery = text.contains("چقدر") || text.contains("کجا") || text.contains("جمع") || asksTop
+        if (asksBalance && !asksDebt && !asksExpense && !asksIncome && asksQuery) {
+            val balance = accountingManager.getBalance()
+            return "موجودی فعلی شما: ${com.maliar.pro.utils.CurrencyFormatter.format(balance)}."
+        }
         if ((!asksMonth && !asksToday) || !asksQuery || (asksExpense == asksIncome)) return null
 
         if (asksToday) {
