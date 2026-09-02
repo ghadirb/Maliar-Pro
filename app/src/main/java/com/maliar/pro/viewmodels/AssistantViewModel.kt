@@ -164,11 +164,21 @@ class AssistantViewModel(
         val asksTop = text.contains("بیشترین") && asksExpense
         val asksQuery = text.contains("چقدر") || text.contains("کجا") || text.contains("جمع") || asksTop
         if (asksDebt && asksQuery) {
-            val unpaid = financialManager.getTotalUnpaidDebts()
+            val debts = financialManager.getAllDebtsList().filter { !it.isPaid }
+            val unpaid = debts.sumOf { it.amount }
             val installments = accountingManager.getActiveInstallments()
+            val nearest = debts.mapNotNull { debt ->
+                debt.endDate?.let { it to debt }
+            }.minByOrNull { it.first }
+            val nearestText = nearest?.let {
+                val days = ((it.first - System.currentTimeMillis()) / (24L * 60 * 60 * 1000)).toInt()
+                val timing = if (days < 0) "عقب‌افتاده" else "حدود $days روز دیگر"
+                "نزدیک‌ترین سررسید: «${it.second.title}»، $timing."
+            } ?: "برای بدهی‌های ثبت‌شده سررسید مشخصی وجود ندارد."
             return "مجموع بدهی‌های پرداخت‌نشده: ${com.maliar.pro.utils.CurrencyFormatter.format(unpaid)}\n" +
+                "تعداد بدهی‌های پرداخت‌نشده: ${debts.size}\n" +
                 "تعداد اقساط فعال: ${installments.size}\n" +
-                "این گزارش فقط بر اساس اطلاعات ثبت‌شده در برنامه است."
+                nearestText + "\nاین گزارش فقط بر اساس اطلاعات ثبت‌شده در برنامه است."
         }
         val asksHabit = (text.contains("\u0686\u0647 \u0631\u0648\u0632") ||
             text.contains("\u0631\u0648\u0632\u0647\u0627\u06cc") ||
