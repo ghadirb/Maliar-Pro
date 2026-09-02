@@ -94,7 +94,8 @@ class AssistantViewModel(
             // online chat model has no way to call app functions - it was only ever
             // describing data already in the system prompt, never writing anything.
             val localActionResult = try {
-                tryExecuteAccountingCommand(message)
+                tryExecuteLocalFinancialQuery(message)
+                    ?: tryExecuteAccountingCommand(message)
                     ?: tryExecuteReminderCommand(message)
                     ?: tryExecuteFinancialStatusCommand(message)
             } catch (e: Exception) {
@@ -149,6 +150,36 @@ class AssistantViewModel(
 
             _chatMessages.value = _chatMessages.value + ChatMessage((System.currentTimeMillis() + 1).toString(), response, false)
             _isProcessing.value = false
+        }
+    }
+
+    private suspend fun tryExecuteLocalFinancialQuery(message: String): String? {
+        val text = message.trim()
+        val asksMonth = text.contains("این ماه") || text.contains("ماه جاری")
+        val asksExpense = text.contains("خرج") || text.contains("هزینه")
+        val asksIncome = text.contains("درآمد") || text.contains("دریافت")
+        val asksTop = text.contains("بیشترین") && asksExpense
+        val asksQuery = text.contains("چقدر") || text.contains("کجا") || text.contains("جمع") || asksTop
+        if (!asksMonth || !asksQuery || (asksExpense == asksIncome)) return null
+
+        return when {
+            asksTop -> {
+                val expenses = accountingManager.getAllExpensesList()
+                    .filter { it.date >= accountingManager.getFinancialPeriodStartMillis() }
+                val top = expenses.groupBy { it.category.trim().ifBlank { "عمومی" } }
+                    .mapValues { (_, items) -> items.sumOf { it.amount } }
+                    .maxByOrNull { it.value }
+                if (top == null) "در دوره جاری هنوز هزینه‌ای ثبت نشده است."
+                else "بیشترین دسته هزینه در دوره جاری «${top.key}» با مبلغ ${com.maliar.pro.utils.CurrencyFormatter.format(top.value)} است."
+            }
+            asksExpense -> {
+                val total = accountingManager.getMonthlyExpense()
+                "مجموع هزینه‌های دوره جاری: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}."
+            }
+            else -> {
+                val total = accountingManager.getMonthlyIncome()
+                "مجموع درآمدهای دوره جاری: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}."
+            }
         }
     }
 
