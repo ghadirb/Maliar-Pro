@@ -13,6 +13,11 @@
     <!-- Used only after an explicit opt-in in Settings; never started automatically. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Lets us show the system "ignore battery optimization" dialog so reminders and the
+         home-screen widget keep refreshing on phones (Xiaomi/Samsung/Huawei, etc.) that
+         otherwise freeze background apps and show a stale/blank widget. Only ever opens a
+         system dialog the person can accept or dismiss; nothing is granted automatically. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Filled by the selected store flavor at build time. -->
     <uses-permission android:name="${marketPermission}" />

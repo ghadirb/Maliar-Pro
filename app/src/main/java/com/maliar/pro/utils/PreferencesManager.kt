@@ -28,6 +28,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_QUIET_HOURS_END_MINUTES = "quiet_hours_end_minutes"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
+        private const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_optimization_prompt_dismissed"
 
         // --- Subscription / entitlement ---
         private const val KEY_DEVICE_ID = "device_id"
@@ -199,6 +200,19 @@ class PreferencesManager(context: Context) {
 
     fun setLastSeenAnnouncementId(id: String) {
         prefs.edit().putString(KEY_LAST_SEEN_ANNOUNCEMENT_ID, id).apply()
+    }
+
+    // --- Battery optimization prompt (widget/reminder reliability) ---
+
+    /** True once the person has explicitly dismissed the "ignore battery optimization"
+     *  prompt with "بعداً" (later), so we don't nag them again every app open. If they
+     *  actually grant the exemption, [android.os.PowerManager.isIgnoringBatteryOptimizations]
+     *  itself becomes the source of truth and this flag stops mattering. */
+    fun hasBatteryOptimizationPromptBeenDismissed(): Boolean =
+        prefs.getBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, false)
+
+    fun setBatteryOptimizationPromptDismissed(dismissed: Boolean) {
+        prefs.edit().putBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, dismissed).apply()
     }
 
     // --- Subscription / entitlement ---

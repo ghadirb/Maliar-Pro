@@ -1,10 +1,12 @@
 package com.maliar.pro
 
 import android.app.AlarmManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -119,7 +121,64 @@ class MainActivity : AppCompatActivity() {
                 return
             }
         }
-        showRemoteAnnouncementIfAny()
+        checkBatteryOptimization()
+    }
+
+    /**
+     * Many Iranian-market phone brands (Xiaomi/MIUI, Samsung, Huawei, etc.) aggressively
+     * freeze/force-stop apps that aren't exempted from battery optimization. When that
+     * happens to Maliar Pro, reminders stop firing and the home-screen widget gets stuck
+     * showing the system's own "tap to open the app so the widget can refresh" placeholder
+     * instead of real data - it looks broken even though nothing crashed. Asking for this
+     * exemption (a single system dialog, not silently granted) is the standard fix. Only
+     * asked once per "بعداً" dismissal; if the user already granted it, or already declined
+     * once, we don't ask again on every launch.
+     */
+    private fun checkBatteryOptimization() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val alreadyExempt = powerManager?.isIgnoringBatteryOptimizations(packageName) ?: true
+        val prefs = PreferencesManager(this)
+
+        if (alreadyExempt || prefs.hasBatteryOptimizationPromptBeenDismissed()) {
+            showRemoteAnnouncementIfAny()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("پایداری یادآوری‌ها و ویجت")
+            .setMessage(
+                "بعضی گوشی‌ها برای صرفه‌جویی باتری، برنامه‌های استفاده‌نشده را در پس‌زمینه " +
+                    "می‌بندند؛ در این حالت ممکن است یادآوری‌ها دیر برسند یا ویجت صفحه اصلی " +
+                    "به‌روزرسانی نشود. برای جلوگیری از این مشکل، مالیار پرو را از بهینه‌سازی " +
+                    "باتری معاف کنید."
+            )
+            .setPositiveButton("رفتن به تنظیمات") { _, _ ->
+                requestIgnoreBatteryOptimizations()
+                showRemoteAnnouncementIfAny()
+            }
+            .setNegativeButton("بعداً") { _, _ ->
+                prefs.setBatteryOptimizationPromptDismissed(true)
+                showRemoteAnnouncementIfAny()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun requestIgnoreBatteryOptimizations() {
+        try {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Some ROMs reject the direct per-app request intent; fall back to the general
+            // battery-optimization list so the person can still find and allow it manually.
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (ignored: Exception) {
+                // Device exposes neither screen; nothing more we can do here.
+            }
+        }
     }
 
     /**
