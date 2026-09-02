@@ -163,6 +163,19 @@ class AssistantViewModel(
         val asksBalance = text.contains("موجودی") || text.contains("مانده") || text.contains("تراز")
         val asksTop = text.contains("بیشترین") && asksExpense
         val asksQuery = text.contains("چقدر") || text.contains("کجا") || text.contains("جمع") || asksTop
+        val asksSpendable = (text.contains("\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u0645") ||
+            text.contains("\u0645\u06cc\u062a\u0648\u0646\u0645") ||
+            text.contains("\u0642\u0627\u0628\u0644 \u062e\u0631\u062c")) &&
+            (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647"))
+        if (asksSpendable) {
+            val balance = accountingManager.getBalance()
+            return if (balance <= 0.0) {
+                "بر اساس اطلاعات فعلی، مبلغ قابل‌خرج پیشنهادی صفر است؛ این نتیجه تخمینی است."
+            } else {
+                "مبلغ پیشنهادی قابل‌خرج بر اساس تراز فعلی: " +
+                    "${com.maliar.pro.utils.CurrencyFormatter.format(balance)}. این عدد تخمینی است و تضمین مالی نیست."
+            }
+        }
         val asksScenario = text.contains("\u0627\u06af\u0631") &&
             (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647") ||
                 text.contains("\u062e\u0631\u06cc\u062f"))
