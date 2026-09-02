@@ -155,6 +155,38 @@ class AssistantViewModel(
 
     private suspend fun tryExecuteLocalFinancialQuery(message: String): String? {
         val text = message.trim()
+        val asksWeeklyBudget = text.contains("\u0647\u0641\u062a\u0647") && text.contains("\u0628\u0648\u062f\u062c\u0647")
+        if (asksWeeklyBudget) {
+            val expenses = accountingManager.getAllExpensesList()
+            val now = java.util.Calendar.getInstance()
+            val weekStart = (now.clone() as java.util.Calendar).apply {
+                set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.SATURDAY)
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val historyStart = weekStart - 12L * 7 * 24 * 60 * 60 * 1000
+            val history = expenses.filter { it.date >= historyStart && it.date < weekStart }
+            if (history.isEmpty()) return "برای پیشنهاد بودجه هفتگی، سابقه هزینه کافی ثبت نشده است."
+            val suggested = history.sumOf { it.amount } / 12.0
+            val current = expenses.filter { it.date >= weekStart }.sumOf { it.amount }
+            return "بودجه پیشنهادی هفتگی: ${com.maliar.pro.utils.CurrencyFormatter.format(suggested)}\n" +
+                "هزینه ثبت‌شده این هفته: ${com.maliar.pro.utils.CurrencyFormatter.format(current)}\n" +
+                "این مبلغ پیشنهادی و قابل ویرایش است."
+        }
+        val asksCategoryBudget = text.contains("\u0628\u0648\u062f\u062c\u0647") && text.contains("\u062f\u0633\u062a\u0647")
+        if (asksCategoryBudget) {
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val top = accountingManager.getAllExpensesList()
+                .filter { it.date >= start }
+                .groupBy { it.category.trim().ifBlank { "عمومی" } }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+                .maxByOrNull { it.value }
+            return if (top == null) "برای پیشنهاد بودجه دسته‌ای، داده کافی وجود ندارد."
+            else "بودجه پیشنهادی دسته «${top.key}»: " +
+                "${com.maliar.pro.utils.CurrencyFormatter.format(top.value * 1.10)}. این مقدار تخمینی است."
+        }
         val asksToday = text.contains("امروز")
         val asksMonth = text.contains("این ماه") || text.contains("ماه جاری")
         val asksExpense = text.contains("خرج") || text.contains("هزینه")
