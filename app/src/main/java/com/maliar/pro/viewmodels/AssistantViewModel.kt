@@ -233,6 +233,31 @@ class AssistantViewModel(
                     "${com.maliar.pro.utils.CurrencyFormatter.format(saving)} خواهد بود. این فقط یک پیشنهاد تخمینی است."
             }
         }
+        val asksCompare = (text.contains("\u0686\u0631\u0627") || text.contains("\u0645\u0642\u0627\u06cc\u0633\u0647")) &&
+            (text.contains("\u0645\u0627\u0647 \u0642\u0628\u0644") || text.contains("\u062f\u0648\u0631\u0647 \u0642\u0628\u0644")) &&
+            (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647"))
+        if (asksCompare) {
+            val now = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val currentStart = accountingManager.getFinancialPeriodStartMillis()
+            val periodLength = (now - currentStart).coerceAtLeast(24L * 60 * 60 * 1000)
+            val previousStart = currentStart - periodLength
+            val expenses = accountingManager.getAllExpensesList()
+            val current = expenses.filter { it.date >= currentStart }.sumOf { it.amount }
+            val previous = expenses.filter { it.date >= previousStart && it.date < currentStart }.sumOf { it.amount }
+            if (previous <= 0.0) {
+                return "برای مقایسه با دوره قبل، هزینه‌ی کافی در دوره‌ی قبلی ثبت نشده است."
+            }
+            val change = (current - previous) / previous * 100.0
+            val direction = if (change >= 0.0) "افزایش" else "کاهش"
+            return "هزینه‌های دوره جاری نسبت به دوره قبل حدود ${kotlin.math.abs(change).toInt()}٪ $direction داشته است.\n" +
+                "دوره جاری: ${com.maliar.pro.utils.CurrencyFormatter.format(current)}؛ " +
+                "دوره قبل: ${com.maliar.pro.utils.CurrencyFormatter.format(previous)}."
+        }
         val asksForecast = text.contains("\u067e\u06cc\u0634\u200c\u0628\u06cc\u0646\u06cc") ||
             text.contains("\u067e\u06cc\u0634 \u0628\u06cc\u0646\u06cc") ||
             text.contains("\u0648\u0636\u0639\u06cc\u062a \u0622\u06cc\u0646\u062f\u0647")
