@@ -151,6 +151,20 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
+            // "تراز همین دوره" answers exactly the question people keep asking: the big
+            // "تراز کل" number above is the all-time total (by design - it never changes
+            // just because you change the period), so this row shows the period-scoped
+            // net (period income − period expense) right next to it, colored red when
+            // negative so it's unmistakable.
+            viewModel.monthlyBalance.collect { balance ->
+                binding.periodBalanceAmount.text = formatCurrency(balance)
+                binding.periodBalanceAmount.setTextColor(
+                    if (balance < 0) android.graphics.Color.parseColor("#FFCDD2")
+                    else android.graphics.Color.WHITE
+                )
+            }
+        }
+        lifecycleScope.launch {
             viewModel.uncashedChecksCount.collect { count ->
                 val total = viewModel.uncashedChecksTotal.value
                 binding.monthlyChecksSummary.text = "$count چک · ${formatCurrency(total)}"
@@ -196,7 +210,7 @@ class AccountingFragment : Fragment() {
     }
 
     private fun formatCurrency(amount: Double): String {
-        return String.format("%,.0f تومان", amount)
+        return com.maliar.pro.utils.CurrencyFormatter.format(amount)
     }
 
     private fun showAddIncomeDialog() {

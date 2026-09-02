@@ -252,5 +252,5 @@ class CarDetailFragment : Fragment() {
         }
     }
 
-    private fun formatCurrency(amount: Double): String = String.format("%,.0f ت", amount)
+    private fun formatCurrency(amount: Double): String = com.maliar.pro.utils.CurrencyFormatter.format(amount, "ت")
 }

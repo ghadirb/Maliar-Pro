@@ -250,12 +250,12 @@ class AssistantViewModel(
                 val latest = accountingManager.getAllIncomesList().firstOrNull()
                     ?: return "⚠️ درآمدی برای ویرایش پیدا نشد."
                 accountingManager.updateIncome(latest.copy(amount = amount, description = message.trim()))
-                "✅ آخرین درآمد به مبلغ ${String.format("%,.0f", amount)} تومان ویرایش شد."
+                "✅ آخرین درآمد به مبلغ ${com.maliar.pro.utils.CurrencyFormatter.format(amount, "")} تومان ویرایش شد."
             } else {
                 val latest = accountingManager.getAllExpensesList().firstOrNull()
                     ?: return "⚠️ هزینه‌ای برای ویرایش پیدا نشد."
                 accountingManager.updateExpense(latest.copy(amount = amount, description = message.trim()))
-                "✅ آخرین هزینه به مبلغ ${String.format("%,.0f", amount)} تومان ویرایش شد."
+                "✅ آخرین هزینه به مبلغ ${com.maliar.pro.utils.CurrencyFormatter.format(amount, "")} تومان ویرایش شد."
             }
         }
 
@@ -278,16 +278,16 @@ class AssistantViewModel(
         }
 
         val description = message.trim()
-        val formattedAmount = String.format("%,.0f", amount)
+        val formattedAmount = com.maliar.pro.utils.CurrencyFormatter.format(amount, "")
 
         return if (isIncome) {
             accountingManager.addIncome(Income(amount = amount, description = description, date = Date().time))
             val newBalance = accountingManager.getBalance()
-            "✅ مبلغ $formattedAmount تومان به‌عنوان درآمد در حسابداری ثبت شد.\n💰 موجودی جدید: ${String.format("%,.0f", newBalance)} تومان"
+            "✅ مبلغ $formattedAmount تومان به‌عنوان درآمد در حسابداری ثبت شد.\n💰 موجودی جدید: ${com.maliar.pro.utils.CurrencyFormatter.format(newBalance, "")} تومان"
         } else {
             accountingManager.addExpense(Expense(amount = amount, description = description, date = Date().time))
             val newBalance = accountingManager.getBalance()
-            "✅ مبلغ $formattedAmount تومان به‌عنوان هزینه در حسابداری ثبت شد.\n💰 موجودی جدید: ${String.format("%,.0f", newBalance)} تومان"
+            "✅ مبلغ $formattedAmount تومان به‌عنوان هزینه در حسابداری ثبت شد.\n💰 موجودی جدید: ${com.maliar.pro.utils.CurrencyFormatter.format(newBalance, "")} تومان"
         }
     }
 
@@ -316,18 +316,18 @@ class AssistantViewModel(
         if (matchCount != 1) return null
 
         val title = message.trim()
-        val formattedAmount = String.format("%,.0f", amount)
+        val formattedAmount = com.maliar.pro.utils.CurrencyFormatter.format(amount, "")
 
         return when {
             isAsset -> {
                 financialManager.addAsset(title, amount)
                 val total = financialManager.getTotalAssets()
-                "✅ دارایی به مبلغ $formattedAmount تومان در «وضعیت مالی» ثبت شد.\n📊 کل دارایی‌ها اکنون: ${String.format("%,.0f", total)} تومان"
+                "✅ دارایی به مبلغ $formattedAmount تومان در «وضعیت مالی» ثبت شد.\n📊 کل دارایی‌ها اکنون: ${com.maliar.pro.utils.CurrencyFormatter.format(total, "")} تومان"
             }
             isDebt -> {
                 financialManager.addDebt(title, amount)
                 val total = financialManager.getTotalUnpaidDebts()
-                "✅ بدهی به مبلغ $formattedAmount تومان در «وضعیت مالی» ثبت شد.\n📊 کل بدهی‌های پرداخت‌نشده اکنون: ${String.format("%,.0f", total)} تومان"
+                "✅ بدهی به مبلغ $formattedAmount تومان در «وضعیت مالی» ثبت شد.\n📊 کل بدهی‌های پرداخت‌نشده اکنون: ${com.maliar.pro.utils.CurrencyFormatter.format(total, "")} تومان"
             }
             isGoal -> {
                 financialManager.addFinancialGoal(title, amount)
@@ -614,16 +614,16 @@ class AssistantViewModel(
         return """
             شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
             اطلاعات کاربر:
-            - تراز کل: ${String.format("%,.0f", balance)} تومان
-            - کل درآمد: ${String.format("%,.0f", totalIncome)} تومان
-            - کل هزینه: ${String.format("%,.0f", totalExpense)} تومان
-            - درآمد این ماه: ${String.format("%,.0f", monthlyIncome)} تومان
-            - هزینه این ماه: ${String.format("%,.0f", monthlyExpense)} تومان
+            - تراز کل: ${com.maliar.pro.utils.CurrencyFormatter.format(balance, "")} تومان
+            - کل درآمد: ${com.maliar.pro.utils.CurrencyFormatter.format(totalIncome, "")} تومان
+            - کل هزینه: ${com.maliar.pro.utils.CurrencyFormatter.format(totalExpense, "")} تومان
+            - درآمد این ماه: ${com.maliar.pro.utils.CurrencyFormatter.format(monthlyIncome, "")} تومان
+            - هزینه این ماه: ${com.maliar.pro.utils.CurrencyFormatter.format(monthlyExpense, "")} تومان
             - یادآوری‌های فعال: ${activeReminders.size} عدد
             - چک‌های وصول نشده: ${uncashedChecks.size} عدد
             - اقساط فعال: ${activeInstallments.size} عدد
-            - کل دارایی‌ها (وضعیت مالی): ${String.format("%,.0f", totalAssets)} تومان
-            - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${String.format("%,.0f", totalDebts)} تومان
+            - کل دارایی‌ها (وضعیت مالی): ${com.maliar.pro.utils.CurrencyFormatter.format(totalAssets, "")} تومان
+            - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${com.maliar.pro.utils.CurrencyFormatter.format(totalDebts, "")} تومان
             - اهداف مالی فعال: ${activeGoals.size} عدد${if (activeGoals.isNotEmpty()) " (" + activeGoals.joinToString("، ") { it.title } + ")" else ""}
 
             شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید.
@@ -787,7 +787,7 @@ class AssistantViewModel(
         return when {
             lower.contains("تراز") || lower.contains("balance") || lower.contains("موجودی") -> {
                 val balance = accountingManager.getBalance()
-                "💰 تراز فعلی شما: ${String.format("%,.0f", balance)} تومان"
+                "💰 تراز فعلی شما: ${com.maliar.pro.utils.CurrencyFormatter.format(balance, "")} تومان"
             }
             else -> "🤖 دستیار هوشمند مالیار آماده است. دستورات را امتحان کنید!"
         }

@@ -23,7 +23,7 @@ class DebtorPaymentAdapter : ListAdapter<DebtorPayment, DebtorPaymentAdapter.Vie
             val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(payment.date)
             binding.paymentDateText.text = PersianCalendarHelper.formatJalali(y, m, d)
             binding.paymentNoteText.text = payment.note.ifBlank { "بدون یادداشت" }
-            binding.paymentAmountText.text = String.format("%,.0f تومان", payment.amount)
+            binding.paymentAmountText.text = com.maliar.pro.utils.CurrencyFormatter.format(payment.amount)
         }
     }
 

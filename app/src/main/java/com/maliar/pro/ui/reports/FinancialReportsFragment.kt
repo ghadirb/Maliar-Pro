@@ -183,9 +183,9 @@ class FinancialReportsFragment : Fragment() {
     }
 
     private fun renderReport(report: FinancialReport) {
-        binding.totalIncomeText.text = String.format("%,.0f", report.totalIncome)
-        binding.totalExpenseText.text = String.format("%,.0f", report.totalExpense)
-        binding.netText.text = String.format("%,.0f", report.net)
+        binding.totalIncomeText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.totalIncome, "")
+        binding.totalExpenseText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.totalExpense, "")
+        binding.netText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.net, "")
         binding.netText.setTextColor(
             if (report.net >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
         )

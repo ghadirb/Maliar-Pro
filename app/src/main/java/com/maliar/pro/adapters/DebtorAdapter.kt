@@ -32,7 +32,7 @@ class DebtorAdapter(
             binding.directionText.setTextColor(
                 if (debtor.direction == DebtorDirection.THEY_OWE_ME) 0xFF4CAF50.toInt() else 0xFFF44336.toInt()
             )
-            binding.remainingText.text = String.format("%,.0f تومان", item.remaining)
+            binding.remainingText.text = com.maliar.pro.utils.CurrencyFormatter.format(item.remaining)
 
             if (debtor.dueDate != null) {
                 val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(debtor.dueDate)

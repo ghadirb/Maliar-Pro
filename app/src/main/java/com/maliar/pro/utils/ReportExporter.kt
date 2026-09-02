@@ -89,7 +89,7 @@ object ReportExporter {
         document.close()
     }
 
-    private fun format(amount: Double): String = String.format("%,.0f", amount)
+    private fun format(amount: Double): String = com.maliar.pro.utils.CurrencyFormatter.format(amount, "")
 
     /** Draws one right-aligned, RTL-correct paragraph and returns the Y position right
      *  after it, so callers can just keep chaining calls downward. */

@@ -190,5 +190,5 @@ class FinancialStatusFragment : Fragment() {
         }
     }
 
-    private fun formatCurrency(amount: Double): String = String.format("%,.0f تومان", amount)
+    private fun formatCurrency(amount: Double): String = com.maliar.pro.utils.CurrencyFormatter.format(amount)
 }

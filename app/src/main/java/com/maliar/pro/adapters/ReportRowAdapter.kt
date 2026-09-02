@@ -31,7 +31,7 @@ class ReportRowAdapter(private val amountColor: Int) : RecyclerView.Adapter<Repo
             val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(item.date)
             val dateStr = "$d ${PersianCalendarHelper.PERSIAN_MONTH_NAMES.getOrElse(m - 1) { "" }}"
             binding.categoryDateText.text = if (item.category.isNotBlank()) "${item.category} · $dateStr" else dateStr
-            binding.amountText.text = String.format("%,.0f تومان", item.amount)
+            binding.amountText.text = com.maliar.pro.utils.CurrencyFormatter.format(item.amount)
             binding.amountText.setTextColor(amountColor)
         }
     }

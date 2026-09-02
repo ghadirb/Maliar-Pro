@@ -64,12 +64,12 @@ class DebtorListFragment : Fragment() {
         }
         lifecycleScope.launch {
             viewModel.totalTheyOweMe.collect {
-                binding.totalTheyOweMeText.text = String.format("%,.0f تومان", it)
+                binding.totalTheyOweMeText.text = com.maliar.pro.utils.CurrencyFormatter.format(it)
             }
         }
         lifecycleScope.launch {
             viewModel.totalIOweThem.collect {
-                binding.totalIOweThemText.text = String.format("%,.0f تومان", it)
+                binding.totalIOweThemText.text = com.maliar.pro.utils.CurrencyFormatter.format(it)
             }
         }
     }

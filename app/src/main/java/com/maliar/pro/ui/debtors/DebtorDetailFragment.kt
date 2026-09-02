@@ -50,7 +50,7 @@ class DebtorDetailFragment : Fragment() {
                 binding.nameText.text = debtor.name
                 binding.directionText.text = if (debtor.direction == DebtorDirection.THEY_OWE_ME)
                     "🤝 بدهکار به شما" else "🧾 شما بدهکارید"
-                binding.totalAmountText.text = String.format("%,.0f تومان", debtor.amount)
+                binding.totalAmountText.text = com.maliar.pro.utils.CurrencyFormatter.format(debtor.amount)
                 binding.descriptionText.visibility =
                     if (debtor.description.isNotBlank()) View.VISIBLE else View.GONE
                 binding.descriptionText.text = debtor.description
@@ -69,10 +69,10 @@ class DebtorDetailFragment : Fragment() {
 
         lifecycleScope.launch {
             viewModel.totalPaid.collect { paid ->
-                binding.paidAmountText.text = String.format("%,.0f تومان", paid)
+                binding.paidAmountText.text = com.maliar.pro.utils.CurrencyFormatter.format(paid)
                 val debtor = viewModel.debtor.value
                 val remaining = ((debtor?.amount ?: 0.0) - paid).coerceAtLeast(0.0)
-                binding.remainingAmountText.text = String.format("%,.0f تومان", remaining)
+                binding.remainingAmountText.text = com.maliar.pro.utils.CurrencyFormatter.format(remaining)
             }
         }
 

@@ -31,7 +31,7 @@ class DueSoonAdapter(
             }
             binding.titleText.text = "$icon ${item.title}"
             binding.subtitleText.text = item.subtitle
-            binding.amountText.text = String.format("%,.0f تومان", item.amount)
+            binding.amountText.text = com.maliar.pro.utils.CurrencyFormatter.format(item.amount)
 
             val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(item.dueDate)
             val jalaliDate = PersianCalendarHelper.formatJalali(y, m, d)

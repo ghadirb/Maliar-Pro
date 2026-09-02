@@ -179,5 +179,5 @@ class MealPlanFragment : Fragment() {
     private fun formatUnits(value: Double): String =
         if (value == Math.floor(value)) value.toLong().toString() else String.format("%.1f", value)
 
-    private fun formatCurrency(amount: Double): String = String.format("%,.0f ت", amount)
+    private fun formatCurrency(amount: Double): String = com.maliar.pro.utils.CurrencyFormatter.format(amount, "ت")
 }

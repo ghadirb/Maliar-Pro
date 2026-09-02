@@ -37,7 +37,7 @@ class IncomeAdapter(
         }
 
         private fun formatCurrency(amount: Double): String {
-            return String.format("%,.0f تومان", amount)
+            return com.maliar.pro.utils.CurrencyFormatter.format(amount)
         }
 
         private fun formatDate(timestamp: Long): String {

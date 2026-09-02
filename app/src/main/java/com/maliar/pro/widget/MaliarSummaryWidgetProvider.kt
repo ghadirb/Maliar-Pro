@@ -55,7 +55,7 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
                         .filter { !it.isCompleted }
                         .minByOrNull { it.triggerTime }
 
-                    views.setTextViewText(R.id.widgetBalanceText, String.format("%,.0f تومان", balance))
+                    views.setTextViewText(R.id.widgetBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(balance))
                     views.setTextViewText(
                         R.id.widgetNextReminderText,
                         if (nextReminder != null) {

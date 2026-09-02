@@ -37,7 +37,7 @@ class CalendarEventAdapter : RecyclerView.Adapter<CalendarEventAdapter.ViewHolde
             binding.eventTitleText.text = event.title
             binding.eventSubtitleText.text = event.subtitle
             if (event.amount != null) {
-                binding.eventAmountText.text = String.format("%,.0f تومان", event.amount)
+                binding.eventAmountText.text = com.maliar.pro.utils.CurrencyFormatter.format(event.amount)
                 binding.eventAmountText.visibility = android.view.View.VISIBLE
             } else {
                 binding.eventAmountText.visibility = android.view.View.GONE
