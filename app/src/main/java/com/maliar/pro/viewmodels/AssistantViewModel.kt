@@ -41,8 +41,46 @@ class AssistantViewModel(
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
     data class ChatMessage(val id: String, val text: String, val isUser: Boolean)
+    data class QuickTransactionPreview(
+        val isIncome: Boolean,
+        val amount: Double,
+        val description: String
+    )
 
     private val smartReminderManager by lazy { com.maliar.pro.database.SmartReminderManager(appContext) }
+
+    fun previewQuickTransaction(message: String): QuickTransactionPreview? {
+        val incomeKeywords = listOf("درآمد", "حقوق", "دریافت کردم", "دریافتی", "واریز شد", "واریز کردم", "فروش")
+        val expenseKeywords = listOf("هزینه", "خرج کردم", "خرج شد", "پرداخت کردم", "خریدم", "خرید کردم", "پرداختی")
+        val isIncome = incomeKeywords.any { message.contains(it) }
+        val isExpense = expenseKeywords.any { message.contains(it) }
+        if (isIncome == isExpense || message.contains("ویرایش") || message.contains("تغییر")) return null
+        val amount = parsePersianAmount(message) ?: return null
+        if (amount <= 0.0) return null
+        return QuickTransactionPreview(isIncome, amount, message.trim())
+    }
+
+    fun confirmQuickTransaction(preview: QuickTransactionPreview) {
+        viewModelScope.launch {
+            val formatted = com.maliar.pro.utils.CurrencyFormatter.format(preview.amount, "")
+            if (preview.isIncome) {
+                accountingManager.addIncome(
+                    Income(amount = preview.amount, description = preview.description, date = Date().time)
+                )
+            } else {
+                accountingManager.addExpense(
+                    Expense(amount = preview.amount, description = preview.description, date = Date().time)
+                )
+            }
+            val kind = if (preview.isIncome) "درآمد" else "هزینه"
+            val balance = com.maliar.pro.utils.CurrencyFormatter.format(accountingManager.getBalance(), "")
+            _chatMessages.value = _chatMessages.value + ChatMessage(
+                (System.currentTimeMillis() + 1).toString(),
+                "✅ $kind به مبلغ $formatted تومان ثبت شد.\n💰 موجودی جدید: $balance تومان",
+                false
+            )
+        }
+    }
 
     fun sendMessage(message: String) {
         viewModelScope.launch {

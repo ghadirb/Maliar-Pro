@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -53,10 +54,25 @@ class AssistantFragment : Fragment() {
         sendBtn.setOnClickListener {
             val message = input.text.toString().trim()
             if (message.isNotEmpty()) {
-                lifecycleScope.launch {
-                    viewModel.sendMessage(message) // Connected to accounting, reminders
+                val preview = viewModel.previewQuickTransaction(message)
+                if (preview != null) {
+                    val kind = if (preview.isIncome) "درآمد" else "هزینه"
+                    val amount = com.maliar.pro.utils.CurrencyFormatter.format(preview.amount, "")
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("تأیید ثبت $kind")
+                        .setMessage("مبلغ: $amount تومان\nتوضیح: ${preview.description}\n\nآیا این تراکنش در حسابداری ثبت شود؟")
+                        .setPositiveButton("ثبت") { _, _ ->
+                            viewModel.confirmQuickTransaction(preview)
+                            input.text = null
+                        }
+                        .setNegativeButton("لغو", null)
+                        .show()
+                } else {
+                    lifecycleScope.launch {
+                        viewModel.sendMessage(message) // Connected to accounting, reminders
+                        input.text = null
+                    }
                 }
-                input.text = null
             }
         }
 
