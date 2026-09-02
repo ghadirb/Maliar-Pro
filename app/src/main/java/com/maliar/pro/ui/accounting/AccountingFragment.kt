@@ -266,6 +266,15 @@ class AccountingFragment : Fragment() {
                 }
             }
         }
+        lifecycleScope.launch {
+            viewModel.sevenDayForecast.collect { amount ->
+                binding.sevenDayForecastText.text = if (amount == null) {
+                    "برآورد ۷ روز آینده: داده کافی نیست"
+                } else {
+                    "برآورد موجودی/تراز ۷ روز آینده: ${formatCurrency(amount)} · تخمینی"
+                }
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.

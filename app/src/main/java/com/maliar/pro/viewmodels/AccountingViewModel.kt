@@ -178,6 +178,16 @@ class AccountingViewModel(
     } else kotlinx.coroutines.flow.flowOf<EmergencyFundSummary?>(null))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val sevenDayForecast = combine(monthlyIncome, monthlyExpense) { income, expense ->
+        val start = accountingManager.getFinancialPeriodStartMillis()
+        val elapsedDays = ((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000)).toInt() + 1
+        if (elapsedDays < 1 || (income <= 0.0 && expense <= 0.0)) null
+        else {
+            val dailyNet = (income - expense) / elapsedDays
+            ((income - expense) + dailyNet * 7.0)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
