@@ -214,6 +214,20 @@ class AccountingViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "وضعیت بودجه: داده کافی نیست")
 
+    val expenseTrend = expenseList.map { list ->
+        val now = java.util.Calendar.getInstance()
+        now.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        now.set(java.util.Calendar.MINUTE, 0)
+        now.set(java.util.Calendar.SECOND, 0)
+        now.set(java.util.Calendar.MILLISECOND, 0)
+        val currentStart = accountingManager.getFinancialPeriodStartMillis()
+        val periodLength = (now.timeInMillis - currentStart).coerceAtLeast(24L * 60 * 60 * 1000)
+        val previousStart = currentStart - periodLength
+        val current = list.filter { it.date >= currentStart }.sumOf { it.amount }
+        val previous = list.filter { it.date >= previousStart && it.date < currentStart }.sumOf { it.amount }
+        if (previous <= 0.0) null else ((current - previous) / previous * 100.0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     data class ExpenseAnalysis(
         val topCategory: String,
         val topCategoryAmount: Double,

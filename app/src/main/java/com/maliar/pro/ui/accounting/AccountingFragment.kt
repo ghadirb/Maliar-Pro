@@ -293,6 +293,16 @@ class AccountingFragment : Fragment() {
                 )
             }
         }
+        lifecycleScope.launch {
+            viewModel.expenseTrend.collect { change ->
+                binding.expenseTrendText.text = if (change == null) {
+                    "روند هزینه: داده کافی نیست"
+                } else {
+                    val direction = if (change >= 0.0) "افزایش" else "کاهش"
+                    "روند هزینه نسبت به دوره قبل: $direction ${kotlin.math.abs(change).toInt()}٪"
+                }
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.
