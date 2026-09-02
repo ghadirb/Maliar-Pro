@@ -257,6 +257,15 @@ class AccountingFragment : Fragment() {
                 }
             }
         }
+        lifecycleScope.launch {
+            viewModel.emergencyFundSummary.collect { summary ->
+                binding.emergencyFundText.text = if (summary == null) {
+                    "صندوق اضطراری: هدفی تنظیم نشده"
+                } else {
+                    "صندوق اضطراری: ${formatCurrency(summary.current)} از ${formatCurrency(summary.target)} · ${summary.percent}٪"
+                }
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.

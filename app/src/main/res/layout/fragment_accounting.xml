@@ -179,6 +179,14 @@
                     android:text="پیشنهاد پس‌انداز هدف: داده کافی نیست"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/emergencyFundText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="صندوق اضطراری: هدفی تنظیم نشده"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

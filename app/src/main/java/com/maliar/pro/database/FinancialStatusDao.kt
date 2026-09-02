@@ -90,6 +90,9 @@ interface FinancialStatusDao {
     // Financial Preferences
     @Query("SELECT * FROM financial_preferences LIMIT 1")
     suspend fun getPreferences(): FinancialPreferences?
+
+    @Query("SELECT * FROM financial_preferences LIMIT 1")
+    fun getPreferencesFlow(): Flow<FinancialPreferences?>
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPreferences(preferences: FinancialPreferences): Long

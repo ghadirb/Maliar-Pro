@@ -139,6 +139,8 @@ class FinancialStatusManager(context: Context) {
     suspend fun getPreferences(): FinancialPreferences? {
         return financialDao.getPreferences()
     }
+
+    fun getPreferencesFlow(): Flow<FinancialPreferences?> = financialDao.getPreferencesFlow()
     
     suspend fun savePreferences(preferences: FinancialPreferences): Long {
         return financialDao.insertPreferences(preferences)

@@ -157,6 +157,27 @@ class AccountingViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    data class EmergencyFundSummary(val target: Double, val current: Double, val percent: Int)
+
+    val emergencyFundSummary = (if (financialStatusManager != null) {
+        combine(
+            financialStatusManager.getPreferencesFlow(),
+            financialStatusManager.getAllAssets()
+        ) { preferences, assets ->
+            val target = preferences?.emergencyFundTarget ?: 0.0
+            if (target <= 0.0) null
+            else {
+                val current = assets.filter {
+                    it.type == com.maliar.pro.database.AssetType.CASH ||
+                        it.type == com.maliar.pro.database.AssetType.BANK_ACCOUNT ||
+                        it.type == com.maliar.pro.database.AssetType.DEPOSIT
+                }.sumOf { it.value }.coerceAtLeast(0.0)
+                EmergencyFundSummary(target, current, (current / target * 100.0).coerceIn(0.0, 100.0).toInt())
+            }
+        }
+    } else kotlinx.coroutines.flow.flowOf<EmergencyFundSummary?>(null))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
