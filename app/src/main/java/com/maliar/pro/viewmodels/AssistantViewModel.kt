@@ -155,6 +155,19 @@ class AssistantViewModel(
 
     private suspend fun tryExecuteLocalFinancialQuery(message: String): String? {
         val text = message.trim()
+        val asksAnomaly = text.contains("\u063a\u06cc\u0631\u0639\u0627\u062f\u06cc") ||
+            text.contains("\u063a\u06cc\u0631 \u0639\u0627\u062f\u06cc") || text.contains("\u0646\u0627\u0647\u0646\u062c\u0627\u0631")
+        if (asksAnomaly) {
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val expenses = accountingManager.getAllExpensesList().filter { it.date >= start }
+            if (expenses.size < 3) return "برای شناسایی هزینه غیرعادی، حداقل سه هزینه در دوره جاری لازم است."
+            val average = expenses.map { it.amount }.average()
+            val unusual = expenses.maxByOrNull { it.amount }
+            return if (unusual != null && unusual.amount > average * 2.0) {
+                "هزینه «${unusual.description.ifBlank { unusual.category.ifBlank { "بدون توضیح" } }}» با مبلغ " +
+                    "${com.maliar.pro.utils.CurrencyFormatter.format(unusual.amount)} بیش از دو برابر میانگین است و می‌تواند غیرعادی باشد."
+            } else "در داده‌های دوره جاری هزینه‌ای بیش از دو برابر میانگین پیدا نشد."
+        }
         val asksWeeklyBudget = text.contains("\u0647\u0641\u062a\u0647") && text.contains("\u0628\u0648\u062f\u062c\u0647")
         if (asksWeeklyBudget) {
             val expenses = accountingManager.getAllExpensesList()
