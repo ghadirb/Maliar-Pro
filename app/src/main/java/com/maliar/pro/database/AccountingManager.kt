@@ -122,8 +122,17 @@ class AccountingManager(context: Context) {
     }
     
     // Balance
+    /** "تراز کل" - scoped to the current Jalali year (1 Farvardin onward), per the person's
+     *  request, rather than the app's entire lifetime. Used by both the accounting
+     *  dashboard's headline figure and the home-screen widget, so the two always agree. */
     suspend fun getBalance(): Double {
-        return getTotalIncome() - getTotalExpense()
+        val yearStart = com.maliar.pro.utils.PersianCalendarHelper.run {
+            val (year, _, _) = getCurrentJalaliDate()
+            jalaliToGregorianMillis(year, 1, 1)
+        }
+        val yearlyIncome = accountingDao.getMonthlyIncome(yearStart) ?: 0.0
+        val yearlyExpense = accountingDao.getMonthlyExpense(yearStart) ?: 0.0
+        return yearlyIncome - yearlyExpense
     }
 
     suspend fun getMonthlyIncome(): Double {

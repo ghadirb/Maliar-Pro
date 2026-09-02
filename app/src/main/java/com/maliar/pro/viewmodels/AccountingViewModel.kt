@@ -37,6 +37,15 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
         return timestamp >= accountingManager.getFinancialPeriodStartMillis()
     }
 
+    /** Whether [timestamp] falls within the current Jalali (شمسی) year, i.e. on or after
+     *  1 Farvardin of this year. Used for the headline "تراز کل" figure, which the person
+     *  asked to scope to the current year rather than the app's entire lifetime. */
+    private fun isThisYear(timestamp: Long): Boolean {
+        val (currentYear, _, _) = com.maliar.pro.utils.PersianCalendarHelper.getCurrentJalaliDate()
+        val yearStartMillis = com.maliar.pro.utils.PersianCalendarHelper.jalaliToGregorianMillis(currentYear, 1, 1)
+        return timestamp >= yearStartMillis
+    }
+
     val incomeList: kotlinx.coroutines.flow.StateFlow<List<Income>> =
         accountingManager.getAllIncomes().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -55,7 +64,16 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
     val totalExpense = expenseList.map { list -> list.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    val balance = combine(totalIncome, totalExpense) { inc, exp -> inc - exp }
+    /** Headline "تراز کل" income/balance - scoped to the current Jalali *year* (1 Farvardin
+     *  onward), per the person's request, rather than the app's entire lifetime. Still
+     *  independent of the دوره selector below, which stays month/period-scoped. */
+    val yearlyIncome = incomeList.map { list -> list.filter { isThisYear(it.date) }.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val yearlyExpense = expenseList.map { list -> list.filter { isThisYear(it.date) }.sumOf { it.amount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val balance = combine(yearlyIncome, yearlyExpense) { inc, exp -> inc - exp }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val monthlyIncome = incomeList.map { list -> list.filter { isThisMonth(it.date) }.sumOf { it.amount } }

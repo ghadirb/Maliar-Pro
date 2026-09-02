@@ -103,7 +103,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="تراز کل (همه‌ی ورودی‌ها، بدون توجه به دوره)"
+                    android:text="تراز کل (سال جاری)"
                     android:textColor="#DFFFFFFF"
                     android:textSize="11sp" />
 
