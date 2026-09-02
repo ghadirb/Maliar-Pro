@@ -214,6 +214,15 @@ class AccountingFragment : Fragment() {
                 }
             }
         }
+        lifecycleScope.launch {
+            viewModel.suggestedMonthlyBudget.collect { amount ->
+                binding.budgetSuggestionText.text = if (amount <= 0.0) {
+                    "بودجه پیشنهادی ماهانه: داده کافی نیست"
+                } else {
+                    "بودجه پیشنهادی ماهانه: ${formatCurrency(amount)} · قابل ویرایش"
+                }
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.

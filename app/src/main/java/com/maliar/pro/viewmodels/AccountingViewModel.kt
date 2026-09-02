@@ -115,6 +115,22 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    /** Local, non-binding budget suggestion based on the last three completed months. */
+    val suggestedMonthlyBudget = expenseList.map { list ->
+        val now = java.util.Calendar.getInstance()
+        now.set(java.util.Calendar.DAY_OF_MONTH, 1)
+        now.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        now.set(java.util.Calendar.MINUTE, 0)
+        now.set(java.util.Calendar.SECOND, 0)
+        now.set(java.util.Calendar.MILLISECOND, 0)
+        val currentMonthStart = now.timeInMillis
+        val threeMonthsAgo = (now.clone() as java.util.Calendar).apply {
+            add(java.util.Calendar.MONTH, -3)
+        }.timeInMillis
+        val history = list.filter { it.date >= threeMonthsAgo && it.date < currentMonthStart }
+        if (history.isEmpty()) 0.0 else history.sumOf { it.amount } / 3.0
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
