@@ -205,6 +205,15 @@ class AccountingViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val budgetStatus = combine(suggestedMonthlyBudget, monthlyExpense) { budget, spent ->
+        when {
+            budget <= 0.0 -> "وضعیت بودجه: داده کافی نیست"
+            spent > budget -> "هشدار بودجه: هزینه‌های دوره از پیشنهاد بودجه عبور کرده است"
+            spent >= budget * 0.8 -> "هشدار بودجه: حدود ${((spent / budget) * 100).toInt()}٪ بودجه مصرف شده است"
+            else -> "وضعیت بودجه: در محدوده پیشنهادی"
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "وضعیت بودجه: داده کافی نیست")
+
     data class ExpenseAnalysis(
         val topCategory: String,
         val topCategoryAmount: Double,

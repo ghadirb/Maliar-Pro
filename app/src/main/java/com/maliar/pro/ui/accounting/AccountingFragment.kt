@@ -284,6 +284,15 @@ class AccountingFragment : Fragment() {
                 }
             }
         }
+        lifecycleScope.launch {
+            viewModel.budgetStatus.collect { status ->
+                binding.budgetStatusText.text = status
+                binding.budgetStatusText.setTextColor(
+                    if (status.contains("هشدار")) android.graphics.Color.parseColor("#C62828")
+                    else resources.getColor(com.maliar.pro.R.color.text_secondary, null)
+                )
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.
