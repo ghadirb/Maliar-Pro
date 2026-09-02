@@ -233,6 +233,28 @@ class AssistantViewModel(
                     "${com.maliar.pro.utils.CurrencyFormatter.format(saving)} خواهد بود. این فقط یک پیشنهاد تخمینی است."
             }
         }
+        val asksForecast = text.contains("\u067e\u06cc\u0634\u200c\u0628\u06cc\u0646\u06cc") ||
+            text.contains("\u067e\u06cc\u0634 \u0628\u06cc\u0646\u06cc") ||
+            text.contains("\u0648\u0636\u0639\u06cc\u062a \u0622\u06cc\u0646\u062f\u0647")
+        if (asksForecast) {
+            val income = accountingManager.getMonthlyIncome()
+            val expense = accountingManager.getMonthlyExpense()
+            if (income <= 0.0 && expense <= 0.0) {
+                return "برای پیش‌بینی، اطلاعات مالی کافی در دوره جاری ثبت نشده است."
+            }
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val elapsedDays = ((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000))
+                .toInt().coerceAtLeast(0) + 1
+            val dailyNet = (income - expense) / elapsedDays
+            val targetDays = when {
+                text.contains("\u067e\u0627\u06cc\u0627\u0646 \u0645\u0627\u0647") -> 30
+                text.contains("\u06f1\u06f5") || text.contains("15") -> 15
+                else -> 7
+            }
+            val forecast = (income - expense) + dailyNet * targetDays
+            return "پیش‌بینی تخمینی تراز برای $targetDays روز آینده: " +
+                "${com.maliar.pro.utils.CurrencyFormatter.format(forecast)}. این عدد تضمینی نیست."
+        }
         val asksSpendable = (text.contains("\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u0645") ||
             text.contains("\u0645\u06cc\u062a\u0648\u0646\u0645") ||
             text.contains("\u0642\u0627\u0628\u0644 \u062e\u0631\u062c")) &&
