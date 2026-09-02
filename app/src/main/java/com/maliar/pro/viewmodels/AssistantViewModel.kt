@@ -163,6 +163,13 @@ class AssistantViewModel(
         val asksBalance = text.contains("موجودی") || text.contains("مانده") || text.contains("تراز")
         val asksTop = text.contains("بیشترین") && asksExpense
         val asksQuery = text.contains("چقدر") || text.contains("کجا") || text.contains("جمع") || asksTop
+        if (asksDebt && asksQuery) {
+            val unpaid = financialManager.getTotalUnpaidDebts()
+            val installments = accountingManager.getActiveInstallments()
+            return "مجموع بدهی‌های پرداخت‌نشده: ${com.maliar.pro.utils.CurrencyFormatter.format(unpaid)}\n" +
+                "تعداد اقساط فعال: ${installments.size}\n" +
+                "این گزارش فقط بر اساس اطلاعات ثبت‌شده در برنامه است."
+        }
         val asksSpendable = (text.contains("\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u0645") ||
             text.contains("\u0645\u06cc\u062a\u0648\u0646\u0645") ||
             text.contains("\u0642\u0627\u0628\u0644 \u062e\u0631\u062c")) &&
