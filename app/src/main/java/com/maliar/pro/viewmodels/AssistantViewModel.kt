@@ -201,6 +201,28 @@ class AssistantViewModel(
                     "${com.maliar.pro.utils.CurrencyFormatter.format(top.value)}. این تحلیل بر اساس داده‌های ثبت‌شده است."
             }
         }
+        val asksSavingAdvice = (text.contains("\u0635\u0631\u0641\u0647\u200c\u062c\u0648\u06cc\u06cc") ||
+            text.contains("\u0635\u0631\u0641\u0647 \u062c\u0648\u06cc\u06cc") ||
+            text.contains("\u06a9\u0645\u062a\u0631 \u062e\u0631\u062c")) &&
+            (text.contains("\u0686\u0637\u0648\u0631") || text.contains("\u067e\u06cc\u0634\u0646\u0647\u0627\u062f") ||
+                text.contains("\u06a9\u0645\u062a\u0631"))
+        if (asksSavingAdvice) {
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val top = accountingManager.getAllExpensesList()
+                .asSequence()
+                .filter { it.date >= start }
+                .groupBy { it.category.trim().ifBlank { "عمومی" } }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+                .maxByOrNull { it.value }
+            return if (top == null || top.value <= 0.0) {
+                "برای پیشنهاد صرفه‌جویی، ابتدا چند هزینه در دوره جاری ثبت کنید."
+            } else {
+                val saving = top.value * 0.20
+                "بیشترین ظرفیت کاهش هزینه فعلی مربوط به دسته «${top.key}» است. " +
+                    "اگر هزینه این دسته را حدود ۲۰٪ کاهش دهید، صرفه‌جویی پیشنهادی حدود " +
+                    "${com.maliar.pro.utils.CurrencyFormatter.format(saving)} خواهد بود. این فقط یک پیشنهاد تخمینی است."
+            }
+        }
         val asksSpendable = (text.contains("\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u0645") ||
             text.contains("\u0645\u06cc\u062a\u0648\u0646\u0645") ||
             text.contains("\u0642\u0627\u0628\u0644 \u062e\u0631\u062c")) &&
