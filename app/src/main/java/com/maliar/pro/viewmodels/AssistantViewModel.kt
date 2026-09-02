@@ -170,6 +170,37 @@ class AssistantViewModel(
                 "تعداد اقساط فعال: ${installments.size}\n" +
                 "این گزارش فقط بر اساس اطلاعات ثبت‌شده در برنامه است."
         }
+        val asksHabit = (text.contains("\u0686\u0647 \u0631\u0648\u0632") ||
+            text.contains("\u0631\u0648\u0632\u0647\u0627\u06cc") ||
+            text.contains("\u0627\u0644\u0606\u0648\u06cc \u0647\u0641\u062a\u0647")) &&
+            (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647"))
+        if (asksHabit) {
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val dayNames = mapOf(
+                java.util.Calendar.SATURDAY to "شنبه",
+                java.util.Calendar.SUNDAY to "یکشنبه",
+                java.util.Calendar.MONDAY to "دوشنبه",
+                java.util.Calendar.TUESDAY to "سه‌شنبه",
+                java.util.Calendar.WEDNESDAY to "چهارشنبه",
+                java.util.Calendar.THURSDAY to "پنجشنبه",
+                java.util.Calendar.FRIDAY to "جمعه"
+            )
+            val byDay = accountingManager.getAllExpensesList()
+                .asSequence()
+                .filter { it.date >= start }
+                .groupBy { expense ->
+                    java.util.Calendar.getInstance().apply { timeInMillis = expense.date }
+                        .get(java.util.Calendar.DAY_OF_WEEK)
+                }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+            val top = byDay.maxByOrNull { it.value }
+            return if (top == null) {
+                "در دوره جاری هنوز هزینه‌ای برای تحلیل روزهای هفته ثبت نشده است."
+            } else {
+                "بیشترین هزینه ثبت‌شده در دوره جاری مربوط به روز ${dayNames[top.key] ?: "نامشخص"} است: " +
+                    "${com.maliar.pro.utils.CurrencyFormatter.format(top.value)}. این تحلیل بر اساس داده‌های ثبت‌شده است."
+            }
+        }
         val asksSpendable = (text.contains("\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u0645") ||
             text.contains("\u0645\u06cc\u062a\u0648\u0646\u0645") ||
             text.contains("\u0642\u0627\u0628\u0644 \u062e\u0631\u062c")) &&
