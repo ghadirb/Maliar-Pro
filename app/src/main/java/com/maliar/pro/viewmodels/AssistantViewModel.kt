@@ -168,6 +168,20 @@ class AssistantViewModel(
                     "${com.maliar.pro.utils.CurrencyFormatter.format(unusual.amount)} بیش از دو برابر میانگین است و می‌تواند غیرعادی باشد."
             } else "در داده‌های دوره جاری هزینه‌ای بیش از دو برابر میانگین پیدا نشد."
         }
+        val asksSavingsDuration = (text.contains("\u0686\u0647 \u0645\u062f\u062a") ||
+            text.contains("\u0632\u0645\u0627\u0646 \u0631\u0633\u06cc\u062f\u0646")) &&
+            (text.contains("\u067e\u0633\u200c\u0627\u0646\u062f\u0627\u0632") || text.contains("\u0647\u062f\u0641"))
+        if (asksSavingsDuration) {
+            val goal = financialManager.getActiveGoals().minByOrNull { it.targetDate }
+                ?: return "برای برنامه‌ریزی پس‌انداز، ابتدا یک هدف مالی فعال ثبت کنید."
+            val remaining = (goal.targetAmount - goal.currentProgress).coerceAtLeast(0.0)
+            val monthly = accountingManager.getMonthlyIncome() - accountingManager.getMonthlyExpense()
+            if (remaining <= 0.0) return "هدف «${goal.title}» تکمیل شده است."
+            if (monthly <= 0.0) return "با تراز فعلی، مبلغ پس‌انداز ماهانه مثبت نیست؛ ابتدا درآمد و هزینه‌ها را بررسی کنید."
+            val months = kotlin.math.ceil(remaining / monthly).toInt().coerceAtLeast(1)
+            return "با پس‌انداز ماهانه فعلی حدود ${com.maliar.pro.utils.CurrencyFormatter.format(monthly)}، " +
+                "رسیدن به هدف «${goal.title}» تقریباً $months ماه زمان می‌برد. این برآورد تخمینی است."
+        }
         val asksWeeklyBudget = text.contains("\u0647\u0641\u062a\u0647") && text.contains("\u0628\u0648\u062f\u062c\u0647")
         if (asksWeeklyBudget) {
             val expenses = accountingManager.getAllExpensesList()
