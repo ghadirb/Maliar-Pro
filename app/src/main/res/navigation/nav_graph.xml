@@ -191,7 +191,72 @@
             app:exitAnim="@anim/nav_fade_out"
             app:popEnterAnim="@anim/nav_fade_in"
             app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_assetListFragment"
+            app:destination="@id/assetListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_debtListFragment"
+            app:destination="@id/debtListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_goalListFragment"
+            app:destination="@id/goalListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_fixedIncomeListFragment"
+            app:destination="@id/fixedIncomeListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_financialPreferencesFragment"
+            app:destination="@id/financialPreferencesFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
     </fragment>
+
+    <fragment
+        android:id="@+id/assetListFragment"
+        android:name="com.maliar.pro.ui.financial.AssetListFragment"
+        android:label="دارایی‌ها" />
+
+    <fragment
+        android:id="@+id/debtListFragment"
+        android:name="com.maliar.pro.ui.financial.DebtListFragment"
+        android:label="بدهی‌ها" />
+
+    <fragment
+        android:id="@+id/goalListFragment"
+        android:name="com.maliar.pro.ui.financial.GoalListFragment"
+        android:label="اهداف مالی" />
+
+    <fragment
+        android:id="@+id/fixedIncomeListFragment"
+        android:name="com.maliar.pro.ui.financial.FixedIncomeListFragment"
+        android:label="درآمدهای ثابت" />
+
+    <fragment
+        android:id="@+id/financialPreferencesFragment"
+        android:name="com.maliar.pro.ui.financial.FinancialPreferencesFragment"
+        android:label="ترجیحات مالی" />
 
     <fragment
         android:id="@+id/apiKeysFragment"
