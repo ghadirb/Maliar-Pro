@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.database.Check
 import com.maliar.pro.database.Expense
+import com.maliar.pro.database.FinancialStatusManager
+import com.maliar.pro.database.FinancialGoal
 import com.maliar.pro.database.Income
 import com.maliar.pro.database.Installment
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,7 +28,10 @@ import kotlinx.coroutines.launch
  * recreated. Deriving every total from the live Flow means ANY writer (this screen, the
  * assistant, a dialog, anything) shows up immediately, everywhere.
  */
-class AccountingViewModel(private val accountingManager: AccountingManager) : ViewModel() {
+class AccountingViewModel(
+    private val accountingManager: AccountingManager,
+    private val financialStatusManager: FinancialStatusManager? = null
+) : ViewModel() {
 
     /** Whether [timestamp] falls within the *current* financial period, where the period
      *  starts on the day-of-month the user chose in the Profile tab (defaults to the 1st,
@@ -134,6 +139,11 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
     val suggestedSpendableAmount = combine(suggestedMonthlyBudget, monthlyExpense) { budget, spent ->
         if (budget <= 0.0) null else (budget - spent).coerceAtLeast(0.0)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val activeGoalsSummary = (financialStatusManager?.getAllGoals()
+        ?.map { goals -> goals.filter { !it.isCompleted } }
+        ?: kotlinx.coroutines.flow.flowOf<List<FinancialGoal>>(emptyList()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<FinancialGoal>())
 
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)

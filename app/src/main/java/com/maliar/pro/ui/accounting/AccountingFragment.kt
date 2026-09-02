@@ -27,7 +27,10 @@ class AccountingFragment : Fragment() {
 
     private lateinit var binding: FragmentAccountingBinding
     private val viewModel: AccountingViewModel by viewModels {
-        AccountingViewModelFactory(AccountingManager(requireContext()))
+        AccountingViewModelFactory(
+            AccountingManager(requireContext()),
+            com.maliar.pro.database.FinancialStatusManager(requireContext())
+        )
     }
     private val dueSoonViewModel: DueSoonViewModel by viewModels {
         DueSoonViewModelFactory(
@@ -229,6 +232,19 @@ class AccountingFragment : Fragment() {
                     "قابل خرج پیشنهادی: داده کافی نیست"
                 } else {
                     "قابل خرج پیشنهادی تا پایان دوره: ${formatCurrency(amount)}"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.activeGoalsSummary.collect { goals ->
+                binding.goalsSummaryText.text = if (goals.isEmpty()) {
+                    "اهداف فعال: داده‌ای ثبت نشده"
+                } else {
+                    val progress = goals.map { goal ->
+                        if (goal.targetAmount <= 0.0) 0.0
+                        else (goal.currentProgress / goal.targetAmount * 100.0).coerceIn(0.0, 100.0)
+                    }.average().toInt()
+                    "اهداف فعال: ${goals.size} · میانگین پیشرفت $progress٪"
                 }
             }
         }

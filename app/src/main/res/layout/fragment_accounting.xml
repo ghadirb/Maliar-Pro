@@ -163,6 +163,14 @@
                     android:text="قابل خرج پیشنهادی: داده کافی نیست"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/goalsSummaryText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="اهداف فعال: داده‌ای ثبت نشده"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
