@@ -248,6 +248,15 @@ class AccountingFragment : Fragment() {
                 }
             }
         }
+        lifecycleScope.launch {
+            viewModel.nearestGoalSavingsSuggestion.collect { suggestion ->
+                binding.goalSavingsSuggestionText.text = if (suggestion == null) {
+                    "پیشنهاد پس‌انداز هدف: داده کافی نیست"
+                } else {
+                    "برای «${suggestion.first}» ماهانه حدود ${formatCurrency(suggestion.second)} پس‌انداز پیشنهادی است"
+                }
+            }
+        }
 
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.

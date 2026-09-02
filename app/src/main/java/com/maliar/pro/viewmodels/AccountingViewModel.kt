@@ -145,6 +145,18 @@ class AccountingViewModel(
         ?: kotlinx.coroutines.flow.flowOf<List<FinancialGoal>>(emptyList()))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<FinancialGoal>())
 
+    val nearestGoalSavingsSuggestion = activeGoalsSummary.map { goals ->
+        val goal = goals
+            .filter { it.targetAmount > it.currentProgress && it.targetDate > System.currentTimeMillis() }
+            .minByOrNull { it.targetDate }
+        if (goal == null) null else {
+            val remaining = (goal.targetAmount - goal.currentProgress).coerceAtLeast(0.0)
+            val months = ((goal.targetDate - System.currentTimeMillis()).toDouble() /
+                (30.44 * 24 * 60 * 60 * 1000)).coerceAtLeast(1.0)
+            Triple(goal.title, remaining / months, months.toInt())
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
