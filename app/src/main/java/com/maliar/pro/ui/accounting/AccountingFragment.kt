@@ -276,6 +276,15 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
+            viewModel.unpaidDebtSummary.collect { summary ->
+                binding.unpaidDebtText.text = if (summary.second == 0) {
+                    "بدهی پرداخت‌نشده: داده‌ای ثبت نشده"
+                } else {
+                    "بدهی پرداخت‌نشده: ${summary.second} مورد · ${formatCurrency(summary.first)}"
+                }
+            }
+        }
+        lifecycleScope.launch {
             viewModel.expenseAnalysis.collect { analysis ->
                 binding.expenseAnalysisText.text = if (analysis == null) {
                     "تحلیل هزینه: داده کافی نیست"
