@@ -85,6 +85,25 @@ class AccountingViewModel(private val accountingManager: AccountingManager) : Vi
     val monthlyBalance = combine(monthlyIncome, monthlyExpense) { inc, exp -> inc - exp }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
+    private fun startOfToday(): Long = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    val todayExpense = expenseList.map { list ->
+        val start = startOfToday()
+        list.filter { it.date >= start }.sumOf { it.amount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val weekExpense = expenseList.map { list ->
+        val start = startOfToday() - 6L * 24 * 60 * 60 * 1000
+        list.filter { it.date >= start }.sumOf { it.amount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val currentPeriodSavings = monthlyBalance
+
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 

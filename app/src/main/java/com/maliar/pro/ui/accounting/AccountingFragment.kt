@@ -196,6 +196,16 @@ class AccountingFragment : Fragment() {
             }
         }
 
+        lifecycleScope.launch {
+            viewModel.todayExpense.collect { binding.todayExpenseAmount.text = formatCurrency(it) }
+        }
+        lifecycleScope.launch {
+            viewModel.weekExpense.collect { binding.weekExpenseAmount.text = formatCurrency(it) }
+        }
+        lifecycleScope.launch {
+            viewModel.currentPeriodSavings.collect { binding.todaySavingsAmount.text = formatCurrency(it) }
+        }
+
         // Due-soon widget: only shown once there's actually something due within a week,
         // so it never occupies space with an empty state on a quiet week.
         lifecycleScope.launch {
