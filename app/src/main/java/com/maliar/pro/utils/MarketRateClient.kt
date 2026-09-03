@@ -12,7 +12,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 data class MarketRates(
     @SerializedName("gold") val gold: Double? = null,
     @SerializedName("currency") val currency: Double? = null,
-    @SerializedName("updatedAt") val updatedAt: Long = System.currentTimeMillis()
+    @SerializedName("updatedAt") val updatedAt: String? = null,
+    @SerializedName("status") val status: String? = null
 )
 
 /**
