@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -17,6 +19,9 @@ import com.maliar.pro.viewmodels.AccountingViewModel
 import com.maliar.pro.viewmodels.AccountingViewModelFactory
 import kotlinx.coroutines.launch
 import com.maliar.pro.utils.PersianCalendarHelper
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class ExpenseListFragment : Fragment() {
     private lateinit var binding: FragmentExpenseListBinding
@@ -25,6 +30,27 @@ class ExpenseListFragment : Fragment() {
     private var selectedMonth: Pair<Int, Int>? = null
     private val viewModel: AccountingViewModel by viewModels {
         AccountingViewModelFactory(AccountingManager(requireContext()))
+    }
+    private val receiptPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val image = runCatching { InputImage.fromFilePath(requireContext(), uri) }.getOrNull()
+        if (image == null) {
+            Toast.makeText(requireContext(), "خواندن تصویر رسید ممکن نیست.", Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
+        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            .process(image)
+            .addOnSuccessListener { result ->
+                val extracted = result.text.trim()
+                if (extracted.isBlank()) {
+                    Toast.makeText(requireContext(), "متنی از رسید تشخیص داده نشد.", Toast.LENGTH_LONG).show()
+                } else {
+                    showReceiptResult(extracted)
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(requireContext(), "اسکن رسید ناموفق بود.", Toast.LENGTH_LONG).show()
+            }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -39,7 +65,22 @@ class ExpenseListFragment : Fragment() {
         binding.expenseRecyclerView.adapter = adapter
         binding.addExpenseFab.setOnClickListener { AddExpenseDialog(requireContext(), viewModel).show() }
         binding.expenseMonthFilterButton.setOnClickListener { showMonthPicker() }
+        binding.scanReceiptButton.setOnClickListener { receiptPicker.launch("image/*") }
         loadExpenses()
+    }
+
+    private fun showReceiptResult(text: String) {
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("نتیجه اسکن رسید")
+            .setMessage(text)
+            .setPositiveButton("کپی متن") { _, _ ->
+                val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                    as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("receipt", text))
+                Toast.makeText(requireContext(), "متن رسید کپی شد؛ مبلغ و توضیحات را بررسی کنید.", Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("بستن", null)
+            .show()
     }
 
     private fun showEditExpenseDialog(expense: com.maliar.pro.database.Expense) {

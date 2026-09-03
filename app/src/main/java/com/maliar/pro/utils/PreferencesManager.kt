@@ -29,6 +29,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
         private const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_optimization_prompt_dismissed"
+        private const val KEY_BIOMETRIC_LOCK_ENABLED = "biometric_lock_enabled"
+        private const val KEY_MARKET_RATES_ENDPOINT = "market_rates_endpoint"
+        private const val KEY_MARKET_RATES_CACHE = "market_rates_cache"
 
         // --- Subscription / entitlement ---
         private const val KEY_DEVICE_ID = "device_id"
@@ -189,6 +192,21 @@ class PreferencesManager(context: Context) {
     }
 
     fun isOnboardingCompleted(): Boolean = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+
+    fun isBiometricLockEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC_LOCK_ENABLED, false)
+
+    fun setBiometricLockEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK_ENABLED, enabled).apply()
+    }
+
+    fun getMarketRatesEndpoint(): String = prefs.getString(KEY_MARKET_RATES_ENDPOINT, "") ?: ""
+    fun setMarketRatesEndpoint(endpoint: String) {
+        prefs.edit().putString(KEY_MARKET_RATES_ENDPOINT, endpoint.trim()).apply()
+    }
+    fun cacheMarketRates(json: String) {
+        prefs.edit().putString(KEY_MARKET_RATES_CACHE, json).apply()
+    }
+    fun getCachedMarketRates(): String? = prefs.getString(KEY_MARKET_RATES_CACHE, null)
 
     fun setOnboardingCompleted(completed: Boolean) {
         prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()

@@ -13,6 +13,9 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import com.maliar.pro.databinding.FragmentSettingsBinding
 import com.maliar.pro.utils.AutoBackupWorker
 import com.maliar.pro.utils.BackupManager
@@ -53,6 +56,68 @@ class SettingsFragment : Fragment() {
         setupNotificationSettings()
         setupBackgroundServiceSetting()
         setupBackupSettings()
+        setupBiometricLock()
+        setupMarketRates()
+    }
+
+    private fun setupMarketRates() {
+        binding.marketRatesEndpointInput.setText(prefs.getMarketRatesEndpoint())
+        binding.fetchMarketRatesButton.setOnClickListener {
+            val endpoint = binding.marketRatesEndpointInput.text.toString().trim()
+            if (!endpoint.startsWith("https://")) {
+                binding.marketRatesStatusText.text = "فقط آدرس HTTPS معتبر وارد کنید."
+                return@setOnClickListener
+            }
+            prefs.setMarketRatesEndpoint(endpoint)
+            binding.fetchMarketRatesButton.isEnabled = false
+            binding.marketRatesStatusText.text = "در حال دریافت نرخ..."
+            viewLifecycleOwner.lifecycleScope.launch {
+                val rates = withContext(Dispatchers.IO) {
+                    com.maliar.pro.utils.MarketRateClient(requireContext()).fetch()
+                }
+                binding.fetchMarketRatesButton.isEnabled = true
+                binding.marketRatesStatusText.text = if (rates == null) {
+                    "دریافت نرخ ممکن نشد؛ کش قبلی هم در دسترس نیست."
+                } else {
+                    "طلا: ${rates.gold ?: "-"} | ارز: ${rates.currency ?: "-"}"
+                }
+            }
+        }
+    }
+
+    private fun setupBiometricLock() {
+        binding.biometricLockSwitch.isChecked = prefs.isBiometricLockEnabled()
+        binding.biometricLockSwitch.setOnCheckedChangeListener { _, enabled ->
+            if (!enabled) {
+                prefs.setBiometricLockEnabled(false)
+                return@setOnCheckedChangeListener
+            }
+            val availability = BiometricManager.from(requireContext()).canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+                binding.biometricLockSwitch.isChecked = false
+                Toast.makeText(requireContext(), "قفل بیومتریک روی این دستگاه آماده نیست.", Toast.LENGTH_LONG).show()
+                return@setOnCheckedChangeListener
+            }
+            val executor = ContextCompat.getMainExecutor(requireContext())
+            BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    prefs.setBiometricLockEnabled(true)
+                }
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    binding.biometricLockSwitch.isChecked = false
+                }
+            }).authenticate(
+                BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("فعال‌سازی قفل مالیار")
+                    .setSubtitle("برای تأیید، قفل گوشی را تأیید کنید")
+                    .setAllowedAuthenticators(
+                        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    )
+                    .build()
+            )
+        }
     }
 
     override fun onResume() {

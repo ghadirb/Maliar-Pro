@@ -135,6 +135,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-ktx:1.8.2")
+    implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.6.2")
     
     // Coroutines
@@ -163,6 +164,7 @@ dependencies {
     
     // OkHttp for network requests
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     // The official Myket client is configured per product flavor for both Myket and
     // Cafe Bazaar, as documented by Myket. Each store receives its own signed APK/AAB.

@@ -12,6 +12,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
@@ -78,6 +80,29 @@ class MainActivity : AppCompatActivity() {
 
         setupNavigation()
         ensureNotificationPermissions()
+        authenticateAppIfNeeded()
+    }
+
+    private fun authenticateAppIfNeeded() {
+        if (!PreferencesManager(this).isBiometricLockEnabled()) return
+        val can = BiometricManager.from(this).canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        )
+        if (can != BiometricManager.BIOMETRIC_SUCCESS) return
+        BiometricPrompt(this, ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    finish()
+                }
+            }).authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("بازکردن مالیار")
+                .setSubtitle("برای مشاهده اطلاعات مالی، هویت خود را تأیید کنید")
+                .setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                )
+                .build()
+        )
     }
 
     /**

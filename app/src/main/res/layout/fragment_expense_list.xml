@@ -33,6 +33,12 @@
             android:layout_marginStart="8dp"
             android:text="همه هزینه‌ها"
             android:textColor="@color/text_secondary" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/scanReceiptButton"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="اسکن رسید" />
     </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
