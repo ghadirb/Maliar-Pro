@@ -16,10 +16,13 @@ import com.maliar.pro.dialogs.EditExpenseDialog
 import com.maliar.pro.viewmodels.AccountingViewModel
 import com.maliar.pro.viewmodels.AccountingViewModelFactory
 import kotlinx.coroutines.launch
+import com.maliar.pro.utils.PersianCalendarHelper
 
 class ExpenseListFragment : Fragment() {
     private lateinit var binding: FragmentExpenseListBinding
     private lateinit var adapter: ExpenseAdapter
+    private var allExpenses: List<com.maliar.pro.database.Expense> = emptyList()
+    private var selectedMonth: Pair<Int, Int>? = null
     private val viewModel: AccountingViewModel by viewModels {
         AccountingViewModelFactory(AccountingManager(requireContext()))
     }
@@ -35,6 +38,7 @@ class ExpenseListFragment : Fragment() {
         binding.expenseRecyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.expenseRecyclerView.adapter = adapter
         binding.addExpenseFab.setOnClickListener { AddExpenseDialog(requireContext(), viewModel).show() }
+        binding.expenseMonthFilterButton.setOnClickListener { showMonthPicker() }
         loadExpenses()
     }
 
@@ -44,8 +48,25 @@ class ExpenseListFragment : Fragment() {
 
     private fun loadExpenses() {
         lifecycleScope.launch {
-            viewModel.expenseList.collect { adapter.submitList(it) }
+            viewModel.expenseList.collect {
+                allExpenses = it
+                adapter.submitList(selectedMonth?.let { (y, m) -> it.filter { item -> PersianCalendarHelper.gregorianMillisToJalali(item.date).let { d -> d.first == y && d.second == m } } } ?: it)
+            }
         }
+    }
+
+    private fun showMonthPicker() {
+        val year = android.widget.EditText(requireContext()).apply { hint = "سال شمسی"; inputType = 2 }
+        val month = android.widget.EditText(requireContext()).apply { hint = "ماه ۱ تا ۱۲"; inputType = 2 }
+        val box = android.widget.LinearLayout(requireContext()).apply { orientation = 1; addView(year); addView(month) }
+        androidx.appcompat.app.AlertDialog.Builder(requireContext()).setTitle("انتخاب ماه و سال")
+            .setView(box).setNegativeButton("پاک کردن فیلتر") { _, _ -> selectedMonth = null; binding.expenseFilterLabel.text = "همه هزینه‌ها"; adapter.submitList(allExpenses) }
+            .setPositiveButton("نمایش") { _, _ ->
+                val y = year.text.toString().toIntOrNull(); val m = month.text.toString().toIntOrNull()
+                if (y == null || m !in 1..12) return@setPositiveButton
+                selectedMonth = y to m; binding.expenseFilterLabel.text = "هزینه‌های $m/$y"
+                adapter.submitList(allExpenses.filter { PersianCalendarHelper.gregorianMillisToJalali(it.date).let { d -> d.first == y && d.second == m } })
+            }.show()
     }
 
     private fun deleteExpense(expense: com.maliar.pro.database.Expense) {

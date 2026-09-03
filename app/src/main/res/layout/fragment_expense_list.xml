@@ -9,7 +9,31 @@
         android:id="@+id/expenseRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="8dp" />
+        android:padding="8dp"
+        android:paddingTop="64dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:gravity="center_vertical"
+        android:padding="8dp"
+        android:background="@color/background">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/expenseMonthFilterButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="فیلتر ماه/سال" />
+        <TextView
+            android:id="@+id/expenseFilterLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="همه هزینه‌ها"
+            android:textColor="@color/text_secondary" />
+    </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/addExpenseFab"
