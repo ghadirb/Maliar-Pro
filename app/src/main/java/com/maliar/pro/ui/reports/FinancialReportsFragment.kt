@@ -82,6 +82,7 @@ class FinancialReportsFragment : Fragment() {
 
         binding.periodPrevButton.setOnClickListener { viewModel.goToPreviousPeriod() }
         binding.periodNextButton.setOnClickListener { viewModel.goToNextPeriod() }
+        binding.periodSelectButton.setOnClickListener { showJalaliMonthPicker() }
 
         binding.periodChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
@@ -108,6 +109,36 @@ class FinancialReportsFragment : Fragment() {
                 if (report != null) renderReport(report)
             }
         }
+    }
+
+    private fun showJalaliMonthPicker() {
+        val container = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            setPadding(24, 8, 24, 0)
+        }
+        val yearInput = android.widget.EditText(requireContext()).apply {
+            hint = "سال شمسی"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        val monthInput = android.widget.EditText(requireContext()).apply {
+            hint = "ماه ۱ تا ۱۲"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        container.addView(yearInput, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+        container.addView(monthInput, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("انتخاب ماه و سال شمسی")
+            .setView(container)
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("نمایش") { _, _ ->
+                val year = yearInput.text.toString().toIntOrNull()
+                val month = monthInput.text.toString().toIntOrNull()
+                if (year == null || month == null || month !in 1..12) {
+                    android.widget.Toast.makeText(requireContext(), "سال و ماه شمسی معتبر وارد کنید", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    viewModel.selectJalaliMonth(year, month)
+                }
+            }.show()
     }
 
     private fun setupChart() {
