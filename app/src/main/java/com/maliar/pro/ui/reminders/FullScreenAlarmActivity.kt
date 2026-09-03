@@ -18,10 +18,12 @@ import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.card.MaterialCardView
 import com.maliar.pro.R
 import com.maliar.pro.database.AlertType
 import com.maliar.pro.database.SmartReminderManager
+import com.maliar.pro.utils.AIHelper
 import com.maliar.pro.utils.ReminderSound
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +68,13 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         wakeLock?.acquire(10 * 60 * 1000L) // 10 minutes max
 
         // Play sound
-        playAlarmSound(intent.getStringExtra("sound_uri"))
+        if (isSmartAlarm) {
+            findViewById<TextView>(R.id.alarmTypeHint).text = "🔊 یادآوری هوشمند"
+            findViewById<TextView>(R.id.alarmTypeHint).visibility = View.VISIBLE
+            speakSmartReminder(title, description, intent.getStringExtra("sound_uri"))
+        } else {
+            playAlarmSound(intent.getStringExtra("sound_uri"))
+        }
 
         // Vibrate
         vibrate()
@@ -79,15 +87,77 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         }
 
         setupSlideGesture()
+    }
 
-        // The spoken "smart reminder" voice is driven by SmartReminderTtsService, started
-        // directly from ReminderReceiver the instant the alarm fires - not from here - so
-        // it works even if this screen never actually gets shown on top. This activity is
-        // just the visual companion; its dismiss/snooze/complete buttons below also stop
-        // that voice loop.
-        if (isSmartAlarm) {
-            findViewById<TextView>(R.id.alarmTypeHint).text = "یادآوری هوشمند"
-            findViewById<TextView>(R.id.alarmTypeHint).visibility = View.VISIBLE
+    /**
+     * A "smart" reminder speaks its title/description out loud instead of (or before) the
+     * normal alarm tone, using GapGPT's cloud TTS - the device's own local TextToSpeech
+     * engine isn't reliable here since most phones don't have a Persian voice pack
+     * installed, which used to be the actual reason spoken reminders stayed silent even
+     * though everything else (permissions, audio routing, volume) was correct.
+     *
+     * This used to be driven by a separate always-on background Service
+     * (SmartReminderTtsService) that generated and played the voice independently of
+     * whether this screen ever actually appeared. That service was removed for running a
+     * risky, hard-to-justify background pattern - but nothing was put in its place, so
+     * SMART reminders silently stopped speaking at all. Doing the same work here instead,
+     * scoped to this foreground Activity's own lifecycle (lifecycleScope automatically
+     * cancels this if the alarm is dismissed/snoozed/completed before it finishes), avoids
+     * that problem entirely: there's no separate background component, nothing keeps
+     * running once this screen is gone, and it only ever does anything while a real
+     * full-screen alarm is legitimately on screen.
+     *
+     * Never leaves the person with total silence: if there's no active GapGPT key, the
+     * network call fails, or playback of the generated audio fails for any reason, this
+     * falls straight back to the normal looping alarm tone. On success, the alarm tone
+     * still starts automatically right after the spoken sentence finishes, so the alarm
+     * keeps going as backup in case the person didn't notice the one-time announcement.
+     */
+    private fun speakSmartReminder(title: String, description: String, soundUri: String?) {
+        lifecycleScope.launch {
+            val phrase = buildSpokenPhrase(title, description)
+            val audioFile = AIHelper.synthesizeSpeech(this@FullScreenAlarmActivity, phrase)
+            if (isFinishing || isDestroyed) return@launch
+            if (audioFile != null) {
+                playGeneratedSpeech(audioFile, soundUri)
+            } else {
+                playAlarmSound(soundUri)
+            }
+        }
+    }
+
+    private suspend fun buildSpokenPhrase(title: String, description: String): String {
+        val subject = if (description.isNotBlank()) "$title. $description" else title
+        val generated = AIHelper.generateText(
+            context = this@FullScreenAlarmActivity,
+            systemPrompt = "You turn a Persian reminder's title/description into exactly one short, " +
+                "natural-sounding Persian sentence (max ~20 words) to be spoken out loud to the person " +
+                "as a voice reminder. Reply with only that sentence in Persian - no quotes, no labels, " +
+                "no extra commentary.",
+            userPrompt = subject
+        )
+        return generated?.takeIf { it.isNotBlank() } ?: "یادآوری: $subject"
+    }
+
+    /** Plays the generated speech once, then hands off to the normal looping alarm tone
+     *  as soon as it finishes - so the alarm keeps demanding attention afterward exactly
+     *  like a non-smart reminder would. */
+    private fun playGeneratedSpeech(audioFile: java.io.File, soundUri: String?) {
+        try {
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(audioFile.absolutePath)
+                isLooping = false
+                setOnCompletionListener { finished ->
+                    finished.release()
+                    if (mediaPlayer === finished) mediaPlayer = null
+                    if (!isFinishing && !isDestroyed) playAlarmSound(soundUri)
+                }
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("FullScreenAlarm", "Error playing generated speech", e)
+            playAlarmSound(soundUri)
         }
     }
 

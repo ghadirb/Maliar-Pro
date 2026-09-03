@@ -82,13 +82,13 @@ class ReminderReceiver : BroadcastReceiver() {
             // actionable notification as SMART, so choosing "تمام صفحه" when creating a
             // reminder never actually produced a true full-screen wake-the-lock-screen
             // alarm - showFullScreenIntentNotification() existed but nothing ever called
-            // it. SMART no longer has a distinct spoken-TTS behavior to fall back to
-            // (that service was removed for Play Protect safety), so it still uses the
-            // same actionable notification as before.
-            AlertType.FULL_SCREEN.name ->
-                showFullScreenIntentNotification(context, reminderId, title, description, soundValue)
-            AlertType.SMART.name ->
-                showPlainNotification(context, title, description, reminderId, "action", contactName, contactPhone, soundValue)
+            // it. SMART now uses the same full-screen alarm path: FullScreenAlarmActivity
+            // is what actually generates the natural-language phrase and speaks it via
+            // GapGPT TTS the moment it opens (see its onCreate) - that only works if the
+            // activity genuinely gets shown, so SMART can no longer settle for a plain
+            // notification the way it used to.
+            AlertType.FULL_SCREEN.name, AlertType.SMART.name ->
+                showFullScreenIntentNotification(context, reminderId, title, description, soundValue, alertType)
             else -> {
                 val notificationMode = prefs.getNotificationMode()
                 if (notificationMode == "none") {
@@ -162,14 +162,15 @@ class ReminderReceiver : BroadcastReceiver() {
         reminderId: Long,
         title: String,
         description: String,
-        soundValue: String
+        soundValue: String,
+        alertType: String
     ) {
         val alarmIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("reminder_id", reminderId)
             putExtra("reminder_title", title)
             putExtra("reminder_description", description)
-            putExtra("alert_type", AlertType.FULL_SCREEN.name)
+            putExtra("alert_type", alertType)
             putExtra("sound_uri", soundValue)
         }
 
