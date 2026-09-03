@@ -52,6 +52,32 @@ object AIHelper {
     }
 
     /**
+     * Turns a reminder's title/description into one short spoken Persian sentence and
+     * synthesizes it, in one call - the single source of truth for "smart reminder" audio,
+     * used both by ReminderReceiver (to precompute audio for a notification that might
+     * only ever show as a heads-up, never actually opening [FullScreenAlarmActivity]) and
+     * by the activity itself (when it has to generate on the spot, e.g. no precomputed
+     * file was passed along). Returns null - never throws - if either step fails, so
+     * callers must always have a non-cloud fallback (a plain alarm tone) ready.
+     */
+    suspend fun synthesizeReminderSpeech(
+        context: android.content.Context,
+        title: String,
+        description: String
+    ): java.io.File? {
+        val subject = if (description.isNotBlank()) "$title. $description" else title
+        val phrase = generateText(
+            context = context,
+            systemPrompt = "You turn a Persian reminder's title/description into exactly one short, " +
+                "natural-sounding Persian sentence (max ~20 words) to be spoken out loud to the person " +
+                "as a voice reminder. Reply with only that sentence in Persian - no quotes, no labels, " +
+                "no extra commentary.",
+            userPrompt = subject
+        )?.takeIf { it.isNotBlank() } ?: "یادآوری: $subject"
+        return synthesizeSpeech(context, phrase)
+    }
+
+    /**
      * Transcribes a short audio file (recorded for the voice-command notification feature).
      * Personal key first, then the shared proxy; returns null if neither works, so callers
      * must handle that as "couldn't understand".

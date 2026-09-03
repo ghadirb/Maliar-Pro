@@ -82,6 +82,23 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.MaliarPro.Alarm" />
 
+        <!-- Exposes cache-dir files (currently: generated smart-reminder TTS audio) to the
+             system as content:// URIs, e.g. so a heads-up notification (posted while the
+             device is unlocked and the app is backgrounded, where Android intentionally
+             won't auto-launch FullScreenAlarmActivity - see ReminderReceiver) can still
+             play the spoken reminder as its notification sound instead of the plain alarm
+             tone. Nothing here is exported/world-readable; access is only ever granted
+             per-URI via FLAG_GRANT_READ_URI_PERMISSION. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.maliar.pro.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Reminder Receivers -->
         <receiver
             android:name=".receivers.ReminderReceiver"

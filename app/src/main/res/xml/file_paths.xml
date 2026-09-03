@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Used only to grant the system NotificationManager/media services read access to the
+     generated smart-reminder speech file (context.cacheDir) so it can be used as a
+     notification sound and played back from a tapped notification. Nothing else in the
+     app currently needs to share files, so this intentionally only exposes the cache
+     root, not external storage or app-internal data directories. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="tts_cache" path="." />
+</paths>

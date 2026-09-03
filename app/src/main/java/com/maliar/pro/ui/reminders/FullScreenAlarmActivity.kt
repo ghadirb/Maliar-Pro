@@ -71,7 +71,22 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         if (isSmartAlarm) {
             findViewById<TextView>(R.id.alarmTypeHint).text = "🔊 یادآوری هوشمند"
             findViewById<TextView>(R.id.alarmTypeHint).visibility = View.VISIBLE
-            speakSmartReminder(title, description, intent.getStringExtra("sound_uri"))
+            val precomputedAudioPath = intent.getStringExtra("tts_audio_path")
+            val alreadySpoken = intent.getBooleanExtra("already_spoken", false)
+            val precomputedAudio = precomputedAudioPath?.let { java.io.File(it) }?.takeIf { it.exists() }
+            when {
+                // ReminderReceiver already played this exact sentence as the notification's
+                // own sound (see its ttsContentUri/smartAudioChannelId) before the person
+                // tapped through to this screen - speaking it again here would just repeat
+                // the same sentence a second time, so go straight to the normal alarm tone.
+                alreadySpoken -> playAlarmSound(intent.getStringExtra("sound_uri"))
+                // Device was locked, so Android auto-promoted straight to this screen
+                // without ReminderReceiver needing to precompute anything - but it may
+                // still have generated audio in time (e.g. app-foreground direct launch
+                // racing a fast network reply); reuse it instead of a redundant AI call.
+                precomputedAudio != null -> playGeneratedSpeech(precomputedAudio, intent.getStringExtra("sound_uri"))
+                else -> speakSmartReminder(title, description, intent.getStringExtra("sound_uri"))
+            }
         } else {
             playAlarmSound(intent.getStringExtra("sound_uri"))
         }
@@ -115,8 +130,10 @@ class FullScreenAlarmActivity : AppCompatActivity() {
      */
     private fun speakSmartReminder(title: String, description: String, soundUri: String?) {
         lifecycleScope.launch {
-            val phrase = buildSpokenPhrase(title, description)
-            val audioFile = AIHelper.synthesizeSpeech(this@FullScreenAlarmActivity, phrase)
+            // Shared with ReminderReceiver's precompute path (see AIHelper.
+            // synthesizeReminderSpeech) so the exact same phrasing logic is used whichever
+            // path ends up generating the audio.
+            val audioFile = AIHelper.synthesizeReminderSpeech(this@FullScreenAlarmActivity, title, description)
             if (isFinishing || isDestroyed) return@launch
             if (audioFile != null) {
                 playGeneratedSpeech(audioFile, soundUri)
@@ -124,19 +141,6 @@ class FullScreenAlarmActivity : AppCompatActivity() {
                 playAlarmSound(soundUri)
             }
         }
-    }
-
-    private suspend fun buildSpokenPhrase(title: String, description: String): String {
-        val subject = if (description.isNotBlank()) "$title. $description" else title
-        val generated = AIHelper.generateText(
-            context = this@FullScreenAlarmActivity,
-            systemPrompt = "You turn a Persian reminder's title/description into exactly one short, " +
-                "natural-sounding Persian sentence (max ~20 words) to be spoken out loud to the person " +
-                "as a voice reminder. Reply with only that sentence in Persian - no quotes, no labels, " +
-                "no extra commentary.",
-            userPrompt = subject
-        )
-        return generated?.takeIf { it.isNotBlank() } ?: "یادآوری: $subject"
     }
 
     /** Plays the generated speech once, then hands off to the normal looping alarm tone
