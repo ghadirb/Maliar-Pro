@@ -134,16 +134,16 @@ class MealPlanFragment : Fragment() {
         }
         val nameInput = EditText(requireContext()).apply {
             hint = "عنوان کالا یا ماده غذایی"
-            singleLine = true
+            setSingleLine(true)
         }
         val priceInput = EditText(requireContext()).apply {
             hint = "قیمت هر واحد (تومان)"
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-            singleLine = true
+            setSingleLine(true)
         }
         val unitInput = EditText(requireContext()).apply {
             hint = "واحد (مثلاً کیلو یا بسته)"
-            singleLine = true
+            setSingleLine(true)
         }
         val saveButton = Button(requireContext()).apply { text = "افزودن قیمت" }
         val entriesContainer = LinearLayout(requireContext()).apply {

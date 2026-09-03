@@ -63,7 +63,7 @@ class ExpenseListFragment : Fragment() {
             .setView(box).setNegativeButton("پاک کردن فیلتر") { _, _ -> selectedMonth = null; binding.expenseFilterLabel.text = "همه هزینه‌ها"; adapter.submitList(allExpenses) }
             .setPositiveButton("نمایش") { _, _ ->
                 val y = year.text.toString().toIntOrNull(); val m = month.text.toString().toIntOrNull()
-                if (y == null || m !in 1..12) return@setPositiveButton
+                if (y == null || m == null || m !in 1..12) return@setPositiveButton
                 selectedMonth = y to m; binding.expenseFilterLabel.text = "هزینه‌های $m/$y"
                 adapter.submitList(allExpenses.filter { PersianCalendarHelper.gregorianMillisToJalali(it.date).let { d -> d.first == y && d.second == m } })
             }.show()
