@@ -39,6 +39,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_EXPIRY_REMINDER_SCHEDULED_FOR = "expiry_reminder_scheduled_for"
         private const val KEY_PHONE_NUMBER = "phone_number"
         private const val KEY_LAST_STORE_CHANNEL = "last_store_channel"
+        private const val KEY_MARKET_RATES_JSON = "market_rates_json"
+        private const val KEY_MARKET_RATES_CACHED_AT = "market_rates_cached_at"
     }
 
     fun saveAPIKeys(keys: List<APIKey>) {
@@ -274,6 +276,17 @@ class PreferencesManager(context: Context) {
 
     fun setLastStoreChannel(channel: String) {
         prefs.edit().putString(KEY_LAST_STORE_CHANNEL, channel).apply()
+    }
+
+    fun getCachedMarketRatesJson(): String? = prefs.getString(KEY_MARKET_RATES_JSON, null)
+
+    fun getCachedMarketRatesAt(): Long = prefs.getLong(KEY_MARKET_RATES_CACHED_AT, 0L)
+
+    fun setCachedMarketRates(json: String, cachedAt: Long) {
+        prefs.edit()
+            .putString(KEY_MARKET_RATES_JSON, json)
+            .putLong(KEY_MARKET_RATES_CACHED_AT, cachedAt)
+            .apply()
     }
 
 }

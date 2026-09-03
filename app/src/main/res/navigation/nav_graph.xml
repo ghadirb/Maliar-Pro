@@ -93,7 +93,20 @@
             app:exitAnim="@anim/nav_fade_out"
             app:popEnterAnim="@anim/nav_fade_in"
             app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_accountingFragment_to_marketRatesFragment"
+            app:destination="@id/marketRatesFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
     </fragment>
+
+    <fragment
+        android:id="@+id/marketRatesFragment"
+        android:name="com.maliar.pro.ui.market.MarketRatesFragment"
+        android:label="نرخ طلا و ارز" />
 
     <fragment
         android:id="@+id/dueSoonFragment"

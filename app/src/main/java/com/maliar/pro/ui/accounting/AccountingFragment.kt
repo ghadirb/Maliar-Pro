@@ -107,6 +107,10 @@ class AccountingFragment : Fragment() {
         binding.mealPlanCard.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_mealPlanFragment)
         }
+
+        binding.marketRatesCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_marketRatesFragment)
+        }
     }
 
     private fun observeViewModel() {

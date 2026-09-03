@@ -12,6 +12,7 @@ import com.maliar.pro.database.Priority
 import com.maliar.pro.database.RecurringType
 import com.maliar.pro.database.ContactManager
 import com.maliar.pro.models.AIProvider
+import com.maliar.pro.utils.MarketRatesRepository
 import com.maliar.pro.utils.PreferencesManager
 import com.maliar.pro.utils.VoiceCallHelper
 import kotlinx.coroutines.Dispatchers
@@ -610,6 +611,8 @@ class AssistantViewModel(
         val totalAssets = financialManager.getTotalAssets()
         val totalDebts = financialManager.getTotalUnpaidDebts()
         val activeGoals = financialManager.getActiveGoals()
+        val marketRates = MarketRatesRepository(appContext).getRates()
+        val marketBlock = MarketRatesRepository(appContext).toPromptBlock(marketRates)
 
         return """
             شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
@@ -625,6 +628,7 @@ class AssistantViewModel(
             - کل دارایی‌ها (وضعیت مالی): ${com.maliar.pro.utils.CurrencyFormatter.format(totalAssets, "")} تومان
             - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${com.maliar.pro.utils.CurrencyFormatter.format(totalDebts, "")} تومان
             - اهداف مالی فعال: ${activeGoals.size} عدد${if (activeGoals.isNotEmpty()) " (" + activeGoals.joinToString("، ") { it.title } + ")" else ""}
+            $marketBlock
 
             شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید.
 
