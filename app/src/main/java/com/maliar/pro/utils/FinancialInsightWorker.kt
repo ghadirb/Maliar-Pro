@@ -16,14 +16,18 @@ import kotlin.math.roundToInt
 
 /**
  * Runs once a day (while "پیشنهادهای هوشمند مالی" is on) and posts at most one notification
- * with the single most useful insight it can find for that day: either a category spending
- * swing vs. the previous Jalali month (e.g. "هزینه حمل‌ونقل شما در مرداد نسبت به تیر ۲۳٪
- * افزایش داشته است"), or, if nothing swung enough to be worth mentioning, a projected
- * end-of-month surplus/deficit based on the average daily net so far this month. The
- * deterministic numbers are always computed locally first (so the feature works even with
- * no AI credentials/connectivity); [AIHelper.generateText] is used only to phrase the
- * final sentence more naturally when it's available, with the local sentence as a
- * guaranteed fallback either way.
+ * with the single most useful insight it can find for that day, in priority order: a
+ * category spending swing vs. the previous Jalali month (e.g. "هزینه حمل‌ونقل شما در مرداد
+ * نسبت به تیر ۲۳٪ افزایش داشته است"); a meaningful day-over-day swing in the gold/currency
+ * rate from [MarketRateClient] (e.g. "نرخ طلا نسبت به آخرین بررسی حدود ۴٪ افزایش داشته
+ * است") - reported only as a percentage, since that needs no assumption about the rate's
+ * exact unit or quotation basis, unlike a derived "you can afford N grams" figure would;
+ * or, if nothing swung enough to be worth mentioning, a projected end-of-month
+ * surplus/deficit based on the average daily net so far this month. The deterministic
+ * numbers are always computed locally first (so the feature works even with no AI
+ * credentials/connectivity); [AIHelper.generateText] is used only to phrase the final
+ * sentence more naturally when it's available, with the local sentence as a guaranteed
+ * fallback either way.
  */
 class FinancialInsightWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -36,7 +40,9 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
             val expenses = accountingManager.getAllExpensesList()
             val incomes = accountingManager.getAllIncomesList()
 
-            val message = buildCategorySwingInsight(expenses) ?: buildProjectionInsight(incomes, expenses)
+            val message = buildCategorySwingInsight(expenses)
+                ?: buildMarketRateInsight()
+                ?: buildProjectionInsight(incomes, expenses)
             if (message != null) {
                 val finalMessage = tryRephraseWithAi(message) ?: message
                 NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage)
@@ -86,6 +92,34 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         val direction = if (bestIncreased) "افزایش" else "کاهش"
 
         return "هزینه \"$bestCategory\" شما در $thisMonthName نسبت به $lastMonthName حدود $percentText٪ $direction داشته است."
+    }
+
+    /** Compares today's freshly-fetched gold/currency rate against this worker's own last
+     *  successful fetch (cached by [MarketRateClient]) and reports whichever of gold or
+     *  currency swung more, if the swing is at least [MIN_MARKET_SWING_PERCENT]. Reads the
+     *  cache *before* calling [MarketRateClient.fetch] (which overwrites it on success), so
+     *  "previous" and "current" are genuinely two different points in time. Best-effort:
+     *  no network, a stale/missing cache, or any parse failure all just mean no insight. */
+    private suspend fun buildMarketRateInsight(): String? {
+        val prefs = PreferencesManager(applicationContext)
+        val gson = com.google.gson.Gson()
+        val previous = prefs.getCachedMarketRates()
+            ?.let { runCatching { gson.fromJson(it, MarketRates::class.java) }.getOrNull() }
+            ?: return null // nothing to compare against yet (e.g. first run)
+
+        val current = runCatching { MarketRateClient(applicationContext).fetch() }.getOrNull() ?: return null
+
+        return marketSwingSentence("طلا", previous.gold, current.gold)
+            ?: marketSwingSentence("دلار", previous.currency, current.currency)
+    }
+
+    private fun marketSwingSentence(label: String, previousValue: Double?, currentValue: Double?): String? {
+        if (previousValue == null || currentValue == null || previousValue <= 0) return null
+        val swingPercent = ((currentValue - previousValue) / previousValue) * 100
+        if (kotlin.math.abs(swingPercent) < MIN_MARKET_SWING_PERCENT) return null
+        val direction = if (swingPercent > 0) "افزایش" else "کاهش"
+        val percentText = kotlin.math.abs(swingPercent).roundToInt()
+        return "نرخ $label نسبت به آخرین بررسی حدود $percentText٪ $direction داشته است."
     }
 
     /** Projects the month-end balance from the average daily net (income - expense) recorded
@@ -139,6 +173,7 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         private const val UNIQUE_WORK_NAME = "maliar_pro_financial_insights"
         private const val MIN_SWING_PERCENT = 15.0
         private const val MIN_PROJECTION_AMOUNT = 50_000.0
+        private const val MIN_MARKET_SWING_PERCENT = 3.0
 
         fun schedule(context: Context, runImmediately: Boolean = false) {
             val request = PeriodicWorkRequestBuilder<FinancialInsightWorker>(1, TimeUnit.DAYS).build()
