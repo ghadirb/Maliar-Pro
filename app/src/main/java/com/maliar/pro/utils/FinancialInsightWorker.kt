@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.maliar.pro.database.AccountingManager
@@ -139,17 +140,29 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         private const val MIN_SWING_PERCENT = 15.0
         private const val MIN_PROJECTION_AMOUNT = 50_000.0
 
-        fun schedule(context: Context) {
+        fun schedule(context: Context, runImmediately: Boolean = false) {
             val request = PeriodicWorkRequestBuilder<FinancialInsightWorker>(1, TimeUnit.DAYS).build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_WORK_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
+            if (runImmediately) {
+                // Periodic work may legally wait up to the first interval before its
+                // initial run. Run one best-effort analysis immediately only when the
+                // user explicitly enables the feature, never on every app startup.
+                val immediate = OneTimeWorkRequestBuilder<FinancialInsightWorker>().build()
+                WorkManager.getInstance(context).enqueueUniqueWork(
+                    "${UNIQUE_WORK_NAME}_immediate",
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    immediate
+                )
+            }
         }
 
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
+            WorkManager.getInstance(context).cancelUniqueWork("${UNIQUE_WORK_NAME}_immediate")
         }
     }
 }

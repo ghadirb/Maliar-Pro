@@ -170,7 +170,7 @@ class SettingsFragment : Fragment() {
         binding.financialInsightsSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefs.setFinancialInsightsEnabled(isChecked)
             if (isChecked) {
-                FinancialInsightWorker.schedule(requireContext())
+                FinancialInsightWorker.schedule(requireContext(), runImmediately = true)
                 Toast.makeText(requireContext(), "پیشنهادهای هوشمند مالی فعال شد", Toast.LENGTH_SHORT).show()
             } else {
                 FinancialInsightWorker.cancel(requireContext())
