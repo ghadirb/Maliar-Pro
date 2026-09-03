@@ -31,6 +31,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_optimization_prompt_dismissed"
         private const val KEY_BIOMETRIC_LOCK_ENABLED = "biometric_lock_enabled"
         private const val KEY_MARKET_RATES_ENDPOINT = "market_rates_endpoint"
+        private const val KEY_MARKET_RATES_TOKEN = "market_rates_token"
         private const val KEY_MARKET_RATES_CACHE = "market_rates_cache"
 
         // --- Subscription / entitlement ---
@@ -202,6 +203,10 @@ class PreferencesManager(context: Context) {
     fun getMarketRatesEndpoint(): String = prefs.getString(KEY_MARKET_RATES_ENDPOINT, "") ?: ""
     fun setMarketRatesEndpoint(endpoint: String) {
         prefs.edit().putString(KEY_MARKET_RATES_ENDPOINT, endpoint.trim()).apply()
+    }
+    fun getMarketRatesToken(): String = prefs.getString(KEY_MARKET_RATES_TOKEN, "") ?: ""
+    fun setMarketRatesToken(token: String) {
+        prefs.edit().putString(KEY_MARKET_RATES_TOKEN, token.trim()).apply()
     }
     fun cacheMarketRates(json: String) {
         prefs.edit().putString(KEY_MARKET_RATES_CACHE, json).apply()

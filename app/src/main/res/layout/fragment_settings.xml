@@ -285,6 +285,14 @@
                     android:hint="آدرس HTTPS وب‌اپ Apps Script"
                     android:inputType="textUri"
                     android:singleLine="true" />
+                <EditText
+                    android:id="@+id/marketRatesTokenInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:hint="توکن دسترسی وب‌اپ (APP_TOKEN)"
+                    android:inputType="textPassword"
+                    android:singleLine="true" />
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/fetchMarketRatesButton"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"

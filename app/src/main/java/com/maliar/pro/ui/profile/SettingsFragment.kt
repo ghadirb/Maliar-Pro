@@ -62,6 +62,7 @@ class SettingsFragment : Fragment() {
 
     private fun setupMarketRates() {
         binding.marketRatesEndpointInput.setText(prefs.getMarketRatesEndpoint())
+        binding.marketRatesTokenInput.setText(prefs.getMarketRatesToken())
         binding.fetchMarketRatesButton.setOnClickListener {
             val endpoint = binding.marketRatesEndpointInput.text.toString().trim()
             if (!endpoint.startsWith("https://")) {
@@ -69,6 +70,7 @@ class SettingsFragment : Fragment() {
                 return@setOnClickListener
             }
             prefs.setMarketRatesEndpoint(endpoint)
+            prefs.setMarketRatesToken(binding.marketRatesTokenInput.text.toString())
             binding.fetchMarketRatesButton.isEnabled = false
             binding.marketRatesStatusText.text = "در حال دریافت نرخ..."
             viewLifecycleOwner.lifecycleScope.launch {
