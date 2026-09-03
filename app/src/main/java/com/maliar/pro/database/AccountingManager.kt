@@ -145,6 +145,14 @@ class AccountingManager(context: Context) {
         return accountingDao.getMonthlyExpense(start) ?: 0.0
     }
 
+    /** "تراز دوره" - period income minus period expense, using the same
+     *  getFinancialPeriodStartMillis() boundary (the person's custom period-start-day
+     *  from Profile) as AccountingViewModel.monthlyBalance on the accounting dashboard,
+     *  so this and that screen always agree. Deliberately separate from getBalance()
+     *  above ("تراز کل"), which is scoped to the whole Jalali year on purpose and
+     *  shouldn't change just because the person picks a different period-start-day. */
+    suspend fun getPeriodBalance(): Double = getMonthlyIncome() - getMonthlyExpense()
+
     /** Epoch millis for the start of the *current* financial period, based on the
      *  period-start-day the user picked in the Profile tab (defaults to the 1st of the
      *  Jalali month when unset). Plain synchronous SharedPreferences + calendar math, so

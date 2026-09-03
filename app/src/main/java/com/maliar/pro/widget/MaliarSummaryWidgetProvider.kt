@@ -16,11 +16,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * A simple home-screen widget: current balance + the next upcoming reminder. Read-only and
- * refreshed periodically (every 30 min, the Android-enforced minimum-adjacent interval) plus
- * on-demand via [requestUpdate] whenever accounting/reminder data actually changes, so it
- * doesn't rely only on the slow periodic refresh. Tapping it opens the app - no other
- * interaction, no background service, no new permissions.
+ * A simple home-screen widget: total balance ("تراز کل") + this period's balance
+ * ("تراز دوره") + the next upcoming reminder. Read-only and refreshed periodically
+ * (every 30 min, the Android-enforced minimum-adjacent interval) plus on-demand via
+ * [requestUpdate] whenever accounting/reminder data actually changes, so it doesn't rely
+ * only on the slow periodic refresh. Tapping it opens the app - no other interaction, no
+ * background service, no new permissions.
  */
 class MaliarSummaryWidgetProvider : AppWidgetProvider() {
 
@@ -42,6 +43,7 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widgetRoot, pendingIntent)
             views.setOnClickPendingIntent(R.id.widgetBalanceText, pendingIntent)
+            views.setOnClickPendingIntent(R.id.widgetPeriodBalanceText, pendingIntent)
             views.setOnClickPendingIntent(R.id.widgetNextReminderText, pendingIntent)
 
             // Show something immediately (avoids a blank widget while the async load below
@@ -50,12 +52,19 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val balance = AccountingManager(context).getBalance()
+                    val accountingManager = AccountingManager(context)
+                    val balance = accountingManager.getBalance()
+                    val periodBalance = accountingManager.getPeriodBalance()
                     val nextReminder = SmartReminderManager(context).getActiveRemindersList()
                         .filter { !it.isCompleted }
                         .minByOrNull { it.triggerTime }
 
                     views.setTextViewText(R.id.widgetBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(balance))
+                    views.setTextViewText(R.id.widgetPeriodBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(periodBalance))
+                    views.setTextColor(
+                        R.id.widgetPeriodBalanceText,
+                        if (periodBalance < 0) android.graphics.Color.parseColor("#FFCDD2") else android.graphics.Color.WHITE
+                    )
                     views.setTextViewText(
                         R.id.widgetNextReminderText,
                         if (nextReminder != null) {

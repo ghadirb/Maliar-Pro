@@ -49,6 +49,23 @@
         android:textSize="18sp"
         android:text="۰ تومان" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="تراز دوره"
+        android:textColor="#CCFFFFFF"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/widgetPeriodBalanceText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="15sp"
+        android:text="۰ تومان" />
+
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"
