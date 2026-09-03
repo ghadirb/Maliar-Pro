@@ -63,28 +63,37 @@ class SettingsFragment : Fragment() {
     private fun setupMarketRates() {
         binding.marketRatesEndpointInput.setText(prefs.getMarketRatesEndpoint())
         binding.marketRatesTokenInput.setText(prefs.getMarketRatesToken())
-        binding.fetchMarketRatesButton.setOnClickListener {
-            val endpoint = binding.marketRatesEndpointInput.text.toString().trim()
-            if (!endpoint.startsWith("https://")) {
-                binding.marketRatesStatusText.text = "فقط آدرس HTTPS معتبر وارد کنید."
-                return@setOnClickListener
+
+        fun runFetch(persistCustomEndpoint: Boolean) {
+            if (persistCustomEndpoint) {
+                val endpoint = binding.marketRatesEndpointInput.text.toString().trim()
+                if (endpoint.isNotEmpty() && !endpoint.startsWith("https://")) {
+                    binding.marketRatesStatusText.text = "فقط آدرس HTTPS معتبر وارد کنید."
+                    return
+                }
+                prefs.setMarketRatesEndpoint(endpoint)
+                prefs.setMarketRatesToken(binding.marketRatesTokenInput.text.toString())
             }
-            prefs.setMarketRatesEndpoint(endpoint)
-            prefs.setMarketRatesToken(binding.marketRatesTokenInput.text.toString())
             binding.fetchMarketRatesButton.isEnabled = false
             binding.marketRatesStatusText.text = "در حال دریافت نرخ..."
             viewLifecycleOwner.lifecycleScope.launch {
                 val rates = withContext(Dispatchers.IO) {
                     com.maliar.pro.utils.MarketRateClient(requireContext()).fetch()
                 }
+                if (!isAdded) return@launch
                 binding.fetchMarketRatesButton.isEnabled = true
                 binding.marketRatesStatusText.text = if (rates == null) {
                     "دریافت نرخ ممکن نشد؛ کش قبلی هم در دسترس نیست."
                 } else {
-                    "طلا: ${rates.gold ?: "-"} | ارز: ${rates.currency ?: "-"}"
+                    "طلا: ${rates.gold ?: "-"} | دلار: ${rates.currency ?: "-"} | سکه امامی: ${rates.coinEmami ?: "-"}"
                 }
             }
         }
+
+        binding.fetchMarketRatesButton.setOnClickListener { runFetch(persistCustomEndpoint = true) }
+        // Show the automatically-fetched (or cached) rate as soon as the screen opens, so
+        // the user can see it's already working with no address entered.
+        runFetch(persistCustomEndpoint = false)
     }
 
     private fun setupBiometricLock() {

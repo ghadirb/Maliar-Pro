@@ -274,15 +274,22 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="نرخ طلا و ارز (اختیاری)"
+                    android:text="نرخ طلا و ارز"
                     android:textSize="16sp"
                     android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="این نرخ‌ها به‌صورت خودکار دریافت می‌شوند و دستیار هوشمند از آن‌ها در تحلیل‌ها استفاده می‌کند؛ نیازی به وارد کردن آدرسی نیست. آدرس زیر فقط برای کاربران پیشرفته است که می‌خواهند منبع اختصاصی خودشان را جایگزین کنند."
+                    android:textSize="12sp"
+                    android:textColor="#757575" />
                 <EditText
                     android:id="@+id/marketRatesEndpointInput"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:hint="آدرس HTTPS وب‌اپ Apps Script"
+                    android:hint="آدرس HTTPS اختصاصی (اختیاری - برای کاربران پیشرفته)"
                     android:inputType="textUri"
                     android:singleLine="true" />
                 <EditText
@@ -290,7 +297,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:hint="توکن دسترسی وب‌اپ (APP_TOKEN)"
+                    android:hint="توکن دسترسی منبع اختصاصی (اختیاری)"
                     android:inputType="textPassword"
                     android:singleLine="true" />
                 <com.google.android.material.button.MaterialButton
@@ -299,7 +306,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="دریافت نرخ" />
+                    android:text="آزمایش دریافت نرخ" />
                 <TextView
                     android:id="@+id/marketRatesStatusText"
                     android:layout_width="match_parent"

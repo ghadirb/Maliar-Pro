@@ -991,6 +991,7 @@ class AssistantViewModel(
         val totalAssets = financialManager.getTotalAssets()
         val totalDebts = financialManager.getTotalUnpaidDebts()
         val activeGoals = financialManager.getActiveGoals()
+        val marketRatesSection = buildMarketRatesSection()
 
         return """
             شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
@@ -1006,12 +1007,42 @@ class AssistantViewModel(
             - کل دارایی‌ها (وضعیت مالی): ${com.maliar.pro.utils.CurrencyFormatter.format(totalAssets, "")} تومان
             - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${com.maliar.pro.utils.CurrencyFormatter.format(totalDebts, "")} تومان
             - اهداف مالی فعال: ${activeGoals.size} عدد${if (activeGoals.isNotEmpty()) " (" + activeGoals.joinToString("، ") { it.title } + ")" else ""}
+            $marketRatesSection
 
-            شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید.
+            شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید. اگر نرخ طلا/ارز در بالا موجود بود و کاربر درباره خرید طلا/سکه/ارز، حفظ ارزش پول یا تخصیص بودجه به دارایی پرسید، آن نرخ‌ها را در کنار بودجه و موجودی کاربر تحلیل کنید (مثلاً چند گرم طلا با موجودی فعلی قابل خرید است، یا نسبت پس‌انداز به نرخ روز). اگر نرخی در دسترس نبود، صراحتاً بگویید نرخ لحظه‌ای در دسترس نیست و تحلیل را فقط بر مبنای داده‌های ثبت‌شده در برنامه بدهید؛ هرگز عددی را حدس نزنید.
 
             نکته‌ی بسیار مهم: شما توانایی فنی نوشتن یا ذخیره کردن هیچ‌چیزی در دیتابیس برنامه را ندارید (نه یادآوری، نه هزینه/درآمد، نه دارایی/بدهی/هدف). اگر همین پیام کاربر به این مکالمه رسیده، یعنی سیستم داخلی برنامه آن را به‌عنوان یک دستور اجرایی (ثبت یادآوری/هزینه/درآمد/دارایی/بدهی/هدف) تشخیص نداده است. پس هرگز عباراتی مثل «ثبت شد»، «یادآوری تنظیم شد»، «ذخیره کردم» را به‌کار نبرید، چون واقعاً چیزی ذخیره نشده و کاربر را گمراه می‌کند. در عوض، اگر پیام کاربر به‌نظر یک درخواست ثبت/یادآوری است، از او بخواهید دقیق‌تر و ساده‌تر بنویسد (مثلاً «یادآوری کن فردا ساعت ۵ ...» یا «۵۰ هزار تومان هزینه»)، تا سیستم داخلی بتواند آن را تشخیص دهد.
             لطفاً به زبان فارسی پاسخ دهید.
         """.trimIndent()
+    }
+
+    /**
+     * Best-effort, non-blocking read of the public gold/currency rates (see
+     * [com.maliar.pro.utils.MarketRateClient]) formatted as a prompt section. Bounded by a
+     * short timeout and wrapped so any failure (no internet, slow host, malformed JSON)
+     * silently yields an empty section - it must never delay or break an assistant reply.
+     */
+    private suspend fun buildMarketRatesSection(): String {
+        val rates = try {
+            kotlinx.coroutines.withTimeoutOrNull(4000) {
+                com.maliar.pro.utils.MarketRateClient(appContext).fetch()
+            }
+        } catch (e: Exception) {
+            null
+        } ?: return ""
+
+        if (rates.gold == null && rates.currency == null) return ""
+
+        val lines = mutableListOf<String>()
+        rates.gold?.let { lines.add("- نرخ هر گرم طلای ۱۸ عیار: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
+        rates.currency?.let { lines.add("- نرخ دلار: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
+        rates.coinEmami?.let { lines.add("- سکه امامی: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
+        rates.coinHalf?.let { lines.add("- نیم سکه: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
+        rates.coinQuarter?.let { lines.add("- ربع سکه: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
+        if (lines.isEmpty()) return ""
+
+        val updated = rates.updatedAt?.let { " (به‌روزرسانی: $it)" } ?: ""
+        return "\nنرخ لحظه‌ای طلا و ارز$updated:\n" + lines.joinToString("\n")
     }
 
     private suspend fun callGapgptAI(message: String): String? = withContext(Dispatchers.IO) {
