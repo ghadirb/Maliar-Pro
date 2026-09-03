@@ -131,6 +131,7 @@ class MealPlanFragment : Fragment() {
         val root = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 8, 32, 8)
+            textDirection = View.TEXT_DIRECTION_RTL
         }
         val nameInput = EditText(requireContext()).apply {
             hint = "عنوان کالا یا ماده غذایی"
@@ -178,10 +179,17 @@ class MealPlanFragment : Fragment() {
         val listJob = lifecycleScope.launch {
             manager.getAll().collect { items ->
                 entriesContainer.removeAllViews()
+                if (items.isEmpty()) {
+                    entriesContainer.addView(TextView(requireContext()).apply {
+                        text = "هنوز قیمتی ثبت نشده است."
+                        setPadding(0, 24, 0, 16)
+                        gravity = android.view.Gravity.CENTER_HORIZONTAL
+                    })
+                }
                 items.forEach { item ->
                     val row = LinearLayout(requireContext()).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        setPadding(0, 8, 0, 8)
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(0, 16, 0, 16)
                     }
                     val label = TextView(requireContext()).apply {
                         text = "${item.name} — ${item.pricePerUnit.toLong()} تومان" +
@@ -205,9 +213,13 @@ class MealPlanFragment : Fragment() {
                     delete.setOnClickListener {
                         lifecycleScope.launch { manager.delete(item) }
                     }
+                    val actions = LinearLayout(requireContext()).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                    }
+                    actions.addView(edit)
+                    actions.addView(delete)
                     row.addView(label)
-                    row.addView(edit)
-                    row.addView(delete)
+                    row.addView(actions)
                     entriesContainer.addView(row)
                 }
             }

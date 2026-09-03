@@ -253,7 +253,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val fullScreenPendingIntent = PendingIntent.getActivity(
+        val contentPendingIntent = PendingIntent.getActivity(
             context, reminderId.toInt(), alarmIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -268,11 +268,13 @@ class ReminderReceiver : BroadcastReceiver() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(description)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setContentIntent(fullScreenPendingIntent)
+            // Android 14+ requires USE_FULL_SCREEN_INTENT for takeover notifications.
+            // Maliar is not an alarm/phone app, so use a reliable heads-up notification
+            // and open the reminder screen only after the user taps it.
+            .setContentIntent(contentPendingIntent)
 
         // Pre-Oreo devices have no notification channels at all, so a channel's sound
         // can't carry the generated speech there - fall back to setSound() directly.

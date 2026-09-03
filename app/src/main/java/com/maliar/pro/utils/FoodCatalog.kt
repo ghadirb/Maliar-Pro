@@ -48,13 +48,52 @@ object FoodCatalog {
         FoodItemDef("دوغ", "لیتر", 200_000.0)
     )
 
+    private val aliases: Map<String, List<String>> = mapOf(
+        "سیب‌زمینی" to listOf("سیب زمینی", "سیبزمینی", "سیب زمینی تازه"),
+        "گوجه‌فرنگی" to listOf(
+            "گوجه", "گوجه فرنگی", "گوجهفرنگی",
+            "گرجه", "گرجه فرنگی", "گرجه‌فرنگی", "گرجهفرنگی"
+        ),
+        "تخم‌مرغ" to listOf("تخم مرغ", "تخممرغ"),
+        "رب گوجه" to listOf("رب گوجه‌فرنگی", "رب گوجه فرنگی", "ربگوجه"),
+        "لوبیا" to listOf("لوبیا چیتی", "لوبیا قرمز", "لوبیا سفید"),
+        "سبزی" to listOf("سبزی خوردن", "سبزی آش", "سبزی پلو")
+    )
+
+    /** A conservative Persian comparison key: spaces, half-spaces and punctuation do not
+     * matter; common Arabic letter variants are unified. It intentionally does not apply
+     * broad fuzzy matching, so one food is never silently priced as another. */
+    fun canonicalKey(value: String): String = value.trim()
+        .lowercase(java.util.Locale.ROOT)
+        .replace('ي', 'ی')
+        .replace('ى', 'ی')
+        .replace('ك', 'ک')
+        .replace('ة', 'ه')
+        .filter { it.isLetterOrDigit() }
+        .toString()
+
+    /** Recognizes a catalog food from an exact item/alias name or a longer expense
+     * description that contains one. The longest matching alias wins (e.g. "گوجه فرنگی"
+     * before "گوجه"). */
+    fun matchName(value: String): FoodItemDef? {
+        val key = canonicalKey(value)
+        if (key.isBlank()) return null
+        val candidates = ITEMS.flatMap { item ->
+            (listOf(item.name) + aliases[item.name].orEmpty()).map { alias -> item to canonicalKey(alias) }
+        }.filter { it.second.isNotBlank() }
+        return candidates.filter { it.second == key }
+            .maxByOrNull { it.second.length }
+            ?.first
+            ?: candidates.filter { key.contains(it.second) }
+                .maxByOrNull { it.second.length }
+                ?.first
+    }
+
     /** Best-effort match: does this expense description mention a known food ingredient?
      *  Returns the matched [FoodItemDef] or null - a plain substring check, deliberately
      *  simple since the person's own free-text descriptions are short and Persian word
      *  forms vary too much for anything fancier to be reliably better. */
     fun findMatch(description: String): FoodItemDef? {
-        val normalized = description.trim()
-        if (normalized.isBlank()) return null
-        return ITEMS.firstOrNull { normalized.contains(it.name) }
+        return matchName(description)
     }
 }
