@@ -12,8 +12,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
-               MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class],
-    version = 16,
+               MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class,
+               MonthlyBudget::class],
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +29,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun mealPlanDao(): MealPlanDao
     abstract fun foodPriceDao(): FoodPriceDao
     abstract fun marketRateHistoryDao(): MarketRateHistoryDao
+    abstract fun budgetDao(): BudgetDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -209,6 +211,30 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE assets ADD COLUMN dailyLimit REAL")
             }
         }
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `monthly_budgets` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `year` INTEGER NOT NULL,
+                        `month` INTEGER NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `softThreshold` INTEGER NOT NULL DEFAULT 70,
+                        `hardThreshold` INTEGER NOT NULL DEFAULT 85,
+                        `isEnabled` INTEGER NOT NULL DEFAULT 1,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_monthly_budgets_year_month_category` " +
+                        "ON `monthly_budgets` (`year`, `month`, `category`)"
+                )
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -223,7 +249,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

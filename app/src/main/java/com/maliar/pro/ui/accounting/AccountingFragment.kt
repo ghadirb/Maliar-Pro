@@ -109,6 +109,10 @@ class AccountingFragment : Fragment() {
             findNavController().navigate(R.id.action_accountingFragment_to_financialReportsFragment)
         }
 
+        binding.budgetCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_budgetFragment)
+        }
+
         binding.carsCard.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_carListFragment)
         }

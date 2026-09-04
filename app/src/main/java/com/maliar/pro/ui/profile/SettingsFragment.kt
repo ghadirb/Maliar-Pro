@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -111,9 +112,12 @@ class SettingsFragment : Fragment() {
                 prefs.setBiometricLockEnabled(false)
                 return@setOnCheckedChangeListener
             }
-            val availability = BiometricManager.from(requireContext()).canAuthenticate(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-            )
+            val authenticators = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            } else {
+                BiometricManager.Authenticators.BIOMETRIC_WEAK
+            }
+            val availability = BiometricManager.from(requireContext()).canAuthenticate(authenticators)
             if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
                 binding.biometricLockSwitch.isChecked = false
                 Toast.makeText(requireContext(), "قفل بیومتریک روی این دستگاه آماده نیست.", Toast.LENGTH_LONG).show()
@@ -132,7 +136,7 @@ class SettingsFragment : Fragment() {
                     .setTitle("فعال‌سازی قفل مالیار")
                     .setSubtitle("برای تأیید، قفل گوشی را تأیید کنید")
                     .setAllowedAuthenticators(
-                        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                        authenticators
                     )
                     .build()
             )

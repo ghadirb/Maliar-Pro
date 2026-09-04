@@ -107,8 +107,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun authenticateAppIfNeeded() {
         if (!PreferencesManager(this).isBiometricLockEnabled()) return
+        val authenticators = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        } else {
+            BiometricManager.Authenticators.BIOMETRIC_WEAK
+        }
         val can = BiometricManager.from(this).canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            authenticators
         )
         if (can != BiometricManager.BIOMETRIC_SUCCESS) return
         BiometricPrompt(this, ContextCompat.getMainExecutor(this),
@@ -121,7 +126,7 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("بازکردن مالیار")
                 .setSubtitle("برای مشاهده اطلاعات مالی، هویت خود را تأیید کنید")
                 .setAllowedAuthenticators(
-                    BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                    authenticators
                 )
                 .build()
         )
