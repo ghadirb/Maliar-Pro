@@ -41,6 +41,9 @@ interface FinancialStatusDao {
 
     @Query("SELECT * FROM assets WHERE purpose = :purpose ORDER BY value DESC")
     suspend fun getAssetsByPurposeList(purpose: AccountPurpose): List<Asset>
+
+    @Query("UPDATE assets SET dailyLimit = :dailyLimit WHERE id = :assetId")
+    suspend fun setDailyLimit(assetId: Long, dailyLimit: Double?)
     
     // Debts
     @Query("SELECT * FROM debts ORDER BY amount DESC")

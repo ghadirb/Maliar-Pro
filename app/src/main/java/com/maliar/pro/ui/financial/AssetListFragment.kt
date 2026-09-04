@@ -84,7 +84,10 @@ class AssetListFragment : Fragment() {
                 val items = assets.map { asset ->
                     val typeLabel = typeLabels[asset.type] ?: ""
                     val purposeLabel = purposeLabels[asset.purpose] ?: asset.purpose.name
-                    val subtitle = "$typeLabel · $purposeLabel"
+                    val limitLabel = asset.dailyLimit?.let {
+                        " · سقف روزانه ${CurrencyFormatter.format(it)}"
+                    } ?: ""
+                    val subtitle = "$typeLabel · $purposeLabel$limitLabel"
                     FinancialEntryItem(
                         id = asset.id,
                         title = asset.title,
@@ -130,8 +133,40 @@ class AssetListFragment : Fragment() {
                 purposes.map { purposeLabels[it] ?: it.name }.toTypedArray(),
                 purposes.indexOf(asset.purpose)
             ) { dialog, position ->
-                viewModel.setAccountPurpose(asset.id, purposes[position])
                 dialog.dismiss()
+                val purpose = purposes[position]
+                if (purpose == AccountPurpose.DAILY_SPENDING) {
+                    showDailySpendingSetupDialog(asset)
+                } else {
+                    viewModel.setAccountPurpose(asset.id, purpose)
+                }
+            }
+            .setNegativeButton("لغو", null)
+            .show()
+    }
+
+    private fun showDailySpendingSetupDialog(asset: Asset) {
+        val limitInput = EditText(requireContext()).apply {
+            hint = "سقف اختیاری خرج روزانه (تومان)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(asset.dailyLimit?.toLong()?.toString().orEmpty())
+        }
+        val assignHistory = android.widget.CheckBox(requireContext()).apply {
+            text = "هزینه‌های قبلیِ بدون حساب به این حساب وصل شوند"
+        }
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 0)
+            addView(limitInput)
+            addView(assignHistory)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("تنظیم حساب خرج روزانه")
+            .setMessage("این کار انتقال واقعی پول انجام نمی‌دهد؛ فقط مبنای پیشنهاد خرج و دسته‌بندی هزینه‌ها را مشخص می‌کند.")
+            .setView(container)
+            .setPositiveButton("ذخیره") { _, _ ->
+                viewModel.setAccountPurpose(asset.id, AccountPurpose.DAILY_SPENDING, assignHistory.isChecked)
+                viewModel.setDailyLimit(asset.id, limitInput.text.toString().toDoubleOrNull())
             }
             .setNegativeButton("لغو", null)
             .show()
@@ -169,6 +204,11 @@ class AssetListFragment : Fragment() {
                 AccountPurpose.values().map { purposeLabels[it] ?: it.name }
             )
         }
+        val dailyLimitInput = EditText(requireContext()).apply {
+            hint = "سقف اختیاری خرج روزانه (تومان)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            visibility = View.GONE
+        }
         val container = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 0)
@@ -176,6 +216,7 @@ class AssetListFragment : Fragment() {
             addView(nameInput)
             addView(amountInput)
             addView(purposeSpinner)
+            addView(dailyLimitInput)
             addView(goldGramsInput)
             addView(goldHintText)
         }
@@ -187,6 +228,14 @@ class AssetListFragment : Fragment() {
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
+        purposeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, v: View?, position: Int, id: Long) {
+                dailyLimitInput.visibility = if (
+                    AccountPurpose.values()[position] == AccountPurpose.DAILY_SPENDING
+                ) View.VISIBLE else View.GONE
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("افزودن دارایی")
             .setView(container)
@@ -195,12 +244,13 @@ class AssetListFragment : Fragment() {
                 if (name.isEmpty()) return@setPositiveButton
                 val type = types[typeSpinner.selectedItemPosition]
                 val purpose = AccountPurpose.values()[purposeSpinner.selectedItemPosition]
+                val dailyLimit = dailyLimitInput.text.toString().toDoubleOrNull()
                 val grams = goldGramsInput.text.toString().toDoubleOrNull()
                 if (type == AssetType.GOLD && grams != null && grams > 0) {
-                    viewModel.addGoldAsset(name, grams, purpose)
+                    viewModel.addGoldAsset(name, grams, purpose, dailyLimit)
                 } else {
                     val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
-                    viewModel.addAsset(type, name, amount, purpose = purpose)
+                    viewModel.addAsset(type, name, amount, purpose = purpose, dailyLimit = dailyLimit)
                 }
             }
             .setNegativeButton("لغو", null)

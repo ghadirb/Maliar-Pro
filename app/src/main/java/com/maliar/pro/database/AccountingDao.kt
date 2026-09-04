@@ -51,6 +51,9 @@ interface AccountingDao {
 
     @Query("SELECT SUM(amount) FROM expenses WHERE accountId = :accountId")
     suspend fun getExpenseTotalForAccount(accountId: Long): Double?
+
+    @Query("UPDATE expenses SET accountId = :accountId WHERE accountId IS NULL")
+    suspend fun assignUnlinkedExpensesToAccount(accountId: Long)
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExpense(expense: Expense): Long

@@ -158,10 +158,15 @@ class AccountingViewModel(
             } else {
                 val spentFromAccount = expenses.filter { it.accountId == account.id }.sumOf { it.amount }
                 val remaining = (account.value - spentFromAccount).coerceAtLeast(0.0)
-                val calendar = java.util.Calendar.getInstance()
-                val days = (calendar.getActualMaximum(java.util.Calendar.DAY_OF_MONTH) -
-                    calendar.get(java.util.Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
-                DailySpendingSummary(account.title, remaining, remaining / days, true)
+                val (jalaliYear, jalaliMonth, jalaliDay) =
+                    com.maliar.pro.utils.PersianCalendarHelper.getCurrentJalaliDate()
+                val days = (com.maliar.pro.utils.PersianCalendarHelper.daysInJalaliMonth(jalaliYear, jalaliMonth) -
+                    jalaliDay + 1).coerceAtLeast(1)
+                val todayStart = startOfToday()
+                val spentToday = expenses.filter { it.accountId == account.id && it.date >= todayStart }.sumOf { it.amount }
+                val dailyLimitRemaining = account.dailyLimit?.let { (it - spentToday).coerceAtLeast(0.0) }
+                val suggestion = minOf(remaining / days, dailyLimitRemaining ?: Double.MAX_VALUE)
+                DailySpendingSummary(account.title, remaining, suggestion, true)
             }
         }.stateIn(
             viewModelScope,

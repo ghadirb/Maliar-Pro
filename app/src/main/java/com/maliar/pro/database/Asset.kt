@@ -19,7 +19,8 @@ data class Asset(
      *  rather than being a fixed number the user has to update by hand; when null, [value]
      *  behaves exactly as before (a plain fixed amount the user typed in). */
     val goldGrams: Double? = null,
-    val purpose: AccountPurpose = AccountPurpose.NORMAL
+    val purpose: AccountPurpose = AccountPurpose.NORMAL,
+    val dailyLimit: Double? = null
 )
 
 enum class AccountPurpose {

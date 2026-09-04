@@ -25,11 +25,12 @@ class AssetListViewModel(private val financialManager: FinancialStatusManager) :
         name: String,
         amount: Double,
         description: String = "",
-        purpose: AccountPurpose = AccountPurpose.NORMAL
+        purpose: AccountPurpose = AccountPurpose.NORMAL,
+        dailyLimit: Double? = null
     ) {
         viewModelScope.launch {
             val id = financialManager.addAsset(
-                Asset(type = type, title = name, value = amount, description = description, purpose = purpose)
+                Asset(type = type, title = name, value = amount, description = description, purpose = purpose, dailyLimit = dailyLimit)
             )
             if (purpose == AccountPurpose.DAILY_SPENDING) {
                 financialManager.setAccountPurpose(id, purpose)
@@ -37,15 +38,26 @@ class AssetListViewModel(private val financialManager: FinancialStatusManager) :
         }
     }
 
-    fun setAccountPurpose(assetId: Long, purpose: AccountPurpose) {
-        viewModelScope.launch { financialManager.setAccountPurpose(assetId, purpose) }
+    fun setAccountPurpose(assetId: Long, purpose: AccountPurpose, assignExistingExpenses: Boolean = false) {
+        viewModelScope.launch {
+            financialManager.setAccountPurpose(assetId, purpose, assignExistingExpenses)
+        }
+    }
+
+    fun setDailyLimit(assetId: Long, dailyLimit: Double?) {
+        viewModelScope.launch { financialManager.setDailyLimit(assetId, dailyLimit) }
     }
 
     /** Adds a gold asset specified by weight; see [FinancialStatusManager.addGoldAsset]
      *  for why its value is computed from the live rate instead of typed in by hand. */
-    fun addGoldAsset(name: String, grams: Double, purpose: AccountPurpose = AccountPurpose.NORMAL) {
+    fun addGoldAsset(
+        name: String,
+        grams: Double,
+        purpose: AccountPurpose = AccountPurpose.NORMAL,
+        dailyLimit: Double? = null
+    ) {
         viewModelScope.launch {
-            financialManager.addGoldAsset(name, grams, purpose)
+            financialManager.addGoldAsset(name, grams, purpose, dailyLimit)
         }
     }
 

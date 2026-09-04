@@ -19,11 +19,22 @@ class FinancialStatusManager(context: Context) {
         return financialDao.getAssetsByPurpose(purpose)
     }
 
-    suspend fun setAccountPurpose(assetId: Long, purpose: AccountPurpose) {
+    suspend fun setAccountPurpose(
+        assetId: Long,
+        purpose: AccountPurpose,
+        assignExistingExpenses: Boolean = false
+    ) {
         if (purpose == AccountPurpose.DAILY_SPENDING) {
             financialDao.clearPurpose(AccountPurpose.DAILY_SPENDING)
+            if (assignExistingExpenses) {
+                database.accountingDao().assignUnlinkedExpensesToAccount(assetId)
+            }
         }
         financialDao.setPurpose(assetId, purpose)
+    }
+
+    suspend fun setDailyLimit(assetId: Long, dailyLimit: Double?) {
+        financialDao.setDailyLimit(assetId, dailyLimit?.takeIf { it > 0.0 })
     }
     
     suspend fun getAllAssetsList(): List<Asset> {
@@ -48,11 +59,23 @@ class FinancialStatusManager(context: Context) {
      *  afterwards by [refreshGoldAssetValues]. If no rate is available yet (offline/first
      *  run), the value simply starts at 0 and self-corrects the next time the rate is
      *  reachable - it never guesses a price. */
-    suspend fun addGoldAsset(name: String, grams: Double, purpose: AccountPurpose = AccountPurpose.NORMAL): Long {
+    suspend fun addGoldAsset(
+        name: String,
+        grams: Double,
+        purpose: AccountPurpose = AccountPurpose.NORMAL,
+        dailyLimit: Double? = null
+    ): Long {
         val rate = runCatching { com.maliar.pro.utils.MarketRateClient(appContext).fetch() }.getOrNull()
         val value = rate?.gold?.let { grams * it / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN } ?: 0.0
         val id = financialDao.insertAsset(
-            Asset(type = AssetType.GOLD, title = name, value = value, goldGrams = grams, purpose = purpose)
+            Asset(
+                type = AssetType.GOLD,
+                title = name,
+                value = value,
+                goldGrams = grams,
+                purpose = purpose,
+                dailyLimit = dailyLimit?.takeIf { it > 0.0 }
+            )
         )
         if (purpose != AccountPurpose.NORMAL) setAccountPurpose(id, purpose)
         return id

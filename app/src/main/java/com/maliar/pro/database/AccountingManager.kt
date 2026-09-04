@@ -54,6 +54,10 @@ class AccountingManager(context: Context) {
     suspend fun getExpenseTotalForAccount(accountId: Long): Double {
         return accountingDao.getExpenseTotalForAccount(accountId) ?: 0.0
     }
+
+    suspend fun assignUnlinkedExpensesToAccount(accountId: Long) {
+        accountingDao.assignUnlinkedExpensesToAccount(accountId)
+    }
     
     suspend fun addExpense(expense: Expense): Long {
         val linkedAccountId = expense.accountId ?: database.financialStatusDao()
