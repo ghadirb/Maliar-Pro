@@ -76,6 +76,9 @@ class AccountingFragment : Fragment() {
         binding.installmentsCard.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_installmentListFragment)
         }
+        binding.periodicPaymentsCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_periodicPaymentFragment)
+        }
 
         binding.addIncomeButton.setOnClickListener {
             showAddIncomeDialog()
@@ -332,6 +335,11 @@ class AccountingFragment : Fragment() {
                     "پرداخت‌های دوره‌ای ۳۰ روز آینده: داده‌ای ثبت نشده"
                 } else {
                     "پرداخت‌های دوره‌ای ۳۰ روز آینده: ${formatCurrency(amount)} · واردشده توسط کاربر"
+                }
+                binding.periodicPaymentsCardSummary.text = if (amount <= 0.0) {
+                    "اشتراک‌ها و تعهدات آینده: موردی ثبت نشده"
+                } else {
+                    "تعهدات ۳۰ روز آینده: ${formatCurrency(amount)}"
                 }
             }
         }

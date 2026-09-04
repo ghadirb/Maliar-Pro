@@ -96,12 +96,19 @@
         <action
             android:id="@+id/action_accountingFragment_to_budgetFragment"
             app:destination="@id/budgetFragment" />
+        <action
+            android:id="@+id/action_accountingFragment_to_periodicPaymentFragment"
+            app:destination="@id/periodicPaymentFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/budgetFragment"
         android:name="com.maliar.pro.ui.accounting.BudgetFragment"
         android:label="بودجه من" />
+    <fragment
+        android:id="@+id/periodicPaymentFragment"
+        android:name="com.maliar.pro.ui.accounting.PeriodicPaymentFragment"
+        android:label="پرداخت‌های دوره‌ای" />
 
     <fragment
         android:id="@+id/dueSoonFragment"
