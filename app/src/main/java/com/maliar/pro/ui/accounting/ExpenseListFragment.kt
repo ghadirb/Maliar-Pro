@@ -92,9 +92,9 @@ class ExpenseListFragment : Fragment() {
                     if (numeric) inputType = android.text.InputType.TYPE_CLASS_NUMBER or
                         android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
                     container.addView(this)
-                }
+            }
             container.addView(TextView(requireContext()).apply {
-                text = "اطلاعات زیر فقط از روی متنِ رسید پیشنهاد شده است؛ پیش از ثبت، همه موارد را بررسی و اصلاح کنید."
+                this.text = "اطلاعات زیر فقط از روی متنِ رسید پیشنهاد شده است؛ پیش از ثبت، همه موارد را بررسی و اصلاح کنید."
             })
             val amountInput = input("مبلغ (تومان)", draft.amount?.toLong()?.toString().orEmpty(), true)
             val titleInput = input("عنوان یا فروشگاه", draft.title)
