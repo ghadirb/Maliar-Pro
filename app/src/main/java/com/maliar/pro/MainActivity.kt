@@ -107,29 +107,42 @@ class MainActivity : AppCompatActivity() {
 
     private fun authenticateAppIfNeeded() {
         if (!PreferencesManager(this).isBiometricLockEnabled()) return
+        // Android 10/OEM biometric implementations are inconsistent when the
+        // DEVICE_CREDENTIAL flag is combined with BIOMETRIC_WEAK. Keep the
+        // Android-10 path strictly fingerprint/biometric and guard every call:
+        // a broken vendor framework must never crash the app.
         val authenticators = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        } else {
-            BiometricManager.Authenticators.BIOMETRIC_WEAK
-        }
-        val can = BiometricManager.from(this).canAuthenticate(
-            authenticators
-        )
-        if (can != BiometricManager.BIOMETRIC_SUCCESS) return
-        BiometricPrompt(this, ContextCompat.getMainExecutor(this),
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    finish()
-                }
-            }).authenticate(
-            BiometricPrompt.PromptInfo.Builder()
+        } else BiometricManager.Authenticators.BIOMETRIC_WEAK
+        try {
+            val can = BiometricManager.from(this).canAuthenticate(authenticators)
+            if (can != BiometricManager.BIOMETRIC_SUCCESS) {
+                Toast.makeText(this, "قفل بیومتریک روی این دستگاه در دسترس نیست.", Toast.LENGTH_LONG).show()
+                return
+            }
+            val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        Toast.makeText(this@MainActivity, "احراز هویت انجام نشد؛ برنامه قفل باقی می‌ماند.", Toast.LENGTH_LONG).show()
+                        finish()
+                    }
+                    override fun onAuthenticationFailed() {
+                        Toast.makeText(this@MainActivity, "اثر انگشت شناسایی نشد.", Toast.LENGTH_SHORT).show()
+                    }
+                })
+            val info = BiometricPrompt.PromptInfo.Builder()
                 .setTitle("بازکردن مالیار")
                 .setSubtitle("برای مشاهده اطلاعات مالی، هویت خود را تأیید کنید")
-                .setAllowedAuthenticators(
-                    authenticators
-                )
+                .setAllowedAuthenticators(authenticators)
                 .build()
-        )
+            prompt.authenticate(info)
+        } catch (security: SecurityException) {
+            Toast.makeText(this, "مجوز یا سرویس بیومتریک دستگاه آماده نیست.", Toast.LENGTH_LONG).show()
+        } catch (state: IllegalStateException) {
+            Toast.makeText(this, "سرویس بیومتریک دستگاه پاسخ نداد.", Toast.LENGTH_LONG).show()
+        } catch (argument: IllegalArgumentException) {
+            Toast.makeText(this, "تنظیمات بیومتریک این دستگاه پشتیبانی نمی‌شود.", Toast.LENGTH_LONG).show()
+        }
     }
 
     /**

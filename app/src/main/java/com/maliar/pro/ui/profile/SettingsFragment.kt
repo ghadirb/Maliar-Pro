@@ -117,29 +117,37 @@ class SettingsFragment : Fragment() {
             } else {
                 BiometricManager.Authenticators.BIOMETRIC_WEAK
             }
-            val availability = BiometricManager.from(requireContext()).canAuthenticate(authenticators)
+            val availability = try {
+                BiometricManager.from(requireContext()).canAuthenticate(authenticators)
+            } catch (_: RuntimeException) {
+                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE
+            }
             if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
                 binding.biometricLockSwitch.isChecked = false
                 Toast.makeText(requireContext(), "قفل بیومتریک روی این دستگاه آماده نیست.", Toast.LENGTH_LONG).show()
                 return@setOnCheckedChangeListener
             }
             val executor = ContextCompat.getMainExecutor(requireContext())
-            BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+            try {
+                BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     prefs.setBiometricLockEnabled(true)
                 }
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     binding.biometricLockSwitch.isChecked = false
                 }
-            }).authenticate(
-                BiometricPrompt.PromptInfo.Builder()
-                    .setTitle("فعال‌سازی قفل مالیار")
-                    .setSubtitle("برای تأیید، قفل گوشی را تأیید کنید")
-                    .setAllowedAuthenticators(
-                        authenticators
-                    )
-                    .build()
-            )
+                }).authenticate(
+                    BiometricPrompt.PromptInfo.Builder()
+                        .setTitle("فعال‌سازی قفل مالیار")
+                        .setSubtitle("برای تأیید، قفل گوشی را تأیید کنید")
+                        .setAllowedAuthenticators(authenticators)
+                        .build()
+                )
+            } catch (_: RuntimeException) {
+                prefs.setBiometricLockEnabled(false)
+                binding.biometricLockSwitch.isChecked = false
+                Toast.makeText(requireContext(), "سرویس بیومتریک دستگاه پاسخ نداد.", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
