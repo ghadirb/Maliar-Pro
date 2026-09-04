@@ -196,9 +196,8 @@ class MealPlanFragment : Fragment() {
                             if (item.unitLabel.isBlank()) "" else " / ${item.unitLabel}"
                         textSize = 14f
                         layoutParams = LinearLayout.LayoutParams(
-                            0,
-                            LinearLayout.LayoutParams.WRAP_CONTENT,
-                            1f
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
                         )
                     }
                     val edit = Button(requireContext()).apply { text = "ویرایش" }
