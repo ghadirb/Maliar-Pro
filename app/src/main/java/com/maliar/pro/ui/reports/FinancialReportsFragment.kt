@@ -198,7 +198,7 @@ class FinancialReportsFragment : Fragment() {
             "$d/$m"
         }
 
-        val dataSets = mutableListOf<com.github.mikephil.charting.data.ILineDataSet>()
+        val dataSets = mutableListOf<com.github.mikephil.charting.interfaces.datasets.ILineDataSet>()
         if (goldEntries.size >= 2) {
             dataSets.add(LineDataSet(goldEntries, "طلا (تومان)").apply {
                 color = Color.parseColor("#FFB300")
