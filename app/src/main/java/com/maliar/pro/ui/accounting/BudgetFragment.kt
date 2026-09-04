@@ -88,7 +88,7 @@ class BudgetFragment : Fragment() {
             .setPositiveButton("نمایش") { _, _ ->
                 val y = year.text.toString().toIntOrNull()
                 val m = month.text.toString().toIntOrNull()
-                if (y != null && m in 1..12) vm.selectMonth(y, m)
+                if (y != null && m != null && m in 1..12) vm.selectMonth(y, m)
             }
             .setNegativeButton("لغو", null)
             .show()
