@@ -5,8 +5,10 @@ import kotlinx.coroutines.flow.Flow
 
 class FinancialStatusManager(context: Context) {
     
+    private val appContext = context.applicationContext
     private val database = AppDatabase.getDatabase(context)
     private val financialDao = database.financialStatusDao()
+    private val marketRateHistoryDao = database.marketRateHistoryDao()
     
     // Assets
     fun getAllAssets(): Flow<List<Asset>> {
@@ -28,6 +30,35 @@ class FinancialStatusManager(context: Context) {
     suspend fun addAsset(name: String, amount: Double): Long {
         val asset = Asset(type = AssetType.OTHER, title = name, value = amount)
         return financialDao.insertAsset(asset)
+    }
+
+    /** Adds a gold asset the user specified by weight (grams) rather than a fixed price;
+     *  its [Asset.value] is computed from the current rate right away and kept fresh
+     *  afterwards by [refreshGoldAssetValues]. If no rate is available yet (offline/first
+     *  run), the value simply starts at 0 and self-corrects the next time the rate is
+     *  reachable - it never guesses a price. */
+    suspend fun addGoldAsset(name: String, grams: Double): Long {
+        val rate = runCatching { com.maliar.pro.utils.MarketRateClient(appContext).fetch() }.getOrNull()
+        val value = rate?.gold?.let { grams * it / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN } ?: 0.0
+        return financialDao.insertAsset(Asset(type = AssetType.GOLD, title = name, value = value, goldGrams = grams))
+    }
+
+    /** Re-prices every gold asset that was entered by weight (see [addGoldAsset]) against
+     *  the latest gold rate, so their [Asset.value] - and therefore "کل دارایی‌ها" wherever
+     *  it's summed - never goes stale. Best-effort: with no reachable rate this silently
+     *  does nothing and leaves the last known values in place, exactly like the rest of the
+     *  market-rate features. Safe to call often; it skips writes when the value hasn't
+     *  meaningfully changed. */
+    suspend fun refreshGoldAssetValues() {
+        val rate = runCatching { com.maliar.pro.utils.MarketRateClient(appContext).fetch() }.getOrNull() ?: return
+        val goldPerGramToman = rate.gold?.let { it / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN } ?: return
+        val goldAssets = getAllAssetsList().filter { it.type == AssetType.GOLD && (it.goldGrams ?: 0.0) > 0.0 }
+        for (asset in goldAssets) {
+            val newValue = asset.goldGrams!! * goldPerGramToman
+            if (kotlin.math.abs(newValue - asset.value) > 1.0) {
+                financialDao.updateAsset(asset.copy(value = newValue, updatedAt = System.currentTimeMillis()))
+            }
+        }
     }
     
     suspend fun updateAsset(asset: Asset) {
@@ -190,5 +221,40 @@ class FinancialStatusManager(context: Context) {
         if (preferences != null) completed++
         
         return (completed * 100) / total
+    }
+
+    // Market rate history (feature: "روند نرخ طلا و دلار" chart on the reports screen)
+
+    /** Upserts today's rate snapshot (replaces any row already recorded for today - see
+     *  the unique index on [MarketRateHistory.date]) and prunes anything older than a
+     *  year, so the table can't grow unbounded on a long-lived install. */
+    suspend fun recordMarketRateSnapshot(rates: com.maliar.pro.utils.MarketRates) {
+        val todayStart = startOfDayMillis(System.currentTimeMillis())
+        marketRateHistoryDao.insert(
+            MarketRateHistory(
+                date = todayStart,
+                gold = rates.gold,
+                currency = rates.currency,
+                coinEmami = rates.coinEmami,
+                coinHalf = rates.coinHalf,
+                coinQuarter = rates.coinQuarter
+            )
+        )
+        marketRateHistoryDao.deleteOlderThan(todayStart - 365L * 24 * 60 * 60 * 1000)
+    }
+
+    suspend fun getMarketRateHistory(days: Int): List<MarketRateHistory> {
+        val since = startOfDayMillis(System.currentTimeMillis()) - days.toLong() * 24 * 60 * 60 * 1000
+        return marketRateHistoryDao.getSince(since)
+    }
+
+    private fun startOfDayMillis(millis: Long): Long {
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = millis
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
     }
 }

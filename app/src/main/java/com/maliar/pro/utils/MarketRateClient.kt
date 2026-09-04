@@ -69,5 +69,11 @@ class MarketRateClient(context: Context) {
 
         /** Public, read-only JSON published by the companion repo - no key required. */
         const val DEFAULT_ENDPOINT = "https://raw.githubusercontent.com/ghadirb/maliar-market-rates/main/rates.json"
+
+        /** The published rates.json values are Rial (Servix codes end in _RLS - see that
+         *  repo's update-rates.yml workflow); the app displays/stores everything in Toman
+         *  (1 Toman = 10 Rial), so any screen combining a raw rate with an app-native
+         *  amount (e.g. converting grams to Toman for a gold asset) must divide by this. */
+        const val RIAL_TO_TOMAN = 10.0
     }
 }

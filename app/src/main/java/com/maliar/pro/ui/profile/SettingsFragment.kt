@@ -94,6 +94,14 @@ class SettingsFragment : Fragment() {
         // Show the automatically-fetched (or cached) rate as soon as the screen opens, so
         // the user can see it's already working with no address entered.
         runFetch(persistCustomEndpoint = false)
+
+        val currentThreshold = prefs.getMarketSwingThresholdPercent()
+        binding.marketSwingThresholdSlider.value = currentThreshold.coerceIn(2f, 10f)
+        binding.marketSwingThresholdLabel.text = "${currentThreshold.toInt()}٪"
+        binding.marketSwingThresholdSlider.addOnChangeListener { _, value, _ ->
+            prefs.setMarketSwingThresholdPercent(value)
+            binding.marketSwingThresholdLabel.text = "${value.toInt()}٪"
+        }
     }
 
     private fun setupBiometricLock() {

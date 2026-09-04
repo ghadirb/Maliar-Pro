@@ -33,6 +33,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_MARKET_RATES_ENDPOINT = "market_rates_endpoint"
         private const val KEY_MARKET_RATES_TOKEN = "market_rates_token"
         private const val KEY_MARKET_RATES_CACHE = "market_rates_cache"
+        private const val KEY_MARKET_SWING_THRESHOLD = "market_swing_threshold_percent"
 
         // --- Subscription / entitlement ---
         private const val KEY_DEVICE_ID = "device_id"
@@ -212,6 +213,14 @@ class PreferencesManager(context: Context) {
         prefs.edit().putString(KEY_MARKET_RATES_CACHE, json).apply()
     }
     fun getCachedMarketRates(): String? = prefs.getString(KEY_MARKET_RATES_CACHE, null)
+
+    /** Minimum day-over-day gold/currency swing (percent) worth a notification - see
+     *  [com.maliar.pro.utils.FinancialInsightWorker]. User-adjustable in Settings; 3.0 by
+     *  default, same as the value this feature originally shipped hardcoded with. */
+    fun getMarketSwingThresholdPercent(): Float = prefs.getFloat(KEY_MARKET_SWING_THRESHOLD, 3.0f)
+    fun setMarketSwingThresholdPercent(percent: Float) {
+        prefs.edit().putFloat(KEY_MARKET_SWING_THRESHOLD, percent).apply()
+    }
 
     fun setOnboardingCompleted(completed: Boolean) {
         prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()

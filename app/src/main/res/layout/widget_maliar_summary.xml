@@ -66,6 +66,16 @@
         android:textSize="15sp"
         android:text="۰ تومان" />
 
+    <TextView
+        android:id="@+id/widgetMarketRateText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="طلا: - | دلار: -"
+        android:textColor="#CCFFFFFF"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"

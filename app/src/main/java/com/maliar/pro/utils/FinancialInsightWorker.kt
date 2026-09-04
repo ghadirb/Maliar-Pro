@@ -37,15 +37,27 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
 
         return try {
             val accountingManager = AccountingManager(applicationContext)
+            val financialManager = com.maliar.pro.database.FinancialStatusManager(applicationContext)
             val expenses = accountingManager.getAllExpensesList()
             val incomes = accountingManager.getAllIncomesList()
 
-            val message = buildCategorySwingInsight(expenses)
-                ?: buildMarketRateInsight()
-                ?: buildProjectionInsight(incomes, expenses)
+            // One shared rate fetch feeds three things below: the swing insight (compared
+            // against what was cached *before* this call), today's history snapshot for the
+            // reports trend chart, and re-pricing any weight-based gold assets - instead of
+            // each doing its own redundant network round-trip.
+            val previousRates = prefs.getCachedMarketRates()
+                ?.let { runCatching { com.google.gson.Gson().fromJson(it, MarketRates::class.java) }.getOrNull() }
+            val currentRates = runCatching { MarketRateClient(applicationContext).fetch() }.getOrNull()
+            if (currentRates != null) {
+                runCatching { financialManager.recordMarketRateSnapshot(currentRates) }
+                runCatching { financialManager.refreshGoldAssetValues() }
+            }
+
+            val marketInsight = buildMarketRateInsight(prefs, previousRates, currentRates)
+            val message = buildCategorySwingInsight(expenses) ?: marketInsight ?: buildProjectionInsight(incomes, expenses)
             if (message != null) {
                 val finalMessage = tryRephraseWithAi(message) ?: message
-                NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage)
+                NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage, isMarketInsight = message == marketInsight)
             }
             Result.success()
         } catch (e: Exception) {
@@ -94,29 +106,25 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         return "هزینه \"$bestCategory\" شما در $thisMonthName نسبت به $lastMonthName حدود $percentText٪ $direction داشته است."
     }
 
-    /** Compares today's freshly-fetched gold/currency rate against this worker's own last
-     *  successful fetch (cached by [MarketRateClient]) and reports whichever of gold or
-     *  currency swung more, if the swing is at least [MIN_MARKET_SWING_PERCENT]. Reads the
-     *  cache *before* calling [MarketRateClient.fetch] (which overwrites it on success), so
-     *  "previous" and "current" are genuinely two different points in time. Best-effort:
-     *  no network, a stale/missing cache, or any parse failure all just mean no insight. */
-    private suspend fun buildMarketRateInsight(): String? {
-        val prefs = PreferencesManager(applicationContext)
-        val gson = com.google.gson.Gson()
-        val previous = prefs.getCachedMarketRates()
-            ?.let { runCatching { gson.fromJson(it, MarketRates::class.java) }.getOrNull() }
-            ?: return null // nothing to compare against yet (e.g. first run)
-
-        val current = runCatching { MarketRateClient(applicationContext).fetch() }.getOrNull() ?: return null
-
-        return marketSwingSentence("طلا", previous.gold, current.gold)
-            ?: marketSwingSentence("دلار", previous.currency, current.currency)
+    /** Compares [currentRates] (this run's shared fetch) against [previousRates] (what was
+     *  cached *before* that fetch, i.e. genuinely an earlier point in time) and reports
+     *  whichever of gold or currency swung more, if at least [PreferencesManager.getMarketSwingThresholdPercent].
+     *  Best-effort: a missing previous/current value just means no insight this run. */
+    private fun buildMarketRateInsight(
+        prefs: PreferencesManager,
+        previousRates: MarketRates?,
+        currentRates: MarketRates?
+    ): String? {
+        if (previousRates == null || currentRates == null) return null
+        val thresholdPercent = prefs.getMarketSwingThresholdPercent().toDouble()
+        return marketSwingSentence("طلا", previousRates.gold, currentRates.gold, thresholdPercent)
+            ?: marketSwingSentence("دلار", previousRates.currency, currentRates.currency, thresholdPercent)
     }
 
-    private fun marketSwingSentence(label: String, previousValue: Double?, currentValue: Double?): String? {
+    private fun marketSwingSentence(label: String, previousValue: Double?, currentValue: Double?, thresholdPercent: Double): String? {
         if (previousValue == null || currentValue == null || previousValue <= 0) return null
         val swingPercent = ((currentValue - previousValue) / previousValue) * 100
-        if (kotlin.math.abs(swingPercent) < MIN_MARKET_SWING_PERCENT) return null
+        if (kotlin.math.abs(swingPercent) < thresholdPercent) return null
         val direction = if (swingPercent > 0) "افزایش" else "کاهش"
         val percentText = kotlin.math.abs(swingPercent).roundToInt()
         return "نرخ $label نسبت به آخرین بررسی حدود $percentText٪ $direction داشته است."
@@ -173,7 +181,6 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         private const val UNIQUE_WORK_NAME = "maliar_pro_financial_insights"
         private const val MIN_SWING_PERCENT = 15.0
         private const val MIN_PROJECTION_AMOUNT = 50_000.0
-        private const val MIN_MARKET_SWING_PERCENT = 3.0
 
         fun schedule(context: Context, runImmediately: Boolean = false) {
             val request = PeriodicWorkRequestBuilder<FinancialInsightWorker>(1, TimeUnit.DAYS).build()

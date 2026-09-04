@@ -25,8 +25,23 @@ class AssetListViewModel(private val financialManager: FinancialStatusManager) :
         }
     }
 
+    /** Adds a gold asset specified by weight; see [FinancialStatusManager.addGoldAsset]
+     *  for why its value is computed from the live rate instead of typed in by hand. */
+    fun addGoldAsset(name: String, grams: Double) {
+        viewModelScope.launch {
+            financialManager.addGoldAsset(name, grams)
+        }
+    }
+
     fun deleteAsset(asset: Asset) {
         viewModelScope.launch { financialManager.deleteAsset(asset) }
+    }
+
+    /** Best-effort re-price of any weight-based gold assets against the current rate;
+     *  called when this screen opens so the list is fresh without waiting for the daily
+     *  background worker. Room's Flow-backed [assets] picks up the change automatically. */
+    fun refreshGoldValues() {
+        viewModelScope.launch { financialManager.refreshGoldAssetValues() }
     }
 }
 

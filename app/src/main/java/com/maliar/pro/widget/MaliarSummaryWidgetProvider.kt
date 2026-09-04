@@ -58,6 +58,7 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
                     val nextReminder = SmartReminderManager(context).getActiveRemindersList()
                         .filter { !it.isCompleted }
                         .minByOrNull { it.triggerTime }
+                    val rates = runCatching { com.maliar.pro.utils.MarketRateClient(context).fetch() }.getOrNull()
 
                     views.setTextViewText(R.id.widgetBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(balance))
                     views.setTextViewText(R.id.widgetPeriodBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(periodBalance))
@@ -65,6 +66,15 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
                         R.id.widgetPeriodBalanceText,
                         if (periodBalance < 0) android.graphics.Color.parseColor("#FFCDD2") else android.graphics.Color.WHITE
                     )
+                    if (rates != null && (rates.gold != null || rates.currency != null)) {
+                        val toToman = { rial: Double -> rial / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN }
+                        val goldText = rates.gold?.let { com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "") } ?: "-"
+                        val currencyText = rates.currency?.let { com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "") } ?: "-"
+                        views.setTextViewText(R.id.widgetMarketRateText, "طلا: $goldText | دلار: $currencyText")
+                        views.setViewVisibility(R.id.widgetMarketRateText, android.view.View.VISIBLE)
+                    } else {
+                        views.setViewVisibility(R.id.widgetMarketRateText, android.view.View.GONE)
+                    }
                     views.setTextViewText(
                         R.id.widgetNextReminderText,
                         if (nextReminder != null) {

@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var navController: androidx.navigation.NavController
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -81,6 +82,27 @@ class MainActivity : AppCompatActivity() {
         setupNavigation()
         ensureNotificationPermissions()
         authenticateAppIfNeeded()
+        handleAssistantDeepLink(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAssistantDeepLink(intent)
+    }
+
+    /** Routes the "نرخ طلا/ارز نوسان داشت" notification tap to the دستیار هوشمند tab with
+     *  a ready-made question, instead of just opening whatever tab the app last had open -
+     *  see [com.maliar.pro.utils.NotificationHelper.notifyFinancialInsight] and
+     *  [com.maliar.pro.utils.PendingAssistantQuestion]. A no-op for every other intent. */
+    private fun handleAssistantDeepLink(intent: Intent) {
+        if (!intent.getBooleanExtra(com.maliar.pro.utils.NotificationHelper.EXTRA_OPEN_ASSISTANT_MARKET_QUESTION, false)) return
+        intent.removeExtra(com.maliar.pro.utils.NotificationHelper.EXTRA_OPEN_ASSISTANT_MARKET_QUESTION)
+        com.maliar.pro.utils.PendingAssistantQuestion.pendingQuestion =
+            "با توجه به نرخ لحظه‌ای طلا و ارز و بودجه/موجودی فعلی من، چه تحلیلی داری؟"
+        runCatching {
+            navController.navigate(R.id.assistantFragment)
+        }
     }
 
     private fun authenticateAppIfNeeded() {
@@ -237,7 +259,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigation() {
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        val navController = navHostFragment.navController
+        navController = navHostFragment.navController
 
         binding.bottomNavigation.setupWithNavController(navController)
     }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Compact, single-line "طلا: ... | دلار: ..." strip. Included at the top of the
+     accounting and financial-status screens (see MarketRateBarBinder for how it's
+     populated) so the day's rate is visible without opening Settings. Hidden entirely
+     (GONE) whenever no rate is available, so it never shows a placeholder/dash row. -->
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/marketRateBarCard"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    android:visibility="gone"
+    app:cardBackgroundColor="#FFF8E1"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="0dp">
+
+    <TextView
+        android:id="@+id/marketRateBarText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="10dp"
+        android:textSize="12sp"
+        android:textColor="#795548"
+        android:gravity="center"
+        tools:text="🪙 طلا: ۲۳,۳۸۹,۱۶۳ | دلار: ۲۲۱,۱۶۸" />
+
+</com.google.android.material.card.MaterialCardView>

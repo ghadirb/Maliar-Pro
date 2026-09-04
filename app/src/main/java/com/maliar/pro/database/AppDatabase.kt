@@ -12,8 +12,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
-               MealPlan::class, MealPlanEntry::class, UserFoodPrice::class],
-    version = 13,
+               MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class],
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,6 +27,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun carDao(): CarDao
     abstract fun mealPlanDao(): MealPlanDao
     abstract fun foodPriceDao(): FoodPriceDao
+    abstract fun marketRateHistoryDao(): MarketRateHistoryDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -170,6 +171,33 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+        /** Two independent, all-additive changes for the gold/currency-rate features:
+         *  a nullable `goldGrams` column on `assets` (existing rows get NULL, so they keep
+         *  behaving exactly as before - a fixed manually-entered value) and a new
+         *  `market_rate_history` table (one row/day) for the reports trend chart. */
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE assets ADD COLUMN goldGrams REAL")
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `market_rate_history` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `date` INTEGER NOT NULL,
+                        `gold` REAL,
+                        `currency` REAL,
+                        `coinEmami` REAL,
+                        `coinHalf` REAL,
+                        `coinQuarter` REAL,
+                        `recordedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_market_rate_history_date` " +
+                        "ON `market_rate_history` (`date`)"
+                )
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -184,7 +212,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

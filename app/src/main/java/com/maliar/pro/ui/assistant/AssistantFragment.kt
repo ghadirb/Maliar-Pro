@@ -85,6 +85,14 @@ class AssistantFragment : Fragment() {
             }
         }
 
+        // If we were opened from the market-rate-swing notification (see
+        // PendingAssistantQuestion / MainActivity.handleAssistantDeepLink), send that
+        // question automatically so the user lands straight on the analysis they tapped
+        // for, instead of an empty chat.
+        com.maliar.pro.utils.PendingAssistantQuestion.consume()?.let { question ->
+            viewModel.sendMessage(question)
+        }
+
         return view
     }
 

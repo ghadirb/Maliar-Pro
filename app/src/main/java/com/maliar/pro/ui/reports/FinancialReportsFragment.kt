@@ -23,8 +23,10 @@ import com.maliar.pro.adapters.ReportRowAdapter
 import com.maliar.pro.adapters.ReportRowItem
 import com.maliar.pro.viewmodels.FinancialReportsViewModel
 import com.maliar.pro.viewmodels.FinancialReportsViewModelFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.maliar.pro.utils.PersianCalendarHelper
 
 /** "گزارش‌های مالی حرفه‌ای": period-scoped income/expense totals, biggest individual
  *  expenses/incomes, the category that ate the most money, and an income-vs-expense trend
@@ -66,6 +68,10 @@ class FinancialReportsFragment : Fragment() {
         binding.topIncomesRecyclerView.adapter = topIncomesAdapter
 
         setupChart()
+
+        lifecycleScope.launch {
+            loadMarketRateTrend()
+        }
 
         binding.exportCsvButton.setOnClickListener {
             val period = viewModel.selectedPeriod.value.name.lowercase()
@@ -151,6 +157,81 @@ class FinancialReportsFragment : Fragment() {
             setTouchEnabled(true)
             setPinchZoom(true)
         }
+        binding.marketRateTrendChart.apply {
+            description.isEnabled = false
+            legend.isEnabled = true
+            axisRight.isEnabled = false
+            xAxis.position = XAxis.XAxisPosition.BOTTOM
+            xAxis.granularity = 1f
+            setTouchEnabled(true)
+            setPinchZoom(true)
+        }
+    }
+
+    /** Draws up to the last 30 days of gold/currency history recorded by
+     *  [com.maliar.pro.utils.FinancialInsightWorker] (see
+     *  [com.maliar.pro.database.FinancialStatusManager.getMarketRateHistory]). Gold and
+     *  currency are shown as two lines on the same chart despite their very different
+     *  scale (gold is roughly 100x the dollar rate) since MPAndroidChart auto-scales each
+     *  dataset's Y range independently by default - a normalized "% change" view could be
+     *  added later, but the raw values are simpler and match how the rest of the app shows
+     *  these numbers. Hides the whole section (label + chart) when there's fewer than 2
+     *  days of history to plot, since a single point isn't a "trend". */
+    private suspend fun loadMarketRateTrend() {
+        val history = withContext(Dispatchers.IO) {
+            runCatching {
+                com.maliar.pro.database.FinancialStatusManager(requireContext()).getMarketRateHistory(30)
+            }.getOrNull()
+        } ?: emptyList()
+
+        if (history.size < 2) {
+            binding.marketRateTrendLabel.visibility = View.GONE
+            binding.marketRateTrendChart.visibility = View.GONE
+            return
+        }
+
+        val toToman = { rial: Double -> rial / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN }
+        val goldEntries = history.mapIndexedNotNull { i, h -> h.gold?.let { Entry(i.toFloat(), toToman(it).toFloat()) } }
+        val currencyEntries = history.mapIndexedNotNull { i, h -> h.currency?.let { Entry(i.toFloat(), toToman(it).toFloat()) } }
+        val labels = history.map {
+            val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(it.date)
+            "$d/$m"
+        }
+
+        val dataSets = mutableListOf<com.github.mikephil.charting.data.ILineDataSet>()
+        if (goldEntries.size >= 2) {
+            dataSets.add(LineDataSet(goldEntries, "طلا (تومان)").apply {
+                color = Color.parseColor("#FFB300")
+                setCircleColor(Color.parseColor("#FFB300"))
+                lineWidth = 2f
+                circleRadius = 2.5f
+                setDrawValues(false)
+                axisDependency = com.github.mikephil.charting.components.YAxis.AxisDependency.LEFT
+            })
+        }
+        if (currencyEntries.size >= 2) {
+            dataSets.add(LineDataSet(currencyEntries, "دلار (تومان)").apply {
+                color = Color.parseColor("#1E88E5")
+                setCircleColor(Color.parseColor("#1E88E5"))
+                lineWidth = 2f
+                circleRadius = 2.5f
+                setDrawValues(false)
+                axisDependency = com.github.mikephil.charting.components.YAxis.AxisDependency.RIGHT
+            })
+        }
+
+        if (dataSets.isEmpty()) {
+            binding.marketRateTrendLabel.visibility = View.GONE
+            binding.marketRateTrendChart.visibility = View.GONE
+            return
+        }
+
+        binding.marketRateTrendChart.axisRight.isEnabled = currencyEntries.size >= 2
+        binding.marketRateTrendChart.xAxis.valueFormatter = IndexAxisValueFormatter(labels)
+        binding.marketRateTrendChart.data = com.github.mikephil.charting.data.LineData(dataSets)
+        binding.marketRateTrendChart.invalidate()
+        binding.marketRateTrendLabel.visibility = View.VISIBLE
+        binding.marketRateTrendChart.visibility = View.VISIBLE
     }
 
     private fun exportReport(uri: android.net.Uri, isPdf: Boolean) {

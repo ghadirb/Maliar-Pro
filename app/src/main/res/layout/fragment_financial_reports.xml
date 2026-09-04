@@ -192,6 +192,23 @@
             android:layout_marginTop="8dp" />
 
         <TextView
+            android:id="@+id/marketRateTrendLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="🪙 روند نرخ طلا و دلار (۳۰ روز اخیر)"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/marketRateTrendChart"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:layout_marginTop="8dp"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/topCategoryLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -12,6 +12,10 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <include
+            android:id="@+id/marketRateBar"
+            layout="@layout/view_market_rate_bar" />
+
         <!-- Due-soon widget: surfaces the nearest upcoming checks/installments/debts right
              at the top of the tab, above even the balance card, since "what's about to be
              due" is the single most actionable thing on this screen. Hidden entirely when

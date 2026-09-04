@@ -1033,12 +1033,13 @@ class AssistantViewModel(
 
         if (rates.gold == null && rates.currency == null) return ""
 
+        val toToman = { rial: Double -> rial / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN }
         val lines = mutableListOf<String>()
-        rates.gold?.let { lines.add("- نرخ هر گرم طلای ۱۸ عیار: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
-        rates.currency?.let { lines.add("- نرخ دلار: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
-        rates.coinEmami?.let { lines.add("- سکه امامی: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
-        rates.coinHalf?.let { lines.add("- نیم سکه: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
-        rates.coinQuarter?.let { lines.add("- ربع سکه: ${com.maliar.pro.utils.CurrencyFormatter.format(it, "ریال")}") }
+        rates.gold?.let { lines.add("- نرخ هر گرم طلای ۱۸ عیار: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        rates.currency?.let { lines.add("- نرخ دلار: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        rates.coinEmami?.let { lines.add("- سکه امامی: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        rates.coinHalf?.let { lines.add("- نیم سکه: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        rates.coinQuarter?.let { lines.add("- ربع سکه: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
         if (lines.isEmpty()) return ""
 
         val updated = rates.updatedAt?.let { " (به‌روزرسانی: $it)" } ?: ""

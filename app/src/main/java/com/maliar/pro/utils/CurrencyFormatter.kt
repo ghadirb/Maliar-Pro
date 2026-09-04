@@ -24,4 +24,14 @@ object CurrencyFormatter {
         val magnitude = String.format(Locale.US, "%,.0f", abs(amount))
         return if (suffix.isEmpty()) "$sign$magnitude" else "$sign$magnitude $suffix"
     }
+
+    /** Formats a plain (non-currency) quantity, e.g. grams of gold: grouped digits, up to
+     *  two decimal places, trailing zeros/decimal point trimmed (so "2.00" -> "2" but
+     *  "2.50" -> "2.5"). No suffix and no currency assumptions. */
+    fun formatPlainNumber(amount: Double): String {
+        val sign = if (amount < 0) "-" else ""
+        val magnitude = String.format(Locale.US, "%,.2f", abs(amount))
+            .trimEnd('0').trimEnd('.')
+        return "$sign$magnitude"
+    }
 }

@@ -71,10 +71,13 @@ class AssetListFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.assets.collect { assets ->
                 val items = assets.map { asset ->
+                    val subtitle = typeLabels[asset.type] ?: ""
                     FinancialEntryItem(
                         id = asset.id,
                         title = asset.title,
-                        subtitle = typeLabels[asset.type] ?: "",
+                        subtitle = if (asset.goldGrams != null && asset.goldGrams > 0) {
+                            "$subtitle · ${CurrencyFormatter.formatPlainNumber(asset.goldGrams)} گرم · نرخ خودکار"
+                        } else subtitle,
                         amountText = CurrencyFormatter.format(asset.value),
                         amountColor = requireContext().getColor(com.maliar.pro.R.color.success)
                     )
@@ -88,6 +91,13 @@ class AssetListFragment : Fragment() {
                 binding.totalAmountText.text = CurrencyFormatter.format(total)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-prices weight-based gold assets against the latest rate every time this
+        // screen is opened, so the user doesn't have to wait for the once-a-day worker.
+        viewModel.refreshGoldValues()
     }
 
     private fun confirmDelete(asset: Asset) {
@@ -113,21 +123,46 @@ class AssetListFragment : Fragment() {
             hint = "مبلغ (تومان)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
+        val goldGramsInput = EditText(requireContext()).apply {
+            hint = "مقدار طلا (گرم) - اختیاری"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            visibility = View.GONE
+        }
+        val goldHintText = android.widget.TextView(requireContext()).apply {
+            text = "اگر گرم را وارد کنید، نیازی به مبلغ نیست: ارزش این دارایی هر روز خودکار با نرخ روز طلا به‌روزرسانی می‌شود."
+            textSize = 11f
+            setPadding(0, 4, 0, 12)
+            visibility = View.GONE
+        }
         val container = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 0)
             addView(typeSpinner)
             addView(nameInput)
             addView(amountInput)
+            addView(goldGramsInput)
+            addView(goldHintText)
+        }
+        typeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, v: View?, position: Int, id: Long) {
+                val isGold = types[position] == AssetType.GOLD
+                goldGramsInput.visibility = if (isGold) View.VISIBLE else View.GONE
+                goldHintText.visibility = if (isGold) View.VISIBLE else View.GONE
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("افزودن دارایی")
             .setView(container)
             .setPositiveButton("ذخیره") { _, _ ->
                 val name = nameInput.text.toString().trim()
-                val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
-                if (name.isNotEmpty()) {
-                    val type = types[typeSpinner.selectedItemPosition]
+                if (name.isEmpty()) return@setPositiveButton
+                val type = types[typeSpinner.selectedItemPosition]
+                val grams = goldGramsInput.text.toString().toDoubleOrNull()
+                if (type == AssetType.GOLD && grams != null && grams > 0) {
+                    viewModel.addGoldAsset(name, grams)
+                } else {
+                    val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
                     viewModel.addAsset(type, name, amount)
                 }
             }

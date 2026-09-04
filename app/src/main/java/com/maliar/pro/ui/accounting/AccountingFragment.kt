@@ -52,6 +52,12 @@ class AccountingFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupUI()
         observeViewModel()
+        com.maliar.pro.utils.MarketRateBarBinder.bind(
+            binding.marketRateBar.marketRateBarCard,
+            binding.marketRateBar.marketRateBarText,
+            viewLifecycleOwner.lifecycleScope,
+            requireContext()
+        )
     }
 
     private fun setupUI() {

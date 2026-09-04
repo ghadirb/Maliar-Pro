@@ -35,6 +35,12 @@ class FinancialStatusFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupSections()
         observeViewModel()
+        com.maliar.pro.utils.MarketRateBarBinder.bind(
+            binding.marketRateBar.marketRateBarCard,
+            binding.marketRateBar.marketRateBarText,
+            viewLifecycleOwner.lifecycleScope,
+            requireContext()
+        )
     }
 
     private fun setupSections() {
