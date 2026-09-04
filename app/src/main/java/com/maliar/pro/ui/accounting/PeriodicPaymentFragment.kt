@@ -5,21 +5,23 @@ import android.os.Bundle
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.maliar.pro.database.PeriodicPayment
 import com.maliar.pro.database.PeriodicPaymentManager
+import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.utils.CurrencyFormatter
+import com.maliar.pro.utils.PersianCalendarHelper
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class PeriodicPaymentFragment : Fragment() {
     private val manager by lazy { PeriodicPaymentManager(requireContext()) }
-    private val dateFormat = SimpleDateFormat("yyyy/MM/dd", Locale.US)
+    private val financialManager by lazy { FinancialStatusManager(requireContext()) }
+    private lateinit var summary: TextView
+    private lateinit var list: LinearLayout
 
     override fun onCreateView(inflater: android.view.LayoutInflater, container: android.view.ViewGroup?, state: Bundle?): View {
         val root = LinearLayout(requireContext()).apply {
@@ -31,10 +33,15 @@ class PeriodicPaymentFragment : Fragment() {
             setOnClickListener { showAddDialog() }
         }
         root.addView(add)
-        val summary = TextView(requireContext()).apply { setPadding(0, 12, 0, 12) }
+        summary = TextView(requireContext()).apply { setPadding(0, 12, 0, 12) }
         root.addView(summary)
-        val list = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        list = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
         root.addView(list)
+        return root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         viewLifecycleOwner.lifecycleScope.launch {
             manager.getAll().collect { payments ->
                 list.removeAllViews()
@@ -45,7 +52,7 @@ class PeriodicPaymentFragment : Fragment() {
                     val row = TextView(requireContext()).apply {
                         setPadding(0, 10, 0, 10)
                         text = "${payment.title} · ${CurrencyFormatter.format(payment.amount, "")} تومان\n" +
-                            "سررسید: ${dateFormat.format(Date(payment.nextPaymentAt))} · هر ${payment.periodDays} روز" +
+                            "سررسید: ${formatJalaliDate(payment.nextPaymentAt)} · هر ${payment.periodDays} روز" +
                             if (!payment.isActive) "\nغیرفعال" else ""
                         setOnClickListener { showActions(payment) }
                     }
@@ -53,7 +60,6 @@ class PeriodicPaymentFragment : Fragment() {
                 }
             }
         }
-        return root
     }
 
     private fun showAddDialog() {
@@ -62,16 +68,25 @@ class PeriodicPaymentFragment : Fragment() {
         val title = field("عنوان (مثلاً اینترنت)")
         val amount = field("مبلغ تومان")
         val period = field("دوره به روز (۷، ۳۰، ۹۰ یا ۳۶۵)")
-        val date = field("تاریخ بعدی میلادی (YYYY-MM-DD)")
+        val (year, month, day) = PersianCalendarHelper.getCurrentJalaliDate()
+        val date = field("تاریخ بعدی شمسی (مثلاً ۱۴۰۵/۰۶/۱۵)").also { it.setText("$year/$month/$day") }
         val category = field("دسته‌بندی")
-        AlertDialog.Builder(requireContext()).setTitle("پرداخت دوره‌ای").setView(box)
-            .setNegativeButton("لغو", null)
-            .setPositiveButton("ذخیره") { _, _ ->
+        viewLifecycleOwner.lifecycleScope.launch {
+            val accounts = financialManager.getAllAssetsList()
+            val accountSpinner = Spinner(requireContext()).apply {
+                adapter = android.widget.ArrayAdapter(
+                    requireContext(),
+                    android.R.layout.simple_spinner_dropdown_item,
+                    listOf("حساب پیش‌فرض") + accounts.map { it.title }
+                )
+                box.addView(this)
+            }
+            AlertDialog.Builder(requireContext()).setTitle("پرداخت دوره‌ای").setView(box)
+                .setNegativeButton("لغو", null)
+                .setPositiveButton("ذخیره") { _, _ ->
                 val parsedAmount = amount.text.toString().replace(",", "").toDoubleOrNull()
                 val parsedPeriod = period.text.toString().toIntOrNull()?.coerceAtLeast(1)
-                val parsedDate = runCatching {
-                    SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date.text.toString())?.time
-                }.getOrNull()
+                val parsedDate = parseJalaliDate(date.text.toString())
                 if (title.text.isBlank() || parsedAmount == null || parsedAmount <= 0 || parsedDate == null) {
                     Toast.makeText(requireContext(), "عنوان، مبلغ و تاریخ صحیح الزامی است.", Toast.LENGTH_LONG).show()
                     return@setPositiveButton
@@ -82,10 +97,30 @@ class PeriodicPaymentFragment : Fragment() {
                         amount = parsedAmount,
                         periodDays = parsedPeriod ?: 30,
                         nextPaymentAt = parsedDate,
-                        category = category.text.toString().trim().ifBlank { "عمومی" }
+                        category = category.text.toString().trim().ifBlank { "عمومی" },
+                        accountId = accountSpinner.selectedItemPosition.takeIf { it > 0 }?.let { accounts[it - 1].id }
                     ))
                 }
             }.show()
+        }
+    }
+
+    private fun formatJalaliDate(millis: Long): String {
+        val (year, month, day) = PersianCalendarHelper.gregorianMillisToJalali(millis)
+        return "$year/$month/$day"
+    }
+
+    private fun parseJalaliDate(value: String): Long? {
+        val normalized = value
+            .replace('۰', '0').replace('۱', '1').replace('۲', '2').replace('۳', '3').replace('۴', '4')
+            .replace('۵', '5').replace('۶', '6').replace('۷', '7').replace('۸', '8').replace('۹', '9')
+        val parts = normalized.trim().split(Regex("[/\\-]"))
+        if (parts.size != 3) return null
+        val year = parts[0].toIntOrNull() ?: return null
+        val month = parts[1].toIntOrNull() ?: return null
+        val day = parts[2].toIntOrNull() ?: return null
+        if (year !in 1300..1600 || month !in 1..12 || day !in 1..PersianCalendarHelper.daysInJalaliMonth(year, month)) return null
+        return PersianCalendarHelper.jalaliToGregorianMillis(year, month, day)
     }
 
     private fun showActions(payment: PeriodicPayment) {

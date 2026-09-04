@@ -8,6 +8,8 @@ class PeriodicPaymentManager(context: Context) {
 
     fun getAll(): Flow<List<PeriodicPayment>> = dao.getAll()
 
+    suspend fun getAllList(): List<PeriodicPayment> = dao.getAllList()
+
     suspend fun save(payment: PeriodicPayment): Long = dao.insert(payment)
 
     suspend fun delete(payment: PeriodicPayment) = dao.delete(payment)

@@ -11,6 +11,8 @@ import androidx.work.WorkerParameters
 import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.database.BudgetManager
 import com.maliar.pro.database.Expense
+import com.maliar.pro.database.PeriodicPayment
+import com.maliar.pro.database.PeriodicPaymentManager
 import com.maliar.pro.utils.PersianCalendarHelper.PERSIAN_MONTH_NAMES
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
@@ -55,8 +57,11 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
             }
 
             val marketInsight = buildMarketRateInsight(prefs, previousRates, currentRates)
+            val periodicPaymentInsight = buildPeriodicPaymentInsight(
+                PeriodicPaymentManager(applicationContext).getAllList()
+            )
             val budgetInsight = buildBudgetInsight(applicationContext, expenses)
-            val message = budgetInsight ?: buildCategorySwingInsight(expenses) ?: marketInsight ?: buildProjectionInsight(incomes, expenses)
+            val message = periodicPaymentInsight ?: budgetInsight ?: buildCategorySwingInsight(expenses) ?: marketInsight ?: buildProjectionInsight(incomes, expenses)
             if (message != null) {
                 val finalMessage = tryRephraseWithAi(message) ?: message
                 NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage, isMarketInsight = message == marketInsight)
@@ -65,6 +70,21 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         } catch (e: Exception) {
             Log.e(TAG, "Failed to compute financial insight", e)
             Result.success() // best-effort feature; never worth retrying/crashing over
+        }
+    }
+
+    private fun buildPeriodicPaymentInsight(payments: List<PeriodicPayment>): String? {
+        val now = System.currentTimeMillis()
+        val due = payments
+            .filter { it.isActive && it.nextPaymentAt <= now + it.reminderDaysBefore.coerceIn(0, 30) * DAY_MILLIS }
+            .minByOrNull { it.nextPaymentAt }
+            ?: return null
+        val remainingDays = ((due.nextPaymentAt - now) / DAY_MILLIS).toInt()
+        val amount = String.format("%,.0f", due.amount)
+        return when {
+            remainingDays < 0 -> "پرداخت دوره‌ای «${due.title}» به مبلغ $amount تومان سررسید شده است."
+            remainingDays == 0 -> "امروز موعد پرداخت دوره‌ای «${due.title}» به مبلغ $amount تومان است."
+            else -> "$remainingDays روز دیگر پرداخت دوره‌ای «${due.title}» به مبلغ $amount تومان سررسید می‌شود."
         }
     }
 
@@ -218,6 +238,7 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         private const val UNIQUE_WORK_NAME = "maliar_pro_financial_insights"
         private const val MIN_SWING_PERCENT = 15.0
         private const val MIN_PROJECTION_AMOUNT = 50_000.0
+        private const val DAY_MILLIS = 24L * 60 * 60 * 1000
 
         fun schedule(context: Context, runImmediately: Boolean = false) {
             val request = PeriodicWorkRequestBuilder<FinancialInsightWorker>(1, TimeUnit.DAYS).build()

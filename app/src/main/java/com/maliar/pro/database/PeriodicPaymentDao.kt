@@ -13,6 +13,9 @@ interface PeriodicPaymentDao {
     @Query("SELECT * FROM periodic_payments ORDER BY isActive DESC, nextPaymentAt ASC")
     fun getAll(): Flow<List<PeriodicPayment>>
 
+    @Query("SELECT * FROM periodic_payments ORDER BY isActive DESC, nextPaymentAt ASC")
+    suspend fun getAllList(): List<PeriodicPayment>
+
     @Query("SELECT * FROM periodic_payments WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): PeriodicPayment?
 
