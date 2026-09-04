@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
                MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -198,6 +198,12 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE assets ADD COLUMN purpose TEXT NOT NULL DEFAULT 'NORMAL'")
+                database.execSQL("ALTER TABLE expenses ADD COLUMN accountId INTEGER")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -212,7 +218,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

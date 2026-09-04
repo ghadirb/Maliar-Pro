@@ -18,8 +18,16 @@ data class Asset(
      *  kept in sync with the live per-gram rate (see [com.maliar.pro.database.FinancialStatusManager.refreshGoldAssetValues])
      *  rather than being a fixed number the user has to update by hand; when null, [value]
      *  behaves exactly as before (a plain fixed amount the user typed in). */
-    val goldGrams: Double? = null
+    val goldGrams: Double? = null,
+    val purpose: AccountPurpose = AccountPurpose.NORMAL
 )
+
+enum class AccountPurpose {
+    NORMAL,
+    DAILY_SPENDING,
+    SAVINGS,
+    EMERGENCY
+}
 
 enum class AssetType {
     CASH,

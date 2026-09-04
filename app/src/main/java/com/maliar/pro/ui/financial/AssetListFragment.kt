@@ -16,6 +16,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.maliar.pro.adapters.FinancialEntryAdapter
 import com.maliar.pro.adapters.FinancialEntryItem
 import com.maliar.pro.database.Asset
+import com.maliar.pro.database.AccountPurpose
 import com.maliar.pro.database.AssetType
 import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.databinding.FragmentFinancialEntryListBinding
@@ -43,6 +44,13 @@ class AssetListFragment : Fragment() {
         AssetType.OTHER to "سایر"
     )
 
+    private val purposeLabels = mapOf(
+        AccountPurpose.NORMAL to "عادی",
+        AccountPurpose.DAILY_SPENDING to "حساب خرج روزانه",
+        AccountPurpose.SAVINGS to "پس‌انداز",
+        AccountPurpose.EMERGENCY to "اضطراری"
+    )
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentFinancialEntryListBinding.inflate(inflater, container, false)
         return binding.root
@@ -57,7 +65,10 @@ class AssetListFragment : Fragment() {
         binding.emptyStateSubtitle.text = "با دکمه + یک دارایی اضافه کنید"
 
         adapter = FinancialEntryAdapter(
-            onItemClick = { /* Reserved for future edit screen */ },
+            onItemClick = { item ->
+                val asset = viewModel.assets.value.firstOrNull { it.id == item.id } ?: return@FinancialEntryAdapter
+                showPurposeDialog(asset)
+            },
             onDeleteClick = { item ->
                 val asset = viewModel.assets.value.firstOrNull { it.id == item.id } ?: return@FinancialEntryAdapter
                 confirmDelete(asset)
@@ -71,7 +82,9 @@ class AssetListFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.assets.collect { assets ->
                 val items = assets.map { asset ->
-                    val subtitle = typeLabels[asset.type] ?: ""
+                    val typeLabel = typeLabels[asset.type] ?: ""
+                    val purposeLabel = purposeLabels[asset.purpose] ?: asset.purpose.name
+                    val subtitle = "$typeLabel · $purposeLabel"
                     FinancialEntryItem(
                         id = asset.id,
                         title = asset.title,
@@ -109,6 +122,21 @@ class AssetListFragment : Fragment() {
             .show()
     }
 
+    private fun showPurposeDialog(asset: Asset) {
+        val purposes = AccountPurpose.values()
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("نوع حساب")
+            .setSingleChoiceItems(
+                purposes.map { purposeLabels[it] ?: it.name }.toTypedArray(),
+                purposes.indexOf(asset.purpose)
+            ) { dialog, position ->
+                viewModel.setAccountPurpose(asset.id, purposes[position])
+                dialog.dismiss()
+            }
+            .setNegativeButton("لغو", null)
+            .show()
+    }
+
     private fun showAddAssetDialog() {
         val types = AssetType.values()
         val typeSpinner = Spinner(requireContext()).apply {
@@ -134,12 +162,20 @@ class AssetListFragment : Fragment() {
             setPadding(0, 4, 0, 12)
             visibility = View.GONE
         }
+        val purposeSpinner = Spinner(requireContext()).apply {
+            adapter = ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                AccountPurpose.values().map { purposeLabels[it] ?: it.name }
+            )
+        }
         val container = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 0)
             addView(typeSpinner)
             addView(nameInput)
             addView(amountInput)
+            addView(purposeSpinner)
             addView(goldGramsInput)
             addView(goldHintText)
         }
@@ -158,12 +194,13 @@ class AssetListFragment : Fragment() {
                 val name = nameInput.text.toString().trim()
                 if (name.isEmpty()) return@setPositiveButton
                 val type = types[typeSpinner.selectedItemPosition]
+                val purpose = AccountPurpose.values()[purposeSpinner.selectedItemPosition]
                 val grams = goldGramsInput.text.toString().toDoubleOrNull()
                 if (type == AssetType.GOLD && grams != null && grams > 0) {
-                    viewModel.addGoldAsset(name, grams)
+                    viewModel.addGoldAsset(name, grams, purpose)
                 } else {
                     val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
-                    viewModel.addAsset(type, name, amount)
+                    viewModel.addAsset(type, name, amount, purpose = purpose)
                 }
             }
             .setNegativeButton("لغو", null)

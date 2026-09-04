@@ -50,9 +50,17 @@ class AccountingManager(context: Context) {
     suspend fun getTotalExpense(): Double {
         return accountingDao.getTotalExpense() ?: 0.0
     }
+
+    suspend fun getExpenseTotalForAccount(accountId: Long): Double {
+        return accountingDao.getExpenseTotalForAccount(accountId) ?: 0.0
+    }
     
     suspend fun addExpense(expense: Expense): Long {
-        val id = accountingDao.insertExpense(expense)
+        val linkedAccountId = expense.accountId ?: database.financialStatusDao()
+            .getAssetsByPurposeList(AccountPurpose.DAILY_SPENDING)
+            .firstOrNull()
+            ?.id
+        val id = accountingDao.insertExpense(expense.copy(accountId = linkedAccountId))
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
         return id
     }

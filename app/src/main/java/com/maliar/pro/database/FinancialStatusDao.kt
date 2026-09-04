@@ -29,6 +29,18 @@ interface FinancialStatusDao {
     
     @Delete
     suspend fun deleteAsset(asset: Asset)
+
+    @Query("UPDATE assets SET purpose = 'NORMAL' WHERE purpose = :purpose")
+    suspend fun clearPurpose(purpose: AccountPurpose)
+
+    @Query("UPDATE assets SET purpose = :purpose WHERE id = :assetId")
+    suspend fun setPurpose(assetId: Long, purpose: AccountPurpose)
+
+    @Query("SELECT * FROM assets WHERE purpose = :purpose ORDER BY value DESC")
+    fun getAssetsByPurpose(purpose: AccountPurpose): Flow<List<Asset>>
+
+    @Query("SELECT * FROM assets WHERE purpose = :purpose ORDER BY value DESC")
+    suspend fun getAssetsByPurposeList(purpose: AccountPurpose): List<Asset>
     
     // Debts
     @Query("SELECT * FROM debts ORDER BY amount DESC")

@@ -233,11 +233,16 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
-            viewModel.suggestedSpendableAmount.collect { amount ->
-                binding.spendableSuggestionText.text = if (amount == null) {
+            kotlinx.coroutines.flow.combine(
+                viewModel.suggestedSpendableAmount,
+                viewModel.dailySpendingSummary
+            ) { suggested, daily -> suggested to daily }.collect { (suggested, daily) ->
+                binding.spendableSuggestionText.text = if (daily.isConfigured) {
+                    "حساب خرج روزانه «${daily.accountTitle}»: موجودی ${formatCurrency(daily.remainingBalance)} · پیشنهاد امروز ${formatCurrency(daily.dailySuggestion)}"
+                } else if (suggested == null) {
                     "قابل خرج پیشنهادی: داده کافی نیست"
                 } else {
-                    "قابل خرج پیشنهادی تا پایان دوره: ${formatCurrency(amount)}"
+                    "قابل خرج پیشنهادی تا پایان دوره: ${formatCurrency(suggested)}"
                 }
             }
         }

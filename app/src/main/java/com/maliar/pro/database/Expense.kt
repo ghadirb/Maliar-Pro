@@ -11,5 +11,6 @@ data class Expense(
     val description: String,
     val date: Long,
     val category: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val accountId: Long? = null
 )

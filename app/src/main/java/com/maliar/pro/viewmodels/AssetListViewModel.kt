@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.maliar.pro.database.Asset
 import com.maliar.pro.database.AssetType
+import com.maliar.pro.database.AccountPurpose
 import com.maliar.pro.database.FinancialStatusManager
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
@@ -19,17 +20,32 @@ class AssetListViewModel(private val financialManager: FinancialStatusManager) :
     val totalAssets = assets.map { list -> list.sumOf { it.value } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    fun addAsset(type: AssetType, name: String, amount: Double, description: String = "") {
+    fun addAsset(
+        type: AssetType,
+        name: String,
+        amount: Double,
+        description: String = "",
+        purpose: AccountPurpose = AccountPurpose.NORMAL
+    ) {
         viewModelScope.launch {
-            financialManager.addAsset(Asset(type = type, title = name, value = amount, description = description))
+            val id = financialManager.addAsset(
+                Asset(type = type, title = name, value = amount, description = description, purpose = purpose)
+            )
+            if (purpose == AccountPurpose.DAILY_SPENDING) {
+                financialManager.setAccountPurpose(id, purpose)
+            }
         }
+    }
+
+    fun setAccountPurpose(assetId: Long, purpose: AccountPurpose) {
+        viewModelScope.launch { financialManager.setAccountPurpose(assetId, purpose) }
     }
 
     /** Adds a gold asset specified by weight; see [FinancialStatusManager.addGoldAsset]
      *  for why its value is computed from the live rate instead of typed in by hand. */
-    fun addGoldAsset(name: String, grams: Double) {
+    fun addGoldAsset(name: String, grams: Double, purpose: AccountPurpose = AccountPurpose.NORMAL) {
         viewModelScope.launch {
-            financialManager.addGoldAsset(name, grams)
+            financialManager.addGoldAsset(name, grams, purpose)
         }
     }
 

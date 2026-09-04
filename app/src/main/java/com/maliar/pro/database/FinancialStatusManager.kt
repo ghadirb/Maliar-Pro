@@ -14,6 +14,17 @@ class FinancialStatusManager(context: Context) {
     fun getAllAssets(): Flow<List<Asset>> {
         return financialDao.getAllAssets()
     }
+
+    fun getAssetsByPurpose(purpose: AccountPurpose): Flow<List<Asset>> {
+        return financialDao.getAssetsByPurpose(purpose)
+    }
+
+    suspend fun setAccountPurpose(assetId: Long, purpose: AccountPurpose) {
+        if (purpose == AccountPurpose.DAILY_SPENDING) {
+            financialDao.clearPurpose(AccountPurpose.DAILY_SPENDING)
+        }
+        financialDao.setPurpose(assetId, purpose)
+    }
     
     suspend fun getAllAssetsList(): List<Asset> {
         return financialDao.getAllAssetsList()
@@ -37,10 +48,14 @@ class FinancialStatusManager(context: Context) {
      *  afterwards by [refreshGoldAssetValues]. If no rate is available yet (offline/first
      *  run), the value simply starts at 0 and self-corrects the next time the rate is
      *  reachable - it never guesses a price. */
-    suspend fun addGoldAsset(name: String, grams: Double): Long {
+    suspend fun addGoldAsset(name: String, grams: Double, purpose: AccountPurpose = AccountPurpose.NORMAL): Long {
         val rate = runCatching { com.maliar.pro.utils.MarketRateClient(appContext).fetch() }.getOrNull()
         val value = rate?.gold?.let { grams * it / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN } ?: 0.0
-        return financialDao.insertAsset(Asset(type = AssetType.GOLD, title = name, value = value, goldGrams = grams))
+        val id = financialDao.insertAsset(
+            Asset(type = AssetType.GOLD, title = name, value = value, goldGrams = grams, purpose = purpose)
+        )
+        if (purpose != AccountPurpose.NORMAL) setAccountPurpose(id, purpose)
+        return id
     }
 
     /** Re-prices every gold asset that was entered by weight (see [addGoldAsset]) against

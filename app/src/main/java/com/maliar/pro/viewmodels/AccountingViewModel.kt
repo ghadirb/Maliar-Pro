@@ -140,6 +140,39 @@ class AccountingViewModel(
         if (budget <= 0.0) null else (budget - spent).coerceAtLeast(0.0)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    data class DailySpendingSummary(
+        val accountTitle: String,
+        val remainingBalance: Double,
+        val dailySuggestion: Double,
+        val isConfigured: Boolean
+    )
+
+    val dailySpendingSummary = if (financialStatusManager != null) {
+        combine(
+            financialStatusManager.getAssetsByPurpose(com.maliar.pro.database.AccountPurpose.DAILY_SPENDING),
+            expenseList
+        ) { accounts, expenses ->
+            val account = accounts.firstOrNull()
+            if (account == null) {
+                DailySpendingSummary("", 0.0, 0.0, false)
+            } else {
+                val spentFromAccount = expenses.filter { it.accountId == account.id }.sumOf { it.amount }
+                val remaining = (account.value - spentFromAccount).coerceAtLeast(0.0)
+                val calendar = java.util.Calendar.getInstance()
+                val days = (calendar.getActualMaximum(java.util.Calendar.DAY_OF_MONTH) -
+                    calendar.get(java.util.Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
+                DailySpendingSummary(account.title, remaining, remaining / days, true)
+            }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            DailySpendingSummary("", 0.0, 0.0, false)
+        )
+    } else {
+        kotlinx.coroutines.flow.flowOf(DailySpendingSummary("", 0.0, 0.0, false))
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DailySpendingSummary("", 0.0, 0.0, false))
+    }
+
     val activeGoalsSummary = (financialStatusManager?.getAllGoals()
         ?.map { goals -> goals.filter { !it.isCompleted } }
         ?: kotlinx.coroutines.flow.flowOf<List<FinancialGoal>>(emptyList()))
