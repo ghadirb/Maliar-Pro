@@ -118,7 +118,7 @@ class MainActivity : AppCompatActivity() {
         try {
             val can = BiometricManager.from(this).canAuthenticate(authenticators)
             if (can != BiometricManager.BIOMETRIC_SUCCESS) {
-                Toast.makeText(this, "قفل بیومتریک روی این دستگاه در دسترس نیست.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, com.maliar.pro.utils.BiometricAvailability.describe(can), Toast.LENGTH_LONG).show()
                 // Avoid a crash/lockout loop on older OEM firmware. Disable only the
                 // app preference (never device security) so the user can reopen Settings,
                 // fix/enrol a fingerprint and enable the feature again.

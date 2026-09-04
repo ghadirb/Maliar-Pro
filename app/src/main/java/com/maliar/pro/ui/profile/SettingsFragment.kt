@@ -124,7 +124,7 @@ class SettingsFragment : Fragment() {
             }
             if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
                 binding.biometricLockSwitch.isChecked = false
-                Toast.makeText(requireContext(), "قفل بیومتریک روی این دستگاه آماده نیست.", Toast.LENGTH_LONG).show()
+                Toast.makeText(requireContext(), com.maliar.pro.utils.BiometricAvailability.describe(availability), Toast.LENGTH_LONG).show()
                 return@setOnCheckedChangeListener
             }
             val executor = ContextCompat.getMainExecutor(requireContext())
