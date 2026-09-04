@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
 
 /**
  * All numbers on this screen are now derived reactively from Room's Flow<List<...>>
@@ -62,6 +63,18 @@ class AccountingViewModel(
 
     val installmentList: kotlinx.coroutines.flow.StateFlow<List<Installment>> =
         accountingManager.getAllInstallments().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val fixedIncomeList = (financialStatusManager?.getAllFixedIncomes()
+        ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val forecastAssetList = (financialStatusManager?.getAllAssets()
+        ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val forecastDebtList = (financialStatusManager?.getAllDebts()
+        ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalIncome = incomeList.map { list -> list.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
@@ -224,25 +237,89 @@ class AccountingViewModel(
         ?: kotlinx.coroutines.flow.flowOf(0.0 to 0))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0 to 0)
 
-    val sevenDayForecast = combine(monthlyIncome, monthlyExpense) { income, expense ->
+    data class FinancialForecast(
+        val days: Int,
+        val projectedBalance: Double,
+        val hasEnoughData: Boolean
+    )
+
+    private data class ForecastContext(
+        val monthlyFixedIncome: Double,
+        val monthlyInstallments: Double,
+        val monthlyDebtPayments: Double,
+        val liquidAssets: Double
+    )
+
+    private val forecastContext = combine(
+        installmentList,
+        fixedIncomeList,
+        forecastAssetList,
+        forecastDebtList
+    ) { installments, fixedIncomes, assets, debts ->
+        ForecastContext(
+            monthlyFixedIncome = fixedIncomes.sumOf { it.amount }.coerceAtLeast(0.0),
+            monthlyInstallments = installments
+                .filter { it.paidInstallments < it.totalInstallments }
+                .sumOf { it.installmentAmount }
+                .coerceAtLeast(0.0),
+            monthlyDebtPayments = debts
+                .filter { !it.isPaid }
+                .sumOf { it.installmentAmount ?: 0.0 }
+                .coerceAtLeast(0.0),
+            liquidAssets = assets.filter {
+                it.type == com.maliar.pro.database.AssetType.CASH ||
+                    it.type == com.maliar.pro.database.AssetType.BANK_ACCOUNT ||
+                    it.type == com.maliar.pro.database.AssetType.DEPOSIT
+            }.sumOf { it.value }.coerceAtLeast(0.0)
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        ForecastContext(0.0, 0.0, 0.0, 0.0)
+    )
+
+    /**
+     * Conservative 30/60/90-day outlook. It only uses data stored locally: recorded
+     * income/expense pace, fixed income, unpaid installment/debt payments and liquid assets.
+     * It deliberately does not guess market prices or future discretionary income.
+     */
+    val financialForecasts = combine(monthlyIncome, monthlyExpense, forecastContext) { income, expense, context ->
         val start = accountingManager.getFinancialPeriodStartMillis()
         val elapsedDays = ((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000)).toInt() + 1
-        if (elapsedDays < 1 || (income <= 0.0 && expense <= 0.0)) null
-        else {
-            val dailyNet = (income - expense) / elapsedDays
-            ((income - expense) + dailyNet * 7.0)
+        val hasActivity = income > 0.0 || expense > 0.0 || context.monthlyFixedIncome > 0.0 ||
+            context.monthlyInstallments > 0.0 || context.monthlyDebtPayments > 0.0 ||
+            context.liquidAssets > 0.0
+        if (!hasActivity || elapsedDays < 1) {
+            listOf(7, 30, 60, 90).map { FinancialForecast(it, 0.0, false) }
+        } else {
+            val observedDailyIncome = income / elapsedDays
+            val expectedDailyIncome = if (context.monthlyFixedIncome > 0.0) {
+                context.monthlyFixedIncome / 30.0
+            } else {
+                observedDailyIncome
+            }
+            val expectedDailyExpense = expense / elapsedDays
+            val monthlyCommitments = context.monthlyInstallments + context.monthlyDebtPayments
+            val startingBalance = if (context.liquidAssets > 0.0) context.liquidAssets else income - expense
+
+            listOf(7, 30, 60, 90).map { days ->
+                val commitmentCycles = ceil(days / 30.0)
+                val projected = startingBalance +
+                    (expectedDailyIncome - expectedDailyExpense) * days -
+                    (monthlyCommitments * commitmentCycles)
+                FinancialForecast(days, projected, true)
+            }
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private fun forecastFor(days: Int) = financialForecasts.map { forecasts ->
+        forecasts.firstOrNull { it.days == days }?.takeIf { it.hasEnoughData }?.projectedBalance
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val thirtyDayForecast = combine(monthlyIncome, monthlyExpense) { income, expense ->
-        val start = accountingManager.getFinancialPeriodStartMillis()
-        val elapsedDays = ((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000)).toInt() + 1
-        if (elapsedDays < 1 || (income <= 0.0 && expense <= 0.0)) null
-        else {
-            val dailyNet = (income - expense) / elapsedDays
-            (income - expense) + dailyNet * 30.0
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val sevenDayForecast = forecastFor(7)
+    val thirtyDayForecast = forecastFor(30)
+    val sixtyDayForecast = forecastFor(60)
+    val ninetyDayForecast = forecastFor(90)
 
     val expenseAnalysis = expenseList.map { list ->
         val start = accountingManager.getFinancialPeriodStartMillis()

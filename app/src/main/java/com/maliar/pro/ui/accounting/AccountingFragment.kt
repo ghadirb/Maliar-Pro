@@ -309,6 +309,24 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
+            viewModel.sixtyDayForecast.collect { amount ->
+                binding.sixtyDayForecastText.text = if (amount == null) {
+                    "برآورد ۶۰ روز آینده: داده کافی نیست"
+                } else {
+                    "برآورد تراز ۶۰ روز آینده: ${formatCurrency(amount)} · تخمینی"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.ninetyDayForecast.collect { amount ->
+                binding.ninetyDayForecastText.text = if (amount == null) {
+                    "برآورد ۹۰ روز آینده: داده کافی نیست"
+                } else {
+                    "برآورد تراز ۹۰ روز آینده: ${formatCurrency(amount)} · تخمینی"
+                }
+            }
+        }
+        lifecycleScope.launch {
             viewModel.expenseAnalysis.collect { analysis ->
                 binding.expenseAnalysisText.text = if (analysis == null) {
                     "تحلیل هزینه: داده کافی نیست"

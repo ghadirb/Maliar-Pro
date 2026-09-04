@@ -216,6 +216,22 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
                 <TextView
+                    android:id="@+id/sixtyDayForecastText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="برآورد ۶۰ روز آینده: داده کافی نیست"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/ninetyDayForecastText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="برآورد ۹۰ روز آینده: داده کافی نیست"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+                <TextView
                     android:id="@+id/expenseAnalysisText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
