@@ -12,6 +12,9 @@ interface BudgetDao {
     @Query("SELECT * FROM monthly_budgets WHERE year = :year AND month = :month ORDER BY category")
     fun getForMonth(year: Int, month: Int): Flow<List<MonthlyBudget>>
 
+    @Query("SELECT * FROM monthly_budgets WHERE year = :year AND month = :month ORDER BY category")
+    suspend fun getForMonthList(year: Int, month: Int): List<MonthlyBudget>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(budget: MonthlyBudget): Long
 

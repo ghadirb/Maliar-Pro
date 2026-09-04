@@ -9,6 +9,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.maliar.pro.database.AccountingManager
+import com.maliar.pro.database.BudgetManager
 import com.maliar.pro.database.Expense
 import com.maliar.pro.utils.PersianCalendarHelper.PERSIAN_MONTH_NAMES
 import java.util.concurrent.TimeUnit
@@ -54,7 +55,8 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
             }
 
             val marketInsight = buildMarketRateInsight(prefs, previousRates, currentRates)
-            val message = buildCategorySwingInsight(expenses) ?: marketInsight ?: buildProjectionInsight(incomes, expenses)
+            val budgetInsight = buildBudgetInsight(applicationContext, expenses)
+            val message = budgetInsight ?: buildCategorySwingInsight(expenses) ?: marketInsight ?: buildProjectionInsight(incomes, expenses)
             if (message != null) {
                 val finalMessage = tryRephraseWithAi(message) ?: message
                 NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage, isMarketInsight = message == marketInsight)
@@ -63,6 +65,41 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         } catch (e: Exception) {
             Log.e(TAG, "Failed to compute financial insight", e)
             Result.success() // best-effort feature; never worth retrying/crashing over
+        }
+    }
+
+    /** Local budget alert. It is evaluated before online/AI insights and never sends
+     * a notification when no explicit budget exists. */
+    private suspend fun buildBudgetInsight(context: Context, expenses: List<Expense>): String? {
+        val (year, month, _) = PersianCalendarHelper.getCurrentJalaliDate()
+        val budgets = BudgetManager(context).getForMonthList(year, month).filter { it.isEnabled && it.amount > 0.0 }
+        if (budgets.isEmpty()) return null
+        val monthStart = PersianCalendarHelper.jalaliToGregorianMillis(year, month, 1)
+        val spentByCategory = expenses
+            .filter { it.date >= monthStart }
+            .groupBy { it.category.trim().ifBlank { "عمومی" }.lowercase() }
+            .mapValues { (_, rows) -> rows.sumOf { it.amount } }
+        val candidate = budgets.mapNotNull { budget ->
+            val spent = spentByCategory[budget.category.trim().ifBlank { "عمومی" }.lowercase()] ?: 0.0
+            val ratio = spent / budget.amount
+            if (ratio >= budget.hardThreshold / 100.0) Triple(budget, spent, ratio) else null
+        }.maxByOrNull { it.third }
+        if (candidate != null) {
+            val (budget, spent, ratio) = candidate
+            val percent = (ratio * 100).toInt()
+            return if (spent > budget.amount) {
+                "هشدار بودجه: هزینهٔ «${budget.category}» به ${percent}٪ بودجهٔ این ماه رسیده و از سقف عبور کرده است."
+            } else {
+                "هشدار بودجه: حدود ${percent}٪ بودجهٔ «${budget.category}» مصرف شده است."
+            }
+        }
+        val nearing = budgets.mapNotNull { budget ->
+            val spent = spentByCategory[budget.category.trim().ifBlank { "عمومی" }.lowercase()] ?: 0.0
+            val ratio = spent / budget.amount
+            if (ratio >= budget.softThreshold / 100.0) Triple(budget, spent, ratio) else null
+        }.maxByOrNull { it.third }
+        return nearing?.let { (budget, _, ratio) ->
+            "بودجهٔ «${budget.category}» تقریباً به سقف نزدیک شده است (${(ratio * 100).toInt()}٪ مصرف)."
         }
     }
 
