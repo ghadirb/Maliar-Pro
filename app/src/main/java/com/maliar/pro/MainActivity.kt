@@ -82,7 +82,11 @@ class MainActivity : AppCompatActivity() {
 
         setupNavigation()
         ensureNotificationPermissions()
-        authenticateAppIfNeeded()
+        // Deferred to after this frame is laid out (rather than called synchronously here)
+        // since starting a BiometricPrompt fragment transaction before the Activity has
+        // reached onStart/onResume is a known source of flaky IllegalStateExceptions on
+        // some OEM ROMs - see authenticateAppIfNeeded().
+        binding.root.post { authenticateAppIfNeeded() }
         handleAssistantDeepLink(intent)
     }
 
@@ -108,48 +112,89 @@ class MainActivity : AppCompatActivity() {
 
     private fun authenticateAppIfNeeded() {
         if (!PreferencesManager(this).isBiometricLockEnabled()) return
-        // Android 10/OEM biometric implementations are inconsistent when the
-        // DEVICE_CREDENTIAL flag is combined with BIOMETRIC_WEAK. Keep the
-        // Android-10 path strictly fingerprint/biometric and guard every call:
-        // a broken vendor framework must never crash the app.
-        val authenticators = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        } else BiometricManager.Authenticators.BIOMETRIC_WEAK
+        // Try fingerprint/biometric first, then fall back to the phone's own PIN/pattern/
+        // password screen if that fails for any reason (canAuthenticate() reporting
+        // available but authenticate() then throwing is a known issue on cheap/unofficial
+        // devices - e.g. reported on a G-Plus P10 running Android 10 - where the vendor's
+        // fingerprint HAL/binder is broken even though it announces itself as present).
+        // DEVICE_CREDENTIAL used alone (not combined with a biometric type) doesn't have
+        // the API<30 restriction that combining it with BIOMETRIC_WEAK/STRONG does, and
+        // doesn't depend on the fingerprint hardware at all, so it's a solid fallback.
+        tryAuthenticate(
+            authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK,
+            title = "بازکردن مالیار",
+            subtitle = "برای مشاهده اطلاعات مالی، اثر انگشت خود را تأیید کنید",
+            onSuccess = { /* app already open; nothing else to do */ },
+            onUnavailable = {
+                tryAuthenticate(
+                    authenticators = BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+                    title = "بازکردن مالیار",
+                    subtitle = "قفل بیومتریک این دستگاه پاسخ نمی‌دهد؛ رمز/الگوی صفحه گوشی را وارد کنید",
+                    onSuccess = { /* app already open; nothing else to do */ },
+                    onUnavailable = {
+                        // Neither fingerprint nor a phone lock screen is usable. Don't trap
+                        // the user outside their own app over a broken/unset OEM feature -
+                        // let them in, but say so plainly and turn the broken toggle off so
+                        // this doesn't repeat every launch.
+                        Toast.makeText(
+                            this,
+                            "قفل بیومتریک این دستگاه پاسخ نمی‌دهد و قفل صفحه‌ای هم تنظیم نشده. قفل مالیار خاموش شد؛ می‌توانید دوباره از تنظیمات آن را روشن کنید.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        PreferencesManager(this).setBiometricLockEnabled(false)
+                    },
+                    onFailed = { /* wrong PIN/pattern entered; let them retry, prompt stays open */ },
+                    onCancelledOrError = { finish() }
+                )
+            },
+            onFailed = { Toast.makeText(this, "اثر انگشت شناسایی نشد.", Toast.LENGTH_SHORT).show() },
+            onCancelledOrError = { finish() }
+        )
+    }
+
+    /** One authenticate attempt with one [authenticators] value (never a combination on
+     *  API < 30 - see the comment above). [onUnavailable] fires when the check/attempt
+     *  can't even start (no hardware, nothing enrolled, or - the case this exists for - a
+     *  broken vendor implementation throwing where it shouldn't); [onCancelledOrError]
+     *  fires for a real prompt-level error (user backed out, too many attempts, etc). */
+    private fun tryAuthenticate(
+        authenticators: Int,
+        title: String,
+        subtitle: String,
+        onSuccess: () -> Unit,
+        onUnavailable: () -> Unit,
+        onFailed: () -> Unit,
+        onCancelledOrError: () -> Unit
+    ) {
         try {
             val can = BiometricManager.from(this).canAuthenticate(authenticators)
             if (can != BiometricManager.BIOMETRIC_SUCCESS) {
-                Toast.makeText(this, com.maliar.pro.utils.BiometricAvailability.describe(can), Toast.LENGTH_LONG).show()
-                // Avoid a crash/lockout loop on older OEM firmware. Disable only the
-                // app preference (never device security) so the user can reopen Settings,
-                // fix/enrol a fingerprint and enable the feature again.
-                PreferencesManager(this).setBiometricLockEnabled(false)
+                onUnavailable()
                 return
             }
             val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
                 object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        onSuccess()
+                    }
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        Toast.makeText(this@MainActivity, "احراز هویت انجام نشد؛ برنامه قفل باقی می‌ماند.", Toast.LENGTH_LONG).show()
-                        finish()
+                        onCancelledOrError()
                     }
                     override fun onAuthenticationFailed() {
-                        Toast.makeText(this@MainActivity, "اثر انگشت شناسایی نشد.", Toast.LENGTH_SHORT).show()
+                        onFailed()
                     }
                 })
             val info = BiometricPrompt.PromptInfo.Builder()
-                .setTitle("بازکردن مالیار")
-                .setSubtitle("برای مشاهده اطلاعات مالی، هویت خود را تأیید کنید")
+                .setTitle(title)
+                .setSubtitle(subtitle)
                 .setAllowedAuthenticators(authenticators)
                 .build()
             prompt.authenticate(info)
-        } catch (security: SecurityException) {
-            Toast.makeText(this, "مجوز یا سرویس بیومتریک دستگاه آماده نیست.", Toast.LENGTH_LONG).show()
-            PreferencesManager(this).setBiometricLockEnabled(false)
-        } catch (state: IllegalStateException) {
-            Toast.makeText(this, "سرویس بیومتریک دستگاه پاسخ نداد.", Toast.LENGTH_LONG).show()
-            PreferencesManager(this).setBiometricLockEnabled(false)
-        } catch (argument: IllegalArgumentException) {
-            Toast.makeText(this, "تنظیمات بیومتریک این دستگاه پشتیبانی نمی‌شود.", Toast.LENGTH_LONG).show()
-            PreferencesManager(this).setBiometricLockEnabled(false)
+        } catch (e: RuntimeException) {
+            // SecurityException / IllegalStateException / IllegalArgumentException all
+            // mean this particular authenticator can't be used right now - try the next
+            // one in the chain rather than crashing or giving up outright.
+            onUnavailable()
         }
     }
 

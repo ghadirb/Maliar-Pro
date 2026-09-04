@@ -112,42 +112,67 @@ class SettingsFragment : Fragment() {
                 prefs.setBiometricLockEnabled(false)
                 return@setOnCheckedChangeListener
             }
-            val authenticators = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-            } else {
-                BiometricManager.Authenticators.BIOMETRIC_WEAK
-            }
-            val availability = try {
-                BiometricManager.from(requireContext()).canAuthenticate(authenticators)
-            } catch (_: RuntimeException) {
-                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE
-            }
+            // Try fingerprint first, then fall back to the phone's own PIN/pattern/password
+            // if that fails for any reason - see MainActivity.authenticateAppIfNeeded() for
+            // why (a broken vendor fingerprint HAL/binder reporting "available" but then
+            // failing is a known issue on cheap/unofficial devices, e.g. a G-Plus P10
+            // running Android 10).
+            tryBiometricAuth(
+                authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK,
+                subtitle = "برای تأیید، اثر انگشت خود را وارد کنید",
+                onSuccess = { prefs.setBiometricLockEnabled(true) },
+                onUnavailable = {
+                    tryBiometricAuth(
+                        authenticators = BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+                        subtitle = "قفل بیومتریک این دستگاه پاسخ نمی‌دهد؛ رمز/الگوی صفحه گوشی را وارد کنید",
+                        onSuccess = { prefs.setBiometricLockEnabled(true) },
+                        onUnavailable = {
+                            binding.biometricLockSwitch.isChecked = false
+                            Toast.makeText(
+                                requireContext(),
+                                "نه اثر انگشت و نه قفل صفحه‌ای روی این دستگاه در دسترس نیست، پس قفل مالیار را نمی‌توان فعال کرد.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    )
+                }
+            )
+        }
+    }
+
+    /** One authenticate attempt with one [authenticators] value (see the equivalent helper
+     *  in MainActivity for why authenticators are never combined here). Falls through to
+     *  [onUnavailable] - not a crash - for a broken/absent authenticator so the caller can
+     *  chain to the next one. */
+    private fun tryBiometricAuth(
+        authenticators: Int,
+        subtitle: String,
+        onSuccess: () -> Unit,
+        onUnavailable: () -> Unit
+    ) {
+        try {
+            val availability = BiometricManager.from(requireContext()).canAuthenticate(authenticators)
             if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
-                binding.biometricLockSwitch.isChecked = false
-                Toast.makeText(requireContext(), com.maliar.pro.utils.BiometricAvailability.describe(availability), Toast.LENGTH_LONG).show()
-                return@setOnCheckedChangeListener
+                onUnavailable()
+                return
             }
             val executor = ContextCompat.getMainExecutor(requireContext())
-            try {
-                BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+            BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    prefs.setBiometricLockEnabled(true)
+                    onSuccess()
                 }
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     binding.biometricLockSwitch.isChecked = false
                 }
-                }).authenticate(
-                    BiometricPrompt.PromptInfo.Builder()
-                        .setTitle("فعال‌سازی قفل مالیار")
-                        .setSubtitle("برای تأیید، قفل گوشی را تأیید کنید")
-                        .setAllowedAuthenticators(authenticators)
-                        .build()
-                )
-            } catch (_: RuntimeException) {
-                prefs.setBiometricLockEnabled(false)
-                binding.biometricLockSwitch.isChecked = false
-                Toast.makeText(requireContext(), "سرویس بیومتریک دستگاه پاسخ نداد.", Toast.LENGTH_LONG).show()
-            }
+            }).authenticate(
+                BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("فعال‌سازی قفل مالیار")
+                    .setSubtitle(subtitle)
+                    .setAllowedAuthenticators(authenticators)
+                    .build()
+            )
+        } catch (_: RuntimeException) {
+            onUnavailable()
         }
     }
 
