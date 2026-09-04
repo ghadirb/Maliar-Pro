@@ -118,6 +118,10 @@ class MainActivity : AppCompatActivity() {
             val can = BiometricManager.from(this).canAuthenticate(authenticators)
             if (can != BiometricManager.BIOMETRIC_SUCCESS) {
                 Toast.makeText(this, "قفل بیومتریک روی این دستگاه در دسترس نیست.", Toast.LENGTH_LONG).show()
+                // Avoid a crash/lockout loop on older OEM firmware. Disable only the
+                // app preference (never device security) so the user can reopen Settings,
+                // fix/enrol a fingerprint and enable the feature again.
+                PreferencesManager(this).setBiometricLockEnabled(false)
                 return
             }
             val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
@@ -138,10 +142,13 @@ class MainActivity : AppCompatActivity() {
             prompt.authenticate(info)
         } catch (security: SecurityException) {
             Toast.makeText(this, "مجوز یا سرویس بیومتریک دستگاه آماده نیست.", Toast.LENGTH_LONG).show()
+            PreferencesManager(this).setBiometricLockEnabled(false)
         } catch (state: IllegalStateException) {
             Toast.makeText(this, "سرویس بیومتریک دستگاه پاسخ نداد.", Toast.LENGTH_LONG).show()
+            PreferencesManager(this).setBiometricLockEnabled(false)
         } catch (argument: IllegalArgumentException) {
             Toast.makeText(this, "تنظیمات بیومتریک این دستگاه پشتیبانی نمی‌شود.", Toast.LENGTH_LONG).show()
+            PreferencesManager(this).setBiometricLockEnabled(false)
         }
     }
 
