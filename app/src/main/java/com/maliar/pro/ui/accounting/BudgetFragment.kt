@@ -18,6 +18,8 @@ import com.maliar.pro.databinding.FragmentBudgetBinding
 import com.maliar.pro.utils.CurrencyFormatter
 import com.maliar.pro.utils.PersianCalendarHelper
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
@@ -38,6 +40,12 @@ class BudgetFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.addBudgetButton.setOnClickListener { showAddBudgetDialog() }
+        binding.budgetMonthFilterButton.setOnClickListener { showMonthPicker() }
+        viewLifecycleOwner.lifecycleScope.launch {
+            vm.selectedMonth.collect { (year, month) ->
+                binding.budgetMonthLabel.text = "بودجه و مصرف ماه $month/$year"
+            }
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             vm.rows.collect { rows ->
                 binding.budgetRows.removeAllViews()
@@ -54,6 +62,36 @@ class BudgetFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun showMonthPicker() {
+        val (currentYear, currentMonth) = vm.selectedMonth.value
+        val year = EditText(requireContext()).apply {
+            hint = "سال شمسی"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(currentYear.toString())
+        }
+        val month = EditText(requireContext()).apply {
+            hint = "ماه ۱ تا ۱۲"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(currentMonth.toString())
+        }
+        val box = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 16, 48, 0)
+            addView(year)
+            addView(month)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("انتخاب ماه و سال شمسی")
+            .setView(box)
+            .setPositiveButton("نمایش") { _, _ ->
+                val y = year.text.toString().toIntOrNull()
+                val m = month.text.toString().toIntOrNull()
+                if (y != null && m in 1..12) vm.selectMonth(y, m)
+            }
+            .setNegativeButton("لغو", null)
+            .show()
     }
 
     private fun addRow(row: BudgetRow) {
@@ -103,9 +141,10 @@ class BudgetViewModel(
     private val budgetManager: BudgetManager,
     private val accountingManager: AccountingManager
 ) : androidx.lifecycle.ViewModel() {
-    private val currentMonth = PersianCalendarHelper.getCurrentJalaliDate()
+    private val today = PersianCalendarHelper.getCurrentJalaliDate()
+    val selectedMonth = MutableStateFlow(today.first to today.second)
     val rows = combine(
-        budgetManager.getForMonth(currentMonth.first, currentMonth.second),
+        selectedMonth.flatMapLatest { (year, month) -> budgetManager.getForMonth(year, month) },
         accountingManager.getAllExpenses()
     ) { budgets, expenses ->
         budgets.map { budget ->
@@ -121,15 +160,20 @@ class BudgetViewModel(
 
     fun save(category: String, amount: Double) {
         viewModelScope.launch {
+            val (year, month) = selectedMonth.value
             budgetManager.save(
                 MonthlyBudget(
-                    year = currentMonth.first,
-                    month = currentMonth.second,
+                    year = year,
+                    month = month,
                     category = category,
                     amount = amount
                 )
             )
         }
+    }
+
+    fun selectMonth(year: Int, month: Int) {
+        if (year in 1300..1600 && month in 1..12) selectedMonth.value = year to month
     }
 
     class Factory(

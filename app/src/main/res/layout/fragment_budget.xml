@@ -21,6 +21,20 @@
             android:text="برای این ماه بودجه‌ای ثبت نشده است."
             android:textSize="14sp" />
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/budgetMonthFilterButton"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="انتخاب ماه/سال شمسی" />
+        <TextView
+            android:id="@+id/budgetMonthLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/addBudgetButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
