@@ -9,6 +9,8 @@ import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.database.FinancialGoal
 import com.maliar.pro.database.Income
 import com.maliar.pro.database.Installment
+import com.maliar.pro.database.PeriodicPayment
+import com.maliar.pro.database.PeriodicPaymentManager
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -75,6 +77,16 @@ class AccountingViewModel(
     private val forecastDebtList = (financialStatusManager?.getAllDebts()
         ?: kotlinx.coroutines.flow.flowOf(emptyList()))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val periodicPaymentManager = PeriodicPaymentManager(accountingManager.context)
+    val periodicPayments = periodicPaymentManager.getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val next30DayCommitments = periodicPayments.map { payments ->
+        val now = System.currentTimeMillis()
+        val horizon = now + 30L * 24 * 60 * 60 * 1000
+        payments.filter { it.isActive && it.nextPaymentAt in now..horizon }.sumOf { it.amount }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalIncome = incomeList.map { list -> list.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
@@ -254,8 +266,9 @@ class AccountingViewModel(
         installmentList,
         fixedIncomeList,
         forecastAssetList,
-        forecastDebtList
-    ) { installments, fixedIncomes, assets, debts ->
+        forecastDebtList,
+        periodicPayments
+    ) { installments, fixedIncomes, assets, debts, periodic ->
         ForecastContext(
             monthlyFixedIncome = fixedIncomes.sumOf { it.amount }.coerceAtLeast(0.0),
             monthlyInstallments = installments
@@ -271,7 +284,12 @@ class AccountingViewModel(
                     it.type == com.maliar.pro.database.AssetType.BANK_ACCOUNT ||
                     it.type == com.maliar.pro.database.AssetType.DEPOSIT
             }.sumOf { it.value }.coerceAtLeast(0.0)
-        )
+        ).let { base ->
+            val periodicMonthly = periodic.filter { it.isActive }.sumOf {
+                (it.amount * 30.0 / it.periodDays.coerceAtLeast(1)).coerceAtLeast(0.0)
+            }
+            base.copy(monthlyInstallments = base.monthlyInstallments + periodicMonthly)
+        }
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),

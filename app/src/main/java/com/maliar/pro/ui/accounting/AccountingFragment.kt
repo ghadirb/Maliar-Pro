@@ -327,6 +327,15 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
+            viewModel.next30DayCommitments.collect { amount ->
+                binding.periodicCommitmentsText.text = if (amount <= 0.0) {
+                    "پرداخت‌های دوره‌ای ۳۰ روز آینده: داده‌ای ثبت نشده"
+                } else {
+                    "پرداخت‌های دوره‌ای ۳۰ روز آینده: ${formatCurrency(amount)} · واردشده توسط کاربر"
+                }
+            }
+        }
+        lifecycleScope.launch {
             viewModel.expenseAnalysis.collect { analysis ->
                 binding.expenseAnalysisText.text = if (analysis == null) {
                     "تحلیل هزینه: داده کافی نیست"

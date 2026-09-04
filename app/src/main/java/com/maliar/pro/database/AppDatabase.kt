@@ -13,8 +13,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
                MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class,
-               MonthlyBudget::class],
-    version = 17,
+               MonthlyBudget::class, PeriodicPayment::class],
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun foodPriceDao(): FoodPriceDao
     abstract fun marketRateHistoryDao(): MarketRateHistoryDao
     abstract fun budgetDao(): BudgetDao
+    abstract fun periodicPaymentDao(): PeriodicPaymentDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -235,6 +236,29 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `periodic_payments` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `accountId` INTEGER,
+                        `periodDays` INTEGER NOT NULL DEFAULT 30,
+                        `nextPaymentAt` INTEGER NOT NULL,
+                        `category` TEXT NOT NULL DEFAULT 'عمومی',
+                        `isActive` INTEGER NOT NULL DEFAULT 1,
+                        `notes` TEXT NOT NULL DEFAULT '',
+                        `reminderDaysBefore` INTEGER NOT NULL DEFAULT 1,
+                        `lastPaidOccurrenceAt` INTEGER,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -249,7 +273,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

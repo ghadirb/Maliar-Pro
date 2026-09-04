@@ -3,7 +3,7 @@ package com.maliar.pro.database
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
 
-class AccountingManager(context: Context) {
+class AccountingManager(val context: Context) {
 
     private val appContext = context.applicationContext
     private val database = AppDatabase.getDatabase(context)

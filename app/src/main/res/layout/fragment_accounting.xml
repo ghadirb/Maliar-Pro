@@ -232,6 +232,14 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
                 <TextView
+                    android:id="@+id/periodicCommitmentsText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="پرداخت‌های دوره‌ای ۳۰ روز آینده: داده‌ای ثبت نشده"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+                <TextView
                     android:id="@+id/expenseAnalysisText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
