@@ -137,10 +137,6 @@ class RemindersFragment : Fragment() {
             val next = active.filter { it.triggerTime > System.currentTimeMillis() }
                 .minByOrNull { it.triggerTime }
 
-            if (next != null) {
-                val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(next.triggerTime)
-                val cal = java.util.Calendar.getInstance().apply { timeInMillis = next.triggerTime }
-                val timeStr = String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
             val now = System.currentTimeMillis()
             val startOfToday = java.util.Calendar.getInstance().apply {
                 set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
@@ -151,6 +147,7 @@ class RemindersFragment : Fragment() {
             val overdue = active.count { it.triggerTime < now }
             val today = active.count { it.triggerTime in startOfToday until endOfToday }
             val thisWeek = active.count { it.triggerTime in endOfToday until endOfWeek }
+
             if (next != null) {
                 val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(next.triggerTime)
                 val cal = java.util.Calendar.getInstance().apply { timeInMillis = next.triggerTime }

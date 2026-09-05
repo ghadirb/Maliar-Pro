@@ -20,9 +20,6 @@ on:
   pull_request:
     branches: [main, master, develop]
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -61,29 +58,9 @@ jobs:
           BAZAAR_IAB_PUBLIC_KEY: ${{ secrets.BAZAAR_IAB_PUBLIC_KEY }}
           MYKET_IAB_PUBLIC_KEY: ${{ secrets.MYKET_IAB_PUBLIC_KEY }}
         run: |
-          set -o pipefail
           store="${{ matrix.store }}"
           flavor="$(tr '[:lower:]' '[:upper:]' <<< "${store:0:1}")${store:1}"
-          ./gradlew ":app:assemble${flavor}Release" ":app:bundle${flavor}Release" --no-daemon --stacktrace 2>&1 | tee /tmp/build_log_${{ matrix.store }}.txt
-
-      - name: DEBUG - Push build log for diagnosis
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cd "$RUNNER_TEMP"
-          rm -rf logrepo
-          git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git logrepo
-          cd logrepo
-          git checkout --orphan ci-logs-tmp
-          git rm -rf . >/dev/null 2>&1 || true
-          mkdir -p ci-logs
-          cp /tmp/build_log_${{ matrix.store }}.txt ci-logs/build_log_${{ matrix.store }}.txt || echo "no log" > ci-logs/build_log_${{ matrix.store }}.txt
-          git config user.email "ci@maliar.local"
-          git config user.name "CI Debug Bot"
-          git add ci-logs/build_log_${{ matrix.store }}.txt
-          git commit -m "debug: build log for ${{ matrix.store }}"
-          git push -f origin ci-logs-tmp:ci-logs
+          ./gradlew ":app:assemble${flavor}Release" ":app:bundle${flavor}Release" --no-daemon
 
       - name: Print artifact and signing fingerprints
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'release' }}
