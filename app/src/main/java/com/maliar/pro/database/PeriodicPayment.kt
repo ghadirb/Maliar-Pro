@@ -21,6 +21,7 @@ data class PeriodicPayment(
     val isActive: Boolean = true,
     val notes: String = "",
     val reminderDaysBefore: Int = 1,
+    val reminderId: Long? = null,
     /** Scheduled occurrence that was last marked paid, used to prevent duplicate records. */
     val lastPaidOccurrenceAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),

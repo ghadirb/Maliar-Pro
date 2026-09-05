@@ -1,4 +1,4 @@
-// Google Apps Script version of the Maliar Pro billing backend - a free, no-hosting-
+﻿// Google Apps Script version of the Maliar Pro billing backend - a free, no-hosting-
 // needed alternative to the Node.js server in /server. Uses PropertiesService as a tiny
 // key-value store (no Google Sheet needed) and UrlFetchApp to call the gateway's API.
 //
@@ -38,9 +38,9 @@
 //      -- optional AI proxy --
 //      AI_PROVIDER          = gapgpt (or liara)
 //      GAPGPT_API_KEY       = provider key (Script Property only)
-//      LIARA_API_KEY        = provider key (Script Property only)
 //      AI_MODEL             = gpt-4o-mini
-//      AI_DAILY_LIMIT       = 10
+//      AI_STT_MODEL         = whisper-1  (یا gapgpt/whisper-1 برای GapGPT)
+//      AI_TTS_MODEL         = gpt-4o-mini-tts  (یا tts-1)
 // 4. Deploy -> New deployment -> type: "Web app".
 //      Execute as: Me
 //      Who has access: Anyone
@@ -297,7 +297,7 @@ function handleAiStt_(params) {
       muteHttpExceptions: true,
       headers: { Authorization: 'Bearer ' + cfg.key },
       payload: {
-        model: 'whisper-1',
+        model: getSetting_('AI_STT_MODEL', 'whisper-1'),
         file: Utilities.newBlob(Utilities.base64Decode(encoded), 'audio/mp4', 'audio.m4a')
       }
     });
@@ -319,12 +319,12 @@ function handleAiTts_(params) {
   try {
     let response = aiFetch_(cfg.baseUrl + '/audio/speech', {
       apiKey: cfg.key,
-      body: { model: 'gpt-4o-mini-tts', voice: 'alloy', input: text }
+      body: { model: getSetting_('AI_TTS_MODEL', 'gpt-4o-mini-tts'), voice: 'alloy', input: text }
     });
     if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
       response = aiFetch_(cfg.baseUrl + '/audio/speech', {
         apiKey: cfg.key,
-        body: { model: 'tts-1', voice: 'alloy', input: text }
+        body: { model: getSetting_('AI_TTS_MODEL_FALLBACK', 'tts-1'), voice: 'alloy', input: text }
       });
     }
     if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
@@ -706,3 +706,4 @@ function handleCallbackNextpay_(params) {
 
   return htmlOutput_('<h2>❌ پرداخت ناموفق</h2><p>تایید پرداخت توسط نکست‌پی ناموفق بود.</p>');
 }
+

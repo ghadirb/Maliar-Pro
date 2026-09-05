@@ -1,4 +1,4 @@
-package com.maliar.pro.ui.reminders
+﻿package com.maliar.pro.ui.reminders
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -155,7 +155,7 @@ class FullScreenAlarmActivity : AppCompatActivity() {
                 setOnCompletionListener { finished ->
                     finished.release()
                     if (mediaPlayer === finished) mediaPlayer = null
-                    if (!isFinishing && !isDestroyed && smartSpeechRepeats < 2) {
+                    if (!isFinishing && !isDestroyed && smartSpeechRepeats < 5) {
                         smartSpeechRepeats += 1
                         playGeneratedSpeech(audioFile, soundUri)
                     } else if (!isFinishing && !isDestroyed) {
@@ -358,3 +358,4 @@ class FullScreenAlarmActivity : AppCompatActivity() {
         }
     }
 }
+

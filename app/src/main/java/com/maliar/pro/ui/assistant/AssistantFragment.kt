@@ -1,5 +1,6 @@
 package com.maliar.pro.ui.assistant
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -49,7 +50,12 @@ class AssistantFragment : Fragment() {
 
         val input: TextInputEditText = view.findViewById(R.id.messageInput)
         val sendBtn: MaterialButton = view.findViewById(R.id.sendButton)
+        val voiceCommandBtn: MaterialButton = view.findViewById(R.id.voiceCommandButton)
         bindSmartCards(view)
+
+        voiceCommandBtn.setOnClickListener {
+            startActivity(Intent(requireContext(), VoiceCommandActivity::class.java))
+        }
 
         sendBtn.setOnClickListener {
             val message = input.text.toString().trim()

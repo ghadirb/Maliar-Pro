@@ -1,4 +1,4 @@
-package com.maliar.pro.ui.reminders
+﻿package com.maliar.pro.ui.reminders
 
 import android.content.Intent
 import android.os.Bundle
@@ -141,7 +141,8 @@ class RemindersFragment : Fragment() {
                 val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(next.triggerTime)
                 val cal = java.util.Calendar.getInstance().apply { timeInMillis = next.triggerTime }
                 val timeStr = String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
-                nextReminderText.text = "⏭ بعدی: ${next.title} — ${PersianCalendarHelper.formatJalali(y, m, d)} ساعت $timeStr"
+                val extraText = if (todayCount > 1) " (+${todayCount - 1} مورد امروز)" else if (upcomingCount > 1) " (+$upcomingCount مورد تا هفته آینده)" else ""
+                nextReminderText.text = "⏭ بعدی: ${next.title} — ${PersianCalendarHelper.formatJalali(y, m, d)} ساعت $timeStr$extraText"
                 nextReminderText.visibility = View.VISIBLE
             } else {
                 nextReminderText.visibility = View.GONE

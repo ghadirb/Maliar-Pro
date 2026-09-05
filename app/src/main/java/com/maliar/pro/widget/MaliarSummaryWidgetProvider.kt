@@ -1,4 +1,4 @@
-package com.maliar.pro.widget
+﻿package com.maliar.pro.widget
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -55,9 +55,13 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
                     val accountingManager = AccountingManager(context)
                     val balance = accountingManager.getBalance()
                     val periodBalance = accountingManager.getPeriodBalance()
-                    val nextReminder = SmartReminderManager(context).reconcileRecurringReminders()
+                    val allActiveReminders = SmartReminderManager(context).reconcileRecurringReminders()
                         .filter { !it.isCompleted }
-                        .minByOrNull { it.triggerTime }
+                        .sortedBy { it.triggerTime }
+                    val nextReminder = allActiveReminders.firstOrNull()
+                    val upcomingCount = allActiveReminders.count {
+                        it.triggerTime > System.currentTimeMillis() && it.triggerTime < System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000L
+                    }
                     val rates = runCatching { com.maliar.pro.utils.MarketRateClient(context).fetch() }.getOrNull()
 
                     views.setTextViewText(R.id.widgetBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(balance))
@@ -79,7 +83,8 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
                         R.id.widgetNextReminderText,
                         if (nextReminder != null) {
                             val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(nextReminder.triggerTime)
-                            "⏰ ${nextReminder.title} - ${PersianCalendarHelper.formatJalali(y, m, d)}"
+                            val suffix = if (upcomingCount > 1) " (+$upcomingCount تا هفته آینده)" else ""
+                            "⏰ ${nextReminder.title} - ${PersianCalendarHelper.formatJalali(y, m, d)}$suffix"
                         } else {
                             "یادآوری فعالی وجود ندارد"
                         }
@@ -121,3 +126,4 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
         }
     }
 }
+

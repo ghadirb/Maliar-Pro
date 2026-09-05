@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
@@ -12,6 +12,13 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Voice command recording; requested only when user taps the mic button -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Full-screen intent for alarm reminders. Android 14+ requires this explicit
+         declaration for USE_FULL_SCREEN_INTENT; the permission is only requested when
+         the user first creates a FULL_SCREEN or SMART reminder. Play Store policy
+         allows this for alarm/reminder apps. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Used only after an explicit opt-in in Settings; never started automatically. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -84,6 +91,15 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.MaliarPro.Alarm" />
 
+        <!-- Voice command: record and transcribe a short command to create an expense,
+             a reminder, or make a call. Launched from the notification action or the
+             voice FAB in the assistant tab. -->
+        <activity
+            android:name=".ui.assistant.VoiceCommandActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MaliarPro"
+            android:label="دستور صوتی" />
+
         <!-- Exposes cache-dir files (currently: generated smart-reminder TTS audio) to the
              system as content:// URIs, e.g. so a heads-up notification (posted while the
              device is unlocked and the app is backgrounded, where Android intentionally
@@ -147,3 +163,4 @@
     </application>
 
 </manifest>
+

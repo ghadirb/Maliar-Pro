@@ -1,4 +1,7 @@
-package com.maliar.pro.ui.accounting
+﻿package com.maliar.pro.ui.accounting
+
+import android.text.Editable
+import android.text.TextWatcher
 
 import android.app.AlertDialog
 import android.os.Bundle
@@ -67,10 +70,24 @@ class PeriodicPaymentFragment : Fragment() {
         fun field(hint: String): EditText = EditText(requireContext()).also { it.hint = hint; box.addView(it) }
         val title = field("عنوان (مثلاً اینترنت)")
         val amount = field("مبلغ تومان")
-        val period = field("دوره به روز (۷، ۳۰، ۹۰ یا ۳۶۵)")
+        val period = field("دوره به روز (۷، ۳۰، ۹۰ یا ۳۶۵) - برای اجاره خودکار تشخیص می‌شود")
+        val reminderDays = field("چند روز قبل یادآوری شود؟").also { it.setText("1") }
+        // Auto-detect period from title for rent
+        title.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val t = s?.toString() ?: ""
+                val detected = PeriodicPaymentManager.detectPeriodDays(t, "")
+                if (detected != null) {
+                    period.setText(detected.toString())
+                }
+            }
+        })
         val (year, month, day) = PersianCalendarHelper.getCurrentJalaliDate()
         val date = field("تاریخ بعدی شمسی (مثلاً ۱۴۰۵/۰۶/۱۵)").also { it.setText("$year/$month/$day") }
         val category = field("دسته‌بندی")
+        val notes = field("توضیحات (اختیاری)")
         viewLifecycleOwner.lifecycleScope.launch {
             val accounts = financialManager.getAllAssetsList()
             val accountSpinner = Spinner(requireContext()).apply {
@@ -86,6 +103,7 @@ class PeriodicPaymentFragment : Fragment() {
                 .setPositiveButton("ذخیره") { _, _ ->
                 val parsedAmount = amount.text.toString().replace(",", "").toDoubleOrNull()
                 val parsedPeriod = period.text.toString().toIntOrNull()?.coerceAtLeast(1)
+                val parsedReminderDays = reminderDays.text.toString().toIntOrNull()?.coerceIn(0, 30) ?: 1
                 val parsedDate = parseJalaliDate(date.text.toString())
                 if (title.text.isBlank() || parsedAmount == null || parsedAmount <= 0 || parsedDate == null) {
                     Toast.makeText(requireContext(), "عنوان، مبلغ و تاریخ صحیح الزامی است.", Toast.LENGTH_LONG).show()
@@ -98,7 +116,9 @@ class PeriodicPaymentFragment : Fragment() {
                         periodDays = parsedPeriod ?: 30,
                         nextPaymentAt = parsedDate,
                         category = category.text.toString().trim().ifBlank { "عمومی" },
-                        accountId = accountSpinner.selectedItemPosition.takeIf { it > 0 }?.let { accounts[it - 1].id }
+                        accountId = accountSpinner.selectedItemPosition.takeIf { it > 0 }?.let { accounts[it - 1].id },
+                        notes = notes.text.toString().trim(),
+                        reminderDaysBefore = parsedReminderDays
                     ))
                 }
             }.show()
@@ -124,13 +144,17 @@ class PeriodicPaymentFragment : Fragment() {
     }
 
     private fun showActions(payment: PeriodicPayment) {
-        val labels = if (payment.isActive) arrayOf("پرداخت شد؛ انتقال به موعد بعد", "حذف") else arrayOf("حذف")
+        val labels = if (payment.isActive) arrayOf("پرداخت شد؛ ثبت هزینه و انتقال به موعد بعد", "غیرفعال‌کردن", "حذف") else arrayOf("فعال‌کردن", "حذف")
         AlertDialog.Builder(requireContext()).setTitle(payment.title).setItems(labels) { _, which ->
             if (payment.isActive && which == 0) {
                 viewLifecycleOwner.lifecycleScope.launch {
                     val settled = manager.markPaid(payment.id)
                     Toast.makeText(requireContext(), if (settled == null) "این موعد قبلاً ثبت شده است." else "پرداخت ثبت شد.", Toast.LENGTH_SHORT).show()
                 }
+            } else if (payment.isActive && which == 1) {
+                viewLifecycleOwner.lifecycleScope.launch { manager.setActive(payment.id, false) }
+            } else if (!payment.isActive && which == 0) {
+                viewLifecycleOwner.lifecycleScope.launch { manager.setActive(payment.id, true) }
             } else {
                 viewLifecycleOwner.lifecycleScope.launch { manager.delete(payment) }
             }
@@ -139,3 +163,6 @@ class PeriodicPaymentFragment : Fragment() {
 
     companion object { private const val DAY = 24L * 60 * 60 * 1000 }
 }
+
+
+
