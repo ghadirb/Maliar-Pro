@@ -141,13 +141,6 @@ class RemindersFragment : Fragment() {
                 val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(next.triggerTime)
                 val cal = java.util.Calendar.getInstance().apply { timeInMillis = next.triggerTime }
                 val timeStr = String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
-                val extraText = if (todayCount > 1) " (+${todayCount - 1} مورد امروز)" else if (upcomingCount > 1) " (+$upcomingCount مورد تا هفته آینده)" else ""
-                nextReminderText.text = "⏭ بعدی: ${next.title} — ${PersianCalendarHelper.formatJalali(y, m, d)} ساعت $timeStr$extraText"
-                nextReminderText.visibility = View.VISIBLE
-            } else {
-                nextReminderText.visibility = View.GONE
-            }
-
             val now = System.currentTimeMillis()
             val startOfToday = java.util.Calendar.getInstance().apply {
                 set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
@@ -158,6 +151,16 @@ class RemindersFragment : Fragment() {
             val overdue = active.count { it.triggerTime < now }
             val today = active.count { it.triggerTime in startOfToday until endOfToday }
             val thisWeek = active.count { it.triggerTime in endOfToday until endOfWeek }
+            if (next != null) {
+                val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(next.triggerTime)
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = next.triggerTime }
+                val timeStr = String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
+                val extraText = if (today > 1) " (+${today - 1} مورد امروز)" else if (thisWeek > 0) " (+$thisWeek مورد تا هفته آینده)" else ""
+                nextReminderText.text = "⏭ بعدی: ${next.title} — ${PersianCalendarHelper.formatJalali(y, m, d)} ساعت $timeStr$extraText"
+                nextReminderText.visibility = View.VISIBLE
+            } else {
+                nextReminderText.visibility = View.GONE
+            }
             reminderPeriodSummaryText.text = "🔴 $overdue سررسیدشده   🟠 $today امروز   🔵 $thisWeek این هفته"
         }
     }
