@@ -271,10 +271,16 @@ class ReminderReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
-            // Android 14+ requires USE_FULL_SCREEN_INTENT for takeover notifications.
-            // Maliar is not an alarm/phone app, so use a reliable heads-up notification
-            // and open the reminder screen only after the user taps it.
             .setContentIntent(contentPendingIntent)
+            // This is what actually makes a "تمام صفحه"/"هوشمند" reminder wake and unlock
+            // the screen when the app is backgrounded, instead of sitting as a silent
+            // heads-up notification the person has to happen to notice. The manifest
+            // already declares USE_FULL_SCREEN_INTENT for exactly this. On Android 14+
+            // the system only honors this if the special permission was actually granted
+            // (see MainActivity.checkFullScreenIntentPermission) - if it wasn't, Android
+            // safely and automatically demotes this to the same heads-up notification as
+            // before, so it's always safe to set regardless of grant state.
+            .setFullScreenIntent(contentPendingIntent, true)
 
         // Pre-Oreo devices have no notification channels at all, so a channel's sound
         // can't carry the generated speech there - fall back to setSound() directly.

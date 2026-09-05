@@ -2,6 +2,7 @@ package com.maliar.pro
 
 import android.app.AlarmManager
 import android.content.Context
+import android.app.NotificationManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -309,7 +310,7 @@ class MainActivity : AppCompatActivity() {
         val prefs = PreferencesManager(this)
 
         if (alreadyExempt || prefs.hasBatteryOptimizationPromptBeenDismissed()) {
-            showRemoteAnnouncementIfAny()
+            checkFullScreenIntentPermission()
             return
         }
 
@@ -323,10 +324,61 @@ class MainActivity : AppCompatActivity() {
             )
             .setPositiveButton("رفتن به تنظیمات") { _, _ ->
                 requestIgnoreBatteryOptimizations()
-                showRemoteAnnouncementIfAny()
+                checkFullScreenIntentPermission()
             }
             .setNegativeButton("بعداً") { _, _ ->
                 prefs.setBatteryOptimizationPromptDismissed(true)
+                checkFullScreenIntentPermission()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    /**
+     * Android 14 (API 34) stopped auto-granting the "USE_FULL_SCREEN_INTENT" special
+     * permission to apps that aren't pre-classified as alarm/call apps, even though the
+     * manifest declares it. Without this permission actually being granted, a "تمام صفحه"
+     * (FULL_SCREEN) or "هوشمند" (SMART) reminder can never truly wake/unlock the screen
+     * when the app is backgrounded - Android silently demotes it to a normal heads-up
+     * notification instead, which is easy to miss while the phone is asleep. This asks
+     * the person, once, to grant it from Settings (same "بعداً" dismissal pattern as the
+     * battery-optimization prompt above) - devices below API 34 keep the permission
+     * auto-granted from the manifest and never see this dialog.
+     */
+    private fun checkFullScreenIntentPermission() {
+        val prefs = PreferencesManager(this)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            showRemoteAnnouncementIfAny()
+            return
+        }
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val alreadyGranted = notificationManager?.canUseFullScreenIntent() ?: true
+        if (alreadyGranted || prefs.hasFullScreenIntentPromptBeenDismissed()) {
+            showRemoteAnnouncementIfAny()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("مجوز هشدار تمام‌صفحه")
+            .setMessage(
+                "برای اینکه یادآوری‌های «تمام صفحه» و «هوشمند» حتی وقتی گوشی قفل یا در " +
+                    "حالت خواب است شما را بیدار کنند، لازم است مجوز نمایش تمام‌صفحه را به " +
+                    "مالیار پرو بدهید؛ در غیر این صورت این یادآوری‌ها فقط به‌صورت یک اعلان " +
+                    "ساده نمایش داده می‌شوند."
+            )
+            .setPositiveButton("رفتن به تنظیمات") { _, _ ->
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    // Device doesn't support the direct intent; ignore.
+                }
+                showRemoteAnnouncementIfAny()
+            }
+            .setNegativeButton("بعداً") { _, _ ->
+                prefs.setFullScreenIntentPromptDismissed(true)
                 showRemoteAnnouncementIfAny()
             }
             .setCancelable(false)

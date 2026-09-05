@@ -29,6 +29,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
         private const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_optimization_prompt_dismissed"
+        private const val KEY_FULL_SCREEN_INTENT_PROMPT_DISMISSED = "full_screen_intent_prompt_dismissed"
         private const val KEY_BIOMETRIC_LOCK_ENABLED = "biometric_lock_enabled"
         private const val KEY_MARKET_RATES_ENDPOINT = "market_rates_endpoint"
         private const val KEY_MARKET_RATES_TOKEN = "market_rates_token"
@@ -245,6 +246,19 @@ class PreferencesManager(context: Context) {
 
     fun setBatteryOptimizationPromptDismissed(dismissed: Boolean) {
         prefs.edit().putBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, dismissed).apply()
+    }
+
+    // --- Full-screen intent prompt (Android 14+ reminder reliability) ---
+
+    /** Same "بعداً" dismissal pattern as the battery-optimization prompt above, for the
+     *  "USE_FULL_SCREEN_INTENT" special permission. If the person grants it,
+     *  [android.app.NotificationManager.canUseFullScreenIntent] becomes the source of
+     *  truth and this flag stops mattering. */
+    fun hasFullScreenIntentPromptBeenDismissed(): Boolean =
+        prefs.getBoolean(KEY_FULL_SCREEN_INTENT_PROMPT_DISMISSED, false)
+
+    fun setFullScreenIntentPromptDismissed(dismissed: Boolean) {
+        prefs.edit().putBoolean(KEY_FULL_SCREEN_INTENT_PROMPT_DISMISSED, dismissed).apply()
     }
 
     // --- Subscription / entitlement ---
