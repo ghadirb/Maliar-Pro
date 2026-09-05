@@ -42,6 +42,17 @@ class SettingsFragment : Fragment() {
     private val restoreLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) confirmAndRestore(uri)
     }
+
+    /** Result callback for [deviceCredentialLauncher]; see MainActivity's identical field
+     *  for why this legacy KeyguardManager path exists alongside the BiometricManager one. */
+    private var onDeviceCredentialResult: ((Boolean) -> Unit)? = null
+    private val deviceCredentialLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val success = result.resultCode == android.app.Activity.RESULT_OK
+        onDeviceCredentialResult?.invoke(success)
+        onDeviceCredentialResult = null
+    }
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -121,22 +132,52 @@ class SettingsFragment : Fragment() {
                 authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK,
                 subtitle = "برای تأیید، اثر انگشت خود را وارد کنید",
                 onSuccess = { prefs.setBiometricLockEnabled(true) },
-                onUnavailable = {
-                    tryBiometricAuth(
-                        authenticators = BiometricManager.Authenticators.DEVICE_CREDENTIAL,
-                        subtitle = "قفل بیومتریک این دستگاه پاسخ نمی‌دهد؛ رمز/الگوی صفحه گوشی را وارد کنید",
-                        onSuccess = { prefs.setBiometricLockEnabled(true) },
-                        onUnavailable = {
-                            binding.biometricLockSwitch.isChecked = false
-                            Toast.makeText(
-                                requireContext(),
-                                "نه اثر انگشت و نه قفل صفحه‌ای روی این دستگاه در دسترس نیست، پس قفل مالیار را نمی‌توان فعال کرد.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    )
-                }
+                onUnavailable = { fallBackToDeviceCredential() }
             )
+        }
+    }
+
+    /** Second-line fallback: the phone's own lock-screen confirmation, launched directly
+     *  via [android.app.KeyguardManager] rather than through BiometricManager/
+     *  BiometricPrompt. Needed because on at least one reported device (a G-Plus P10 on
+     *  Android 10), *both* BIOMETRIC_WEAK and a BiometricPrompt-based DEVICE_CREDENTIAL
+     *  check reported unavailable even with a working fingerprint and an active pattern
+     *  lock - pointing at a broken/incomplete BiometricManager implementation on that
+     *  firmware rather than the device actually lacking a secure lock screen.
+     *  KeyguardManager.createConfirmDeviceCredentialIntent() is a much older (API 21+)
+     *  OS-level API that hands off straight to the system's own lock-screen confirmation
+     *  UI, bypassing BiometricManager entirely. */
+    private fun fallBackToDeviceCredential() {
+        val keyguardManager = requireContext().getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+        val intent = try {
+            if (keyguardManager?.isDeviceSecure == true) {
+                keyguardManager.createConfirmDeviceCredentialIntent("فعال‌سازی قفل مالیار", "قفل صفحه گوشی را تأیید کنید")
+            } else null
+        } catch (e: RuntimeException) {
+            null
+        }
+        if (intent == null) {
+            binding.biometricLockSwitch.isChecked = false
+            Toast.makeText(
+                requireContext(),
+                "نه اثر انگشت و نه قفل صفحه‌ای روی این دستگاه در دسترس نیست، پس قفل مالیار را نمی‌توان فعال کرد.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        onDeviceCredentialResult = { success ->
+            if (success) {
+                prefs.setBiometricLockEnabled(true)
+            } else {
+                binding.biometricLockSwitch.isChecked = false
+            }
+        }
+        try {
+            deviceCredentialLauncher.launch(intent)
+        } catch (e: RuntimeException) {
+            onDeviceCredentialResult = null
+            binding.biometricLockSwitch.isChecked = false
+            Toast.makeText(requireContext(), "قفل صفحه‌ای این دستگاه در دسترس نیست.", Toast.LENGTH_LONG).show()
         }
     }
 

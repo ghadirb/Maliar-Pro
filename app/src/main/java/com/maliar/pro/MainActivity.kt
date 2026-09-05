@@ -39,6 +39,28 @@ class MainActivity : AppCompatActivity() {
             requestAssistantActionPermissions()
         }
 
+    /** Result callback for [deviceCredentialLauncher]; set right before each launch() and
+     *  cleared right after, so exactly one pending attempt is tracked at a time. */
+    private var onDeviceCredentialResult: ((Boolean) -> Unit)? = null
+
+    /** Legacy (pre-BiometricPrompt) device-credential confirmation, launched by
+     *  [tryDeviceCredentialLegacy]. Deliberately independent of androidx.biometric's own
+     *  DEVICE_CREDENTIAL support in BiometricManager/BiometricPrompt - on at least one
+     *  reported device (a G-Plus P10 on Android 10) *both* BIOMETRIC_WEAK and a
+     *  BiometricPrompt-based DEVICE_CREDENTIAL check reported unavailable even with a
+     *  working fingerprint and an active pattern lock, which points at a broken/incomplete
+     *  BiometricManager implementation on that firmware rather than the device actually
+     *  lacking a secure lock screen. KeyguardManager.createConfirmDeviceCredentialIntent()
+     *  is a much older (API 21+) OS-level API that hands off straight to the system's own
+     *  lock-screen confirmation UI, bypassing BiometricManager entirely. */
+    private val deviceCredentialLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val success = result.resultCode == android.app.Activity.RESULT_OK
+        onDeviceCredentialResult?.invoke(success)
+        onDeviceCredentialResult = null
+    }
+
     /**
      * Fixed store-review bug: this used to request android.permission.READ_CONTACTS at
      * runtime even though it was never declared in the Manifest (a request for an
@@ -117,38 +139,40 @@ class MainActivity : AppCompatActivity() {
         // available but authenticate() then throwing is a known issue on cheap/unofficial
         // devices - e.g. reported on a G-Plus P10 running Android 10 - where the vendor's
         // fingerprint HAL/binder is broken even though it announces itself as present).
-        // DEVICE_CREDENTIAL used alone (not combined with a biometric type) doesn't have
-        // the API<30 restriction that combining it with BIOMETRIC_WEAK/STRONG does, and
-        // doesn't depend on the fingerprint hardware at all, so it's a solid fallback.
         tryAuthenticate(
             authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK,
             title = "بازکردن مالیار",
             subtitle = "برای مشاهده اطلاعات مالی، اثر انگشت خود را تأیید کنید",
             onSuccess = { /* app already open; nothing else to do */ },
-            onUnavailable = {
-                tryAuthenticate(
-                    authenticators = BiometricManager.Authenticators.DEVICE_CREDENTIAL,
-                    title = "بازکردن مالیار",
-                    subtitle = "قفل بیومتریک این دستگاه پاسخ نمی‌دهد؛ رمز/الگوی صفحه گوشی را وارد کنید",
-                    onSuccess = { /* app already open; nothing else to do */ },
-                    onUnavailable = {
-                        // Neither fingerprint nor a phone lock screen is usable. Don't trap
-                        // the user outside their own app over a broken/unset OEM feature -
-                        // let them in, but say so plainly and turn the broken toggle off so
-                        // this doesn't repeat every launch.
-                        Toast.makeText(
-                            this,
-                            "قفل بیومتریک این دستگاه پاسخ نمی‌دهد و قفل صفحه‌ای هم تنظیم نشده. قفل مالیار خاموش شد؛ می‌توانید دوباره از تنظیمات آن را روشن کنید.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        PreferencesManager(this).setBiometricLockEnabled(false)
-                    },
-                    onFailed = { /* wrong PIN/pattern entered; let them retry, prompt stays open */ },
-                    onCancelledOrError = { finish() }
-                )
-            },
+            onUnavailable = { fallBackToDeviceCredential() },
             onFailed = { Toast.makeText(this, "اثر انگشت شناسایی نشد.", Toast.LENGTH_SHORT).show() },
             onCancelledOrError = { finish() }
+        )
+    }
+
+    /** Second-line fallback: the phone's own lock-screen confirmation, launched directly
+     *  via [android.app.KeyguardManager] rather than through BiometricManager/
+     *  BiometricPrompt - see [deviceCredentialLauncher]'s doc comment for why. Only gives
+     *  up (and turns the broken toggle off) if the device genuinely has no secure lock
+     *  screen configured at all. */
+    private fun fallBackToDeviceCredential() {
+        tryDeviceCredentialLegacy(
+            onResult = { success ->
+                if (!success) {
+                    // User backed out or failed the confirmation - keep the app closed
+                    // rather than let them in, same as a cancelled biometric prompt would.
+                    finish()
+                }
+                // else: app already open; nothing else to do
+            },
+            onUnavailable = {
+                Toast.makeText(
+                    this,
+                    "قفل بیومتریک این دستگاه پاسخ نمی‌دهد و قفل صفحه‌ای هم تنظیم نشده. قفل مالیار خاموش شد؛ می‌توانید دوباره از تنظیمات آن را روشن کنید.",
+                    Toast.LENGTH_LONG
+                ).show()
+                PreferencesManager(this).setBiometricLockEnabled(false)
+            }
         )
     }
 
@@ -194,6 +218,33 @@ class MainActivity : AppCompatActivity() {
             // SecurityException / IllegalStateException / IllegalArgumentException all
             // mean this particular authenticator can't be used right now - try the next
             // one in the chain rather than crashing or giving up outright.
+            onUnavailable()
+        }
+    }
+
+    /** Launches the OS's own "confirm your PIN/pattern/password" screen directly via
+     *  [android.app.KeyguardManager], independent of BiometricManager/BiometricPrompt.
+     *  [onResult] fires with whether the user confirmed successfully; [onUnavailable]
+     *  fires if the device has no secure lock screen set (or the OS refuses to hand back
+     *  a confirmation intent at all) rather than a real yes/no attempt happening. */
+    private fun tryDeviceCredentialLegacy(onResult: (Boolean) -> Unit, onUnavailable: () -> Unit) {
+        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+        val intent = try {
+            if (keyguardManager?.isDeviceSecure == true) {
+                keyguardManager.createConfirmDeviceCredentialIntent("بازکردن مالیار", "قفل صفحه گوشی را تأیید کنید")
+            } else null
+        } catch (e: RuntimeException) {
+            null
+        }
+        if (intent == null) {
+            onUnavailable()
+            return
+        }
+        onDeviceCredentialResult = onResult
+        try {
+            deviceCredentialLauncher.launch(intent)
+        } catch (e: RuntimeException) {
+            onDeviceCredentialResult = null
             onUnavailable()
         }
     }
