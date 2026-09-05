@@ -102,6 +102,7 @@ class RemindersFragment : Fragment() {
 
     private fun loadReminders() {
         lifecycleScope.launch {
+            smartReminderManager.reconcileRecurringReminders()
             val reminders = smartReminderManager.getAllRemindersList()
             adapter.submitList(groupByCategory(reminders))
             updateHeader()
@@ -126,7 +127,7 @@ class RemindersFragment : Fragment() {
 
     private fun updateHeader() {
         lifecycleScope.launch {
-            val active = smartReminderManager.getActiveRemindersList()
+            val active = smartReminderManager.reconcileRecurringReminders()
             activeCountText.text = if (active.isEmpty()) {
                 "یادآوری فعالی وجود ندارد"
             } else {

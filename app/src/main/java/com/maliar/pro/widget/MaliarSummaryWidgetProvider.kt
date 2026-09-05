@@ -55,7 +55,7 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
                     val accountingManager = AccountingManager(context)
                     val balance = accountingManager.getBalance()
                     val periodBalance = accountingManager.getPeriodBalance()
-                    val nextReminder = SmartReminderManager(context).getActiveRemindersList()
+                    val nextReminder = SmartReminderManager(context).reconcileRecurringReminders()
                         .filter { !it.isCompleted }
                         .minByOrNull { it.triggerTime }
                     val rates = runCatching { com.maliar.pro.utils.MarketRateClient(context).fetch() }.getOrNull()

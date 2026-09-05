@@ -29,6 +29,19 @@ class SmartReminderManager(private val context: Context) {
     fun getActiveReminders(): Flow<List<ReminderEntity>> = dao.getActiveReminders()
     
     suspend fun getActiveRemindersList(): List<ReminderEntity> = dao.getActiveRemindersList()
+
+    /** Repairs stale recurring rows after midnight, reboot, or a missed alarm. */
+    suspend fun reconcileRecurringReminders(): List<ReminderEntity> {
+        val now = System.currentTimeMillis()
+        val active = dao.getActiveRemindersList()
+        active.filter { it.repeatPattern != RepeatPattern.ONCE.name && it.triggerTime <= now }
+            .forEach { stale ->
+                val fixed = ensureFutureTriggerTime(stale)
+                cancelAlarm(fixed.id)
+                scheduleAlarm(fixed)
+            }
+        return dao.getActiveRemindersList()
+    }
     
     suspend fun getReminderById(id: Long): ReminderEntity? = dao.getReminderById(id)
 

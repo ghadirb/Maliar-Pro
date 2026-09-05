@@ -16,7 +16,11 @@ class FoodPriceManager(context: Context) {
         return dao.getAllList().firstOrNull { price ->
             val priceItem = FoodCatalog.matchName(price.name)
             (requestedItem != null && priceItem?.name == requestedItem.name) ||
-                normalize(price.name) == requestedKey
+                normalize(price.name) == requestedKey ||
+                // tolerate punctuation, half-space, plural suffixes and a longer
+                // shopping-list description (e.g. «سیب‌زمینی تازه»).
+                requestedKey.contains(normalize(price.name)) ||
+                normalize(price.name).contains(requestedKey)
         }
     }
 

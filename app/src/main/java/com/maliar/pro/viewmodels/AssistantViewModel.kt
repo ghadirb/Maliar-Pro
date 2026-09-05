@@ -666,9 +666,28 @@ class AssistantViewModel(
             val newBalance = accountingManager.getBalance()
             "✅ مبلغ $formattedAmount تومان به‌عنوان درآمد در حسابداری ثبت شد.\n💰 موجودی جدید: ${com.maliar.pro.utils.CurrencyFormatter.format(newBalance, "")} تومان"
         } else {
-            accountingManager.addExpense(Expense(amount = amount, description = description, date = Date().time))
+            accountingManager.addExpense(
+                Expense(
+                    amount = amount,
+                    description = description,
+                    category = inferExpenseCategory(description),
+                    date = Date().time
+                )
+            )
             val newBalance = accountingManager.getBalance()
             "✅ مبلغ $formattedAmount تومان به‌عنوان هزینه در حسابداری ثبت شد.\n💰 موجودی جدید: ${com.maliar.pro.utils.CurrencyFormatter.format(newBalance, "")} تومان"
+        }
+    }
+
+    /** Assigns a stable category when a natural-language expense omits one. */
+    private fun inferExpenseCategory(text: String): String {
+        val value = normalizeDigits(text).lowercase()
+        return when {
+            listOf("اجاره", "کرایه خانه", "رهن", "قبض", "قسط").any { value.contains(it) } -> "مسکن"
+            listOf("سیب زمینی", "سیب‌زمینی", "گوجه", "برنج", "گوشت", "مرغ", "نان", "میوه", "سبزی", "خواربار", "سوپر", "فروشگاه", "خوراک").any { value.contains(it) } -> "خوراک"
+            listOf("بنزین", "تاکسی", "اسنپ", "ماشین", "مترو", "اتوبوس").any { value.contains(it) } -> "حمل‌ونقل"
+            listOf("دارو", "پزشک", "درمان", "بیمارستان").any { value.contains(it) } -> "درمان"
+            else -> "عمومی"
         }
     }
 

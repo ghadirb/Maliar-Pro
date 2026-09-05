@@ -35,6 +35,7 @@ class FullScreenAlarmActivity : AppCompatActivity() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var reminderId: Long = -1
     private var isSmartAlarm = false
+    private var smartSpeechRepeats = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -154,7 +155,12 @@ class FullScreenAlarmActivity : AppCompatActivity() {
                 setOnCompletionListener { finished ->
                     finished.release()
                     if (mediaPlayer === finished) mediaPlayer = null
-                    if (!isFinishing && !isDestroyed) playAlarmSound(soundUri)
+                    if (!isFinishing && !isDestroyed && smartSpeechRepeats < 2) {
+                        smartSpeechRepeats += 1
+                        playGeneratedSpeech(audioFile, soundUri)
+                    } else if (!isFinishing && !isDestroyed) {
+                        playAlarmSound(soundUri)
+                    }
                 }
                 prepare()
                 start()

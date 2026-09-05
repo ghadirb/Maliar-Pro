@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import com.maliar.pro.utils.FoodCatalog
 
 class BudgetFragment : Fragment() {
     private lateinit var binding: FragmentBudgetBinding
@@ -151,7 +152,7 @@ class BudgetViewModel(
             BudgetRow(
                 budget,
                 expenses.filter { expense ->
-                    expense.category.trim().equals(budget.category.trim(), ignoreCase = true) &&
+                    categoryMatches(expense, budget.category) &&
                         PersianCalendarHelper.gregorianMillisToJalali(expense.date).let { it.first == budget.year && it.second == budget.month }
                 }.sumOf(Expense::amount)
             )
@@ -170,6 +171,19 @@ class BudgetViewModel(
                 )
             )
         }
+    }
+
+    private fun categoryMatches(expense: Expense, budgetCategory: String): Boolean {
+        val budgetKey = budgetCategory.trim().lowercase()
+        val expenseCategory = expense.category.trim().lowercase()
+        if (expenseCategory == budgetKey || expenseCategory.replace("ي", "ی").replace("ك", "ک") == budgetKey) return true
+        // Food budgets include itemised grocery entries (potato, tomato, etc.) even
+        // when the user left the expense category as the default/blank value.
+        if (budgetKey == "خوراک" || budgetKey.contains("غذا") || budgetKey.contains("مواد غذایی")) {
+            return FoodCatalog.findMatch(expense.description) != null ||
+                expenseCategory in setOf("سوپر", "فروشگاه", "خواربار", "مواد غذایی")
+        }
+        return false
     }
 
     fun selectMonth(year: Int, month: Int) {
