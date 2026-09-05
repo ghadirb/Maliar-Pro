@@ -1,17 +1,17 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/white"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:orientation="vertical"
+    android:gravity="center_horizontal">
 
     <ImageButton
         android:id="@+id/closeButton"
         android:layout_width="40dp"
         android:layout_height="40dp"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentEnd="true"
+        android:layout_gravity="end"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@android:drawable/ic_menu_close_clear_cancel"
         android:contentDescription="بستن" />
@@ -20,8 +20,7 @@
         android:id="@+id/voiceTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="40dp"
+        android:layout_marginTop="24dp"
         android:text="🎙️ دستور صوتی"
         android:textSize="22sp"
         android:textStyle="bold" />
@@ -30,7 +29,6 @@
         android:id="@+id/voiceStatusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/voiceTitle"
         android:layout_marginTop="24dp"
         android:gravity="center"
         android:textSize="16sp"
@@ -40,9 +38,8 @@
         android:id="@+id/micButton"
         android:layout_width="80dp"
         android:layout_height="80dp"
-        android:layout_centerInParent="true"
+        android:layout_marginTop="48dp"
         android:src="@drawable/ic_notification"
-        app:fabSize="normal"
         android:contentDescription="ضبط دستور صوتی" />
 
-</RelativeLayout>
+</LinearLayout>
