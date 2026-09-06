@@ -177,11 +177,19 @@ class BudgetViewModel(
         val budgetKey = budgetCategory.trim().lowercase()
         val expenseCategory = expense.category.trim().lowercase()
         if (expenseCategory == budgetKey || expenseCategory.replace("ي", "ی").replace("ك", "ک") == budgetKey) return true
-        // Food budgets include itemised grocery entries (potato, tomato, etc.) even
-        // when the user left the expense category as the default/blank value.
         if (budgetKey == "خوراک" || budgetKey.contains("غذا") || budgetKey.contains("مواد غذایی")) {
-            return FoodCatalog.findMatch(expense.description) != null ||
-                expenseCategory in setOf("سوپر", "فروشگاه", "خواربار", "مواد غذایی")
+            if (expenseCategory in setOf("سوپر", "فروشگاه", "خواربار", "مواد غذایی")) return true
+            // Only fall back to scanning the free-text description for a known food
+            // word when the person left the expense category blank/default. An expense
+            // explicitly filed under a *different* category (e.g. "خودرو" for a car oil
+            // change whose description happens to contain "روغن") must never be
+            // silently counted as food just because a food-catalog word shows up
+            // somewhere in its free-text description - that was previously matching
+            // regardless of the expense's own category, incorrectly pulling car/other
+            // spending into the food budget.
+            if (expenseCategory.isBlank()) {
+                return FoodCatalog.findMatch(expense.description) != null
+            }
         }
         return false
     }
