@@ -99,7 +99,15 @@
         <action
             android:id="@+id/action_accountingFragment_to_periodicPaymentFragment"
             app:destination="@id/periodicPaymentFragment" />
+        <action
+            android:id="@+id/action_accountingFragment_to_forecastFragment"
+            app:destination="@id/forecastFragment" />
     </fragment>
+
+    <fragment
+        android:id="@+id/forecastFragment"
+        android:name="com.maliar.pro.ui.accounting.ForecastFragment"
+        android:label="آینده مالی من" />
 
     <fragment
         android:id="@+id/budgetFragment"

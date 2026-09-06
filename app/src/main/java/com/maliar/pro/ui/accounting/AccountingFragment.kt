@@ -116,6 +116,10 @@ class AccountingFragment : Fragment() {
             findNavController().navigate(R.id.action_accountingFragment_to_budgetFragment)
         }
 
+        binding.forecastCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_forecastFragment)
+        }
+
         binding.carsCard.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_carListFragment)
         }

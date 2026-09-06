@@ -251,6 +251,10 @@ class AccountingViewModel(
 
     data class FinancialForecast(
         val days: Int,
+        val startingBalance: Double,
+        val projectedIncome: Double,
+        val projectedExpense: Double,
+        val projectedCommitments: Double,
         val projectedBalance: Double,
         val hasEnoughData: Boolean
     )
@@ -297,9 +301,11 @@ class AccountingViewModel(
     )
 
     /**
-     * Conservative 30/60/90-day outlook. It only uses data stored locally: recorded
-     * income/expense pace, fixed income, unpaid installment/debt payments and liquid assets.
-     * It deliberately does not guess market prices or future discretionary income.
+     * Conservative 30/60/90-day outlook ("آینده مالی من"). It only uses data stored
+     * locally: recorded income/expense pace, fixed income, unpaid installment/debt
+     * payments and liquid assets. It deliberately does not guess market prices or
+     * future discretionary income - every number here is a "برآورد" (estimate), never
+     * presented as certain.
      */
     val financialForecasts = combine(monthlyIncome, monthlyExpense, forecastContext) { income, expense, context ->
         val start = accountingManager.getFinancialPeriodStartMillis()
@@ -308,7 +314,7 @@ class AccountingViewModel(
             context.monthlyInstallments > 0.0 || context.monthlyDebtPayments > 0.0 ||
             context.liquidAssets > 0.0
         if (!hasActivity || elapsedDays < 1) {
-            listOf(7, 30, 60, 90).map { FinancialForecast(it, 0.0, false) }
+            listOf(7, 30, 60, 90).map { FinancialForecast(it, 0.0, 0.0, 0.0, 0.0, 0.0, false) }
         } else {
             val observedDailyIncome = income / elapsedDays
             val expectedDailyIncome = if (context.monthlyFixedIncome > 0.0) {
@@ -322,10 +328,19 @@ class AccountingViewModel(
 
             listOf(7, 30, 60, 90).map { days ->
                 val commitmentCycles = ceil(days / 30.0)
-                val projected = startingBalance +
-                    (expectedDailyIncome - expectedDailyExpense) * days -
-                    (monthlyCommitments * commitmentCycles)
-                FinancialForecast(days, projected, true)
+                val projectedIncome = expectedDailyIncome * days
+                val projectedExpense = expectedDailyExpense * days
+                val projectedCommitments = monthlyCommitments * commitmentCycles
+                val projected = startingBalance + projectedIncome - projectedExpense - projectedCommitments
+                FinancialForecast(
+                    days = days,
+                    startingBalance = startingBalance,
+                    projectedIncome = projectedIncome,
+                    projectedExpense = projectedExpense,
+                    projectedCommitments = projectedCommitments,
+                    projectedBalance = projected,
+                    hasEnoughData = true
+                )
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -338,6 +353,24 @@ class AccountingViewModel(
     val thirtyDayForecast = forecastFor(30)
     val sixtyDayForecast = forecastFor(60)
     val ninetyDayForecast = forecastFor(90)
+
+    /**
+     * A single cautious warning sentence for the "آینده مالی من" screen, or null when
+     * nothing is worth flagging. Only ever built from the already-computed 30-day
+     * forecast (the spec's example horizon), and always phrased as an estimate
+     * ("احتمال دارد"/"بر اساس اطلاعات ثبت‌شده") rather than a certainty - this never
+     * blocks or alters any real transaction, it's purely informational.
+     */
+    val forecastAlert = financialForecasts.map { forecasts ->
+        val thirty = forecasts.firstOrNull { it.days == 30 }?.takeIf { it.hasEnoughData } ?: return@map null
+        when {
+            thirty.projectedBalance < 0.0 ->
+                "⚠️ بر اساس اطلاعات ثبت‌شده، در ۳۰ روز آینده احتمال کسری موجودی وجود دارد."
+            thirty.startingBalance > 0.0 && thirty.projectedBalance < thirty.startingBalance * 0.3 ->
+                "با روند فعلی هزینه‌ها، احتمال دارد موجودی قابل‌خرج شما در ۳۰ روز آینده کاهش قابل‌توجهی داشته باشد."
+            else -> null
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val expenseAnalysis = expenseList.map { list ->
         val start = accountingManager.getFinancialPeriodStartMillis()
