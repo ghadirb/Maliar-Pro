@@ -153,9 +153,13 @@ class VoiceCommandActivity : AppCompatActivity() {
             return
         }
 
-        val expenseResult = parseExpenseTranscript(transcript)
-        if (expenseResult != null) {
-            showExpenseConfirmDialog(expenseResult)
+        val expenseResults = parseExpenseTranscripts(transcript)
+        if (!expenseResults.isNullOrEmpty()) {
+            if (expenseResults.size == 1) {
+                showExpenseConfirmDialog(expenseResults.first())
+            } else {
+                showMultiExpenseConfirmDialog(expenseResults)
+            }
             return
         }
 
@@ -168,10 +172,57 @@ class VoiceCommandActivity : AppCompatActivity() {
         showFallbackChoices(transcript)
     }
 
-    private fun parseExpenseTranscript(transcript: String): ExpenseResult? {
+    /**
+     * Multi-item aware version (spec: "جملات پیچیده" - e.g. "امروز ۲ میلیون برای سرویس
+     * ماشین دادم، یک میلیون تعویض روغن و یک میلیون فیلتر"). Splits the transcript into
+     * segments on commas and "و" (and), parses each segment with the same
+     * amount+description pattern as before, and returns one [ExpenseResult] per segment
+     * that parsed successfully.
+     *
+     * One special case: when the *first* segment's amount is (within 5%) the sum of all
+     * the other segments' amounts, it's treated as a spoken total/summary rather than a
+     * separate transaction (as in the example above: "۲ میلیون برای سرویس ماشین" is the
+     * total of the "یک میلیون تعویض روغن" + "یک میلیون فیلتر" breakdown that follows it),
+     * so only the itemized breakdown becomes real transactions - never both, which would
+     * double the amount.
+     *
+     * Returns null when nothing parseable was found at all; returns a single-item list
+     * for an ordinary one-transaction sentence, unchanged from the previous behavior.
+     * Nothing here is ever saved directly - every result still goes through the
+     * confirmation dialog (single or multi) before any [Expense] is created.
+     */
+    private fun parseExpenseTranscripts(transcript: String): List<ExpenseResult>? {
         val normalized = normalizeDigits(transcript)
+        val now = System.currentTimeMillis()
+        val date = when {
+            transcript.contains("پریروز") -> now - 2 * 86400000L
+            transcript.contains("دیروز") -> now - 86400000L
+            else -> now
+        }
+
+        val segments = normalized.split(Regex("[،,]|\\sو\\s"))
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+
+        if (segments.size < 2) {
+            return parseSingleExpenseSegment(normalized, date)?.let { listOf(it) }
+        }
+
+        val parsedSegments = segments.mapNotNull { parseSingleExpenseSegment(it, date) }
+        if (parsedSegments.size < 2) return parsedSegments.ifEmpty { null }
+
+        val first = parsedSegments.first()
+        val rest = parsedSegments.drop(1)
+        val restSum = rest.sumOf { it.amount }
+        val looksLikeTotalPlusBreakdown = rest.size >= 2 && restSum > 0.0 &&
+            kotlin.math.abs(first.amount - restSum) <= first.amount * 0.05
+
+        return if (looksLikeTotalPlusBreakdown) rest else parsedSegments
+    }
+
+    private fun parseSingleExpenseSegment(segment: String, date: Long): ExpenseResult? {
         val amountPattern = Regex("(\\d+[\\d,.]*)\\s*(هزار|میلیون|تومان|تومن|ریال)?\\s*(?:برای|بابت|خرج|خرید|پرداخت کردم|پرداخت)?\\s*(.+)")
-        val match = amountPattern.find(normalized) ?: return null
+        val match = amountPattern.find(segment) ?: return null
 
         val amountStr = match.groupValues[1].replace(",", "").replace(".", "")
         val unit = match.groupValues[2]
@@ -184,15 +235,9 @@ class VoiceCommandActivity : AppCompatActivity() {
             unit.contains("هزار") -> baseAmount * 1_000
             else -> baseAmount
         }
+        if (amount <= 0.0) return null
 
         val category = detectCategory(description)
-        val now = System.currentTimeMillis()
-        val date = when {
-            transcript.contains("دیروز") -> now - 86400000L
-            transcript.contains("پریروز") -> now - 2 * 86400000L
-            else -> now
-        }
-
         return ExpenseResult(amount, description, category, date)
     }
 
@@ -208,8 +253,13 @@ class VoiceCommandActivity : AppCompatActivity() {
     private fun detectCategory(description: String): String {
         val lower = description.lowercase()
         return when {
+            // Checked before food/transport so e.g. "تعویض روغن موتور" (a car category
+            // phrase that happens to contain "روغن", also a food keyword below) is
+            // correctly recognized as "خودرو", not "خوراک" - same category-mixup bug
+            // already fixed for the budget screen's own food-matching logic.
+            Regex(".*(روغن موتور|تعویض روغن|لاستیک|باتری ماشین|تعمیر ماشین|سرویس ماشین|صافکاری|جلوبندی|بیمه ماشین|بیمه خودرو|کارواش).*").matches(lower) -> "خودرو"
             Regex(".*(بنزین|سوخت|گازوئیل|پارکینگ|اتوبان|تاکسی|اسنپ|اتوبوس|مترو|قطار|پیک).*").matches(lower) -> "حمل ونقل"
-            Regex(".*(نان|برنج|مرغ|گوشت|میوه|سبزی|لبنیات|شیر|ماست|پنیر|روغن|خرید|سیب زمینی|گوجه|مواد غذایی).*").matches(lower) -> "خوراک"
+            Regex(".*(نان|برنج|مرغ|گوشت|میوه|سبزی|لبنیات|شیر|ماست|پنیر|روغن|سیب زمینی|گوجه|مواد غذایی|سوپرمارکت|بقالی).*").matches(lower) -> "خوراک"
             Regex(".*(اجاره|رهن|قبض|برق|گاز|آب|تلفن|شارژ|موبایل|اینترنت).*").matches(lower) -> "مسکن"
             Regex(".*(دارو|دکتر|بیمارستان|درمان|آزمایش|دندان).*").matches(lower) -> "درمان"
             Regex(".*(سینما|رستوران|کافه|تفریح|گردش|کتاب|فیلم).*").matches(lower) -> "تفریح"
@@ -321,6 +371,112 @@ class VoiceCommandActivity : AppCompatActivity() {
                 .show()
         }
     }
+
+    /**
+     * Multi-item version of [showExpenseConfirmDialog] for a transcript that split into
+     * several transactions (spec: "جملات پیچیده"). Amount/description/category stay
+     * per-item and independently editable, exactly like the single-item dialog; date and
+     * payment account are shared across all items since they all come from the same
+     * spoken sentence about the same outing/payment. Nothing is saved until "ثبت همه" -
+     * each row is validated the same way the single-item dialog validates its one row,
+     * and any row left invalid blocks the whole confirmation rather than silently
+     * skipping it.
+     */
+    private fun showMultiExpenseConfirmDialog(results: List<ExpenseResult>) {
+        lifecycleScope.launch {
+            val accounts = financialStatusManager?.getAllAssetsList().orEmpty()
+            val scroll = android.widget.ScrollView(this@VoiceCommandActivity)
+            val container = LinearLayout(this@VoiceCommandActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                val padding = (20 * resources.displayMetrics.density).toInt()
+                setPadding(padding, padding / 2, padding, 0)
+            }
+            scroll.addView(container)
+
+            val (year, month, day) = PersianCalendarHelper.gregorianMillisToJalali(results.first().date)
+            val dateInput = EditText(this@VoiceCommandActivity).apply {
+                hint = "تاریخ شمسی (مثلاً ۱۴۰۵/۰۶/۱۵)"
+                setText("$year/$month/$day")
+                container.addView(this)
+            }
+
+            data class Row(val amount: EditText, val description: EditText, val category: EditText)
+            val rows = results.mapIndexed { index, result ->
+                TextView(this@VoiceCommandActivity).apply {
+                    text = "تراکنش ${index + 1}"
+                    setPadding(0, (12 * resources.displayMetrics.density).toInt(), 0, 0)
+                    container.addView(this)
+                }
+                val amountInput = EditText(this@VoiceCommandActivity).apply {
+                    hint = "مبلغ (تومان)"
+                    setText(result.amount.toLong().toString())
+                    inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                    container.addView(this)
+                }
+                val descriptionInput = EditText(this@VoiceCommandActivity).apply {
+                    hint = "عنوان یا توضیحات"
+                    setText(result.description)
+                    container.addView(this)
+                }
+                val categoryInput = EditText(this@VoiceCommandActivity).apply {
+                    hint = "دسته‌بندی"
+                    setText(result.category)
+                    container.addView(this)
+                }
+                Row(amountInput, descriptionInput, categoryInput)
+            }
+
+            val accountSpinner = android.widget.Spinner(this@VoiceCommandActivity).apply {
+                adapter = android.widget.ArrayAdapter(
+                    this@VoiceCommandActivity,
+                    android.R.layout.simple_spinner_dropdown_item,
+                    listOf("حساب پیش‌فرض") + accounts.map { it.title }
+                )
+                container.addView(this)
+            }
+
+            AlertDialog.Builder(this@VoiceCommandActivity)
+                .setTitle("بررسی و تأیید ${results.size} هزینهٔ صوتی")
+                .setMessage("این جمله چند تراکنش به نظر می‌رسد؛ پیش از ثبت می‌توانید هر مورد را جدا اصلاح یا حذف کنید.")
+                .setView(scroll)
+                .setPositiveButton("ثبت همه") { _, _ ->
+                    val date = parseJalaliDate(dateInput.text.toString())
+                    if (date == null) {
+                        setStatus("⚠️ تاریخ را به‌صورت صحیح وارد کنید.")
+                        return@setPositiveButton
+                    }
+                    val expenses = rows.map { row ->
+                        val amount = normalizeDigits(row.amount.text.toString()).replace(",", "").replace("٬", "").toDoubleOrNull()
+                        val description = row.description.text.toString().trim()
+                        val category = row.category.text.toString().trim()
+                        Triple(amount, description, category)
+                    }
+                    if (expenses.any { (amount, description, category) -> amount == null || amount <= 0 || description.isBlank() || category.isBlank() }) {
+                        setStatus("⚠️ مبلغ، عنوان و دسته همهٔ تراکنش‌ها را کامل و صحیح وارد کنید.")
+                        return@setPositiveButton
+                    }
+                    lifecycleScope.launch {
+                        val accountId = accountSpinner.selectedItemPosition.takeIf { it > 0 }?.let { accounts[it - 1].id }
+                        var total = 0.0
+                        for ((amount, description, category) in expenses) {
+                            accountingManager?.addExpense(Expense(
+                                amount = amount!!,
+                                description = description,
+                                date = date,
+                                category = category,
+                                accountId = accountId
+                            ))
+                            total += amount
+                        }
+                        setStatus("✅ ${expenses.size} هزینه به مبلغ کل ${total.toLong()} تومان ثبت شد")
+                        findViewById<View>(R.id.micButton).postDelayed({ finish() }, 1500)
+                    }
+                }
+                .setNegativeButton("لغو", null)
+                .show()
+        }
+    }
+
 
     private fun parseJalaliDate(value: String): Long? {
         val parts = normalizeDigits(value).trim().split(Regex("[/\\-]"))
