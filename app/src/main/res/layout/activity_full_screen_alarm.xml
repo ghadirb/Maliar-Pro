@@ -101,7 +101,7 @@
             android:layout_height="56dp"
             android:layout_gravity="center"
             app:cardCornerRadius="28dp"
-            app:cardElevation="6dp"
+            app:cardElevation="1dp"
             app:cardBackgroundColor="#4FC3F7">
 
             <TextView

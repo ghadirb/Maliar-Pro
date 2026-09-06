@@ -34,8 +34,8 @@
             android:layout_marginTop="16dp"
             android:clickable="true"
             android:focusable="true"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
             <TextView
                 android:id="@+id/telegramSupportText"
                 android:layout_width="match_parent"
@@ -52,8 +52,8 @@
             android:layout_marginTop="10dp"
             android:clickable="true"
             android:focusable="true"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
             <TextView
                 android:id="@+id/eitaaSupportText"
                 android:layout_width="match_parent"
@@ -70,8 +70,8 @@
             android:layout_marginTop="10dp"
             android:clickable="true"
             android:focusable="true"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
             <TextView
                 android:id="@+id/rubikaSupportText"
                 android:layout_width="match_parent"
@@ -90,7 +90,7 @@
             android:clickable="true"
             android:focusable="true"
             app:cardBackgroundColor="@color/card_background"
-            app:cardCornerRadius="12dp"
+            app:cardCornerRadius="20dp"
             app:cardElevation="0dp">
             <LinearLayout
                 android:layout_width="match_parent"
@@ -121,7 +121,7 @@
             android:clickable="true"
             android:focusable="true"
             app:cardBackgroundColor="@color/card_background"
-            app:cardCornerRadius="12dp"
+            app:cardCornerRadius="20dp"
             app:cardElevation="0dp">
             <LinearLayout
                 android:layout_width="match_parent"

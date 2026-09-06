@@ -38,4 +38,13 @@
     <!-- Alarm Colors -->
     <color name="alarm_background">#FF1A1A2E</color>
     <color name="widget_background">#FF4B1FA8</color>
+
+    <!-- Modern dashboard hero card (design/modern-ui-phase1): a deliberately dark,
+         elevated accent card used for the top balance summary, independent of
+         light/dark system mode - it reads as an intentional accent surface in light
+         mode and blends naturally with the page in dark mode. -->
+    <color name="hero_card_background">#1C1B29</color>
+    <color name="hero_card_text_secondary">#B3FFFFFF</color>
+    <color name="hero_positive_accent">#7FE0B0</color>
+    <color name="hero_negative_accent">#F0A1A1</color>
 </resources>
