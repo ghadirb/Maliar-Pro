@@ -10,7 +10,7 @@
         android:layout_height="wrap_content"
         android:hint="دسته‌بندی">
 
-        <com.google.android.material.textfield.TextInputEditText
+        <AutoCompleteTextView
             android:id="@+id/categoryInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

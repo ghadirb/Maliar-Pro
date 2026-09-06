@@ -21,6 +21,7 @@ import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.database.AlertType
 import com.maliar.pro.database.ContactManager
 import com.maliar.pro.database.Expense
+import com.maliar.pro.database.ExpenseCategory
 import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.database.Priority
 import com.maliar.pro.database.ReminderEntity
@@ -257,14 +258,15 @@ class VoiceCommandActivity : AppCompatActivity() {
             // phrase that happens to contain "روغن", also a food keyword below) is
             // correctly recognized as "خودرو", not "خوراک" - same category-mixup bug
             // already fixed for the budget screen's own food-matching logic.
-            Regex(".*(روغن موتور|تعویض روغن|لاستیک|باتری ماشین|تعمیر ماشین|سرویس ماشین|صافکاری|جلوبندی|بیمه ماشین|بیمه خودرو|کارواش).*").matches(lower) -> "خودرو"
-            Regex(".*(بنزین|سوخت|گازوئیل|پارکینگ|اتوبان|تاکسی|اسنپ|اتوبوس|مترو|قطار|پیک).*").matches(lower) -> "حمل ونقل"
-            Regex(".*(نان|برنج|مرغ|گوشت|میوه|سبزی|لبنیات|شیر|ماست|پنیر|روغن|سیب زمینی|گوجه|مواد غذایی|سوپرمارکت|بقالی).*").matches(lower) -> "خوراک"
-            Regex(".*(اجاره|رهن|قبض|برق|گاز|آب|تلفن|شارژ|موبایل|اینترنت).*").matches(lower) -> "مسکن"
-            Regex(".*(دارو|دکتر|بیمارستان|درمان|آزمایش|دندان).*").matches(lower) -> "درمان"
-            Regex(".*(سینما|رستوران|کافه|تفریح|گردش|کتاب|فیلم).*").matches(lower) -> "تفریح"
-            Regex(".*(لباس|کفش|پوشاک).*").matches(lower) -> "پوشاک"
-            else -> "عمومی"
+            Regex(".*(روغن موتور|تعویض روغن|لاستیک|باتری ماشین|تعمیر ماشین|سرویس ماشین|صافکاری|جلوبندی|بیمه ماشین|بیمه خودرو|کارواش).*").matches(lower) -> ExpenseCategory.CAR
+            Regex(".*(بنزین|سوخت|گازوئیل|پارکینگ|اتوبان|تاکسی|اسنپ|اتوبوس|مترو|قطار|پیک).*").matches(lower) -> ExpenseCategory.TRANSPORT
+            Regex(".*(نان|برنج|مرغ|گوشت|میوه|سبزی|لبنیات|شیر|ماست|پنیر|روغن|سیب زمینی|گوجه|مواد غذایی|سوپرمارکت|بقالی).*").matches(lower) -> ExpenseCategory.FOOD
+            Regex(".*(اجاره|رهن|ودیعه).*").matches(lower) -> ExpenseCategory.HOUSING
+            Regex(".*(قبض|برق|گاز|آب|تلفن|شارژ|موبایل|اینترنت).*").matches(lower) -> ExpenseCategory.BILLS
+            Regex(".*(دارو|دکتر|بیمارستان|درمان|آزمایش|دندان).*").matches(lower) -> ExpenseCategory.HEALTH
+            Regex(".*(سینما|رستوران|کافه|تفریح|گردش|کتاب|فیلم).*").matches(lower) -> ExpenseCategory.ENTERTAINMENT
+            Regex(".*(لباس|کفش|پوشاک).*").matches(lower) -> ExpenseCategory.CLOTHING
+            else -> ExpenseCategory.OTHER
         }
     }
 
@@ -331,7 +333,14 @@ class VoiceCommandActivity : AppCompatActivity() {
             }
             val amountInput = input("مبلغ (تومان)", result.amount.toLong().toString(), true)
             val descriptionInput = input("عنوان یا توضیحات", result.description)
-            val categoryInput = input("دسته‌بندی", result.category)
+            val categoryInput = android.widget.AutoCompleteTextView(this@VoiceCommandActivity).apply {
+                hint = "دسته‌بندی"
+                setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+                threshold = 0
+                setOnClickListener { showDropDown() }
+                setText(result.category, false)
+                container.addView(this)
+            }
             val (year, month, day) = PersianCalendarHelper.gregorianMillisToJalali(result.date)
             val dateInput = input("تاریخ شمسی (مثلاً ۱۴۰۵/۰۶/۱۵)", "$year/$month/$day")
             val accountSpinner = android.widget.Spinner(this@VoiceCommandActivity).apply {
@@ -400,7 +409,7 @@ class VoiceCommandActivity : AppCompatActivity() {
                 container.addView(this)
             }
 
-            data class Row(val amount: EditText, val description: EditText, val category: EditText)
+            data class Row(val amount: EditText, val description: EditText, val category: android.widget.AutoCompleteTextView)
             val rows = results.mapIndexed { index, result ->
                 TextView(this@VoiceCommandActivity).apply {
                     text = "تراکنش ${index + 1}"
@@ -418,9 +427,12 @@ class VoiceCommandActivity : AppCompatActivity() {
                     setText(result.description)
                     container.addView(this)
                 }
-                val categoryInput = EditText(this@VoiceCommandActivity).apply {
+                val categoryInput = android.widget.AutoCompleteTextView(this@VoiceCommandActivity).apply {
                     hint = "دسته‌بندی"
-                    setText(result.category)
+                    setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+                    threshold = 0
+                    setOnClickListener { showDropDown() }
+                    setText(result.category, false)
                     container.addView(this)
                 }
                 Row(amountInput, descriptionInput, categoryInput)
@@ -542,8 +554,11 @@ class VoiceCommandActivity : AppCompatActivity() {
             setText(transcript)
             container.addView(this)
         }
-        val catInput = EditText(this).apply {
-            hint = "دسته (مثلاً خوراک، حمل ونقل)"
+        val catInput = android.widget.AutoCompleteTextView(this).apply {
+            hint = "دسته‌بندی"
+            setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+            threshold = 0
+            setOnClickListener { showDropDown() }
             container.addView(this)
         }
         AlertDialog.Builder(this)

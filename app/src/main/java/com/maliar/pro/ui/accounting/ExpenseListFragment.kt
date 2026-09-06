@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Spinner
@@ -18,6 +19,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.maliar.pro.adapters.ExpenseAdapter
 import com.maliar.pro.databinding.FragmentExpenseListBinding
 import com.maliar.pro.database.AccountingManager
+import com.maliar.pro.database.ExpenseCategory
 import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.dialogs.AddExpenseDialog
 import com.maliar.pro.dialogs.EditExpenseDialog
@@ -98,7 +100,14 @@ class ExpenseListFragment : Fragment() {
             })
             val amountInput = input("مبلغ (تومان)", draft.amount?.toLong()?.toString().orEmpty(), true)
             val titleInput = input("عنوان یا فروشگاه", draft.title)
-            val categoryInput = input("دسته‌بندی", draft.category)
+            val categoryInput = AutoCompleteTextView(requireContext()).apply {
+                hint = "دسته‌بندی"
+                setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+                threshold = 0
+                setOnClickListener { showDropDown() }
+                setText(draft.category, false)
+                container.addView(this)
+            }
             val (year, month, day) = PersianCalendarHelper.getCurrentJalaliDate()
             val dateInput = input("تاریخ شمسی (مثال ۱۴۰۵/۰۶/۱۳)", "$year/$month/$day")
             val accountLabels = listOf("حساب پیش‌فرض") + accounts.map { it.title }
@@ -154,10 +163,14 @@ class ExpenseListFragment : Fragment() {
             !line.any { it.isDigit() } && line.length <= 80
         }.orEmpty()
         val category = when {
-            listOf("بنزین", "پمپ", "تاکسی", "اسنپ", "ماشین").any { normalized.contains(it) } -> "خودرو"
-            listOf("سوپر", "فروشگاه", "میوه", "نان", "خوراک").any { normalized.contains(it) } -> "خوراک"
-            listOf("دارو", "درمان", "پزشک", "بیمارستان").any { normalized.contains(it) } -> "درمان"
-            else -> "عمومی"
+            listOf("بنزین", "پمپ", "تاکسی", "اسنپ", "ماشین", "روغن موتور", "لاستیک", "تعویض روغن", "کارواش").any { normalized.contains(it) } -> ExpenseCategory.CAR
+            listOf("اتوبوس", "مترو", "قطار", "پارکینگ", "بلیط").any { normalized.contains(it) } -> ExpenseCategory.TRANSPORT
+            listOf("سوپر", "فروشگاه", "میوه", "نان", "خوراک", "قصابی", "سبزی").any { normalized.contains(it) } -> ExpenseCategory.FOOD
+            listOf("دارو", "درمان", "پزشک", "بیمارستان", "داروخانه").any { normalized.contains(it) } -> ExpenseCategory.HEALTH
+            listOf("قبض", "برق", "آب", "گاز", "تلفن", "اینترنت").any { normalized.contains(it) } -> ExpenseCategory.BILLS
+            listOf("لباس", "کفش", "پوشاک").any { normalized.contains(it) } -> ExpenseCategory.CLOTHING
+            listOf("سینما", "رستوران", "کافه", "تفریح").any { normalized.contains(it) } -> ExpenseCategory.ENTERTAINMENT
+            else -> ExpenseCategory.OTHER
         }
         return ReceiptDraft(amounts.maxOrNull(), title, category)
     }

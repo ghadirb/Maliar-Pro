@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.EditText
 import android.widget.LinearLayout
 import androidx.fragment.app.Fragment
@@ -12,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.maliar.pro.database.BudgetManager
 import com.maliar.pro.database.Expense
+import com.maliar.pro.database.ExpenseCategory
 import com.maliar.pro.database.MonthlyBudget
 import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.databinding.FragmentBudgetBinding
@@ -112,7 +115,12 @@ class BudgetFragment : Fragment() {
     }
 
     private fun showAddBudgetDialog() {
-        val category = EditText(requireContext()).apply { hint = "دسته هزینه، مثلاً خوراک" }
+        val category = AutoCompleteTextView(requireContext()).apply {
+            hint = "دسته هزینه"
+            setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+            threshold = 0
+            setOnClickListener { showDropDown() }
+        }
         val amount = EditText(requireContext()).apply {
             hint = "مبلغ بودجه (تومان)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
