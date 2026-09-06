@@ -2,13 +2,13 @@ package com.maliar.pro.support
 
 /**
  * Single, central place for every support-related link/ID (spec: "تمام لینک‌ها و
- * شناسه‌های پشتیبانی باید در یک محل مرکزی قابل تغییر باشند"). To point support at a
- * different account, change the constants below - nothing else in the app needs to
- * change. Public group/channel links only; no bot or messaging API is used anywhere in
- * this file or the support screen it feeds (spec section 7).
+ * شناسه‌های پشتیبانی باید در یک محل مرکزی قابل تغییر باشند"). Public group/channel
+ * links only; no bot or messaging API is used anywhere in this file or the support
+ * screen it feeds (spec section 7).
  *
- * Placeholders below (Rubika, in particular - the spec text only actually gave a
- * Telegram and an Eitaa link) should be swapped for the real handles before shipping.
+ * Every link below is a confirmed, real support account (Telegram, Eitaa and Rubika all
+ * use the same "MaliarProSupport" handle). To point support at a different account
+ * later, change the constants below - nothing else in the app needs to change.
  */
 object SupportConfig {
 
@@ -18,8 +18,7 @@ object SupportConfig {
     /** Public Eitaa support link. */
     const val LINK_EITAA = "https://eitaa.com/MaliarProSupport"
 
-    /** Public Rubika support link - placeholder; Rubika's public profile URL format is
-     *  "https://rubika.ir/<username>". Update once a real Rubika support account exists. */
+    /** Public Rubika support link - username "@MaliarProSupport". */
     const val LINK_RUBIKA = "https://rubika.ir/MaliarProSupport"
 
     /** Where "گزارش مشکل"/"پیشنهاد قابلیت" open by default when the person hasn't
