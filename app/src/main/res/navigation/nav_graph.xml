@@ -7,7 +7,16 @@
     <fragment
         android:id="@+id/profileFragment"
         android:name="com.maliar.pro.ui.profile.ProfileFragment"
-        android:label="پروفایل" />
+        android:label="پروفایل">
+        <action
+            android:id="@+id/action_profileFragment_to_supportFragment"
+            app:destination="@id/supportFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/supportFragment"
+        android:name="com.maliar.pro.ui.support.SupportFragment"
+        android:label="پشتیبانی مالیار پرو" />
 
     <fragment
         android:id="@+id/accountingFragment"

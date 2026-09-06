@@ -45,6 +45,14 @@
         <intent>
             <action android:name="ir.cafebazaar.pardakht.InAppBillingService.BIND" />
         </intent>
+        <!-- Support screen (see com.maliar.pro.support.SupportConfig): needed on
+             Android 11+ so we can actually detect/target these apps directly by
+             package - without this, startActivity(...).setPackage(...) for an
+             installed-but-unqueried app silently fails to resolve and we'd always
+             fall back to the browser even when the app is present. -->
+        <package android:name="org.telegram.messenger" />
+        <package android:name="ir.eitaa.messenger" />
+        <package android:name="ir.resaneh1.iptv" />
     </queries>
 
 

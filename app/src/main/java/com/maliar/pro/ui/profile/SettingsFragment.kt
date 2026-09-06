@@ -17,6 +17,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.navigation.fragment.findNavController
+import com.maliar.pro.R
 import com.maliar.pro.databinding.FragmentSettingsBinding
 import com.maliar.pro.utils.AutoBackupWorker
 import com.maliar.pro.utils.BackupManager
@@ -70,6 +72,10 @@ class SettingsFragment : Fragment() {
         setupBackupSettings()
         setupBiometricLock()
         setupMarketRates()
+
+        binding.supportCard.setOnClickListener {
+            findNavController().navigate(R.id.action_profileFragment_to_supportFragment)
+        }
     }
 
     private fun setupMarketRates() {
