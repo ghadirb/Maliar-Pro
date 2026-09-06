@@ -22,6 +22,7 @@ import com.maliar.pro.viewmodels.AccountingViewModelFactory
 import com.maliar.pro.viewmodels.DueSoonViewModel
 import com.maliar.pro.viewmodels.DueSoonViewModelFactory
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class AccountingFragment : Fragment() {
 
@@ -349,10 +350,40 @@ class AccountingFragment : Fragment() {
         }
         lifecycleScope.launch {
             viewModel.expenseAnalysis.collect { analysis ->
-                binding.expenseAnalysisText.text = if (analysis == null) {
-                    "تحلیل هزینه: داده کافی نیست"
+                if (analysis == null) {
+                    binding.expenseAnalysisText.text = "تحلیل هزینه: داده کافی نیست"
+                    binding.expenseAnalysisChangeText.visibility = View.GONE
+                    binding.expenseAnalysisTopDayText.visibility = View.GONE
+                    return@collect
+                }
+
+                binding.expenseAnalysisText.text = "بیشترین دسته: ${analysis.topCategory} " +
+                    "(${formatCurrency(analysis.topCategoryAmount)}) · میانگین روزانه: " +
+                    "${formatCurrency(analysis.dailyAverage)} · تعداد تراکنش: ${analysis.transactionCount}"
+
+                val increase = analysis.biggestIncreaseCategory
+                val decrease = analysis.biggestDecreaseCategory
+                if (increase == null && decrease == null) {
+                    binding.expenseAnalysisChangeText.visibility = View.GONE
                 } else {
-                    "بیشترین دسته: ${analysis.topCategory} (${formatCurrency(analysis.topCategoryAmount)}) · میانگین روزانه: ${formatCurrency(analysis.dailyAverage)}"
+                    val parts = mutableListOf<String>()
+                    if (increase != null) {
+                        parts.add("بیشترین افزایش: ${increase.category} (+${increase.changePercent.roundToInt()}٪)")
+                    }
+                    if (decrease != null) {
+                        parts.add("بیشترین کاهش: ${decrease.category} (${decrease.changePercent.roundToInt()}٪)")
+                    }
+                    binding.expenseAnalysisChangeText.text = parts.joinToString(" · ") +
+                        " نسبت به دوره قبل"
+                    binding.expenseAnalysisChangeText.visibility = View.VISIBLE
+                }
+
+                if (analysis.topSpendingDayLabel == null || analysis.topSpendingDayAmount <= 0.0) {
+                    binding.expenseAnalysisTopDayText.visibility = View.GONE
+                } else {
+                    binding.expenseAnalysisTopDayText.text = "پرهزینه‌ترین روز: ${analysis.topSpendingDayLabel} " +
+                        "(${formatCurrency(analysis.topSpendingDayAmount)})"
+                    binding.expenseAnalysisTopDayText.visibility = View.VISIBLE
                 }
             }
         }
