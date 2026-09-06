@@ -257,6 +257,84 @@
                     android:textSize="12sp"
                     android:textColor="#757575" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="12dp"
+                    android:background="#E0E0E0" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="فعال/غیرفعال کردن هر نوع هشدار به‌صورت جداگانه:"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="#757575" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightPeriodicPaymentSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:checked="true"
+                    android:text="نزدیک‌شدن پرداخت‌های دوره‌ای" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightInstallmentSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="نزدیک‌شدن سررسید اقساط" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightDebtSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="نزدیک‌شدن سررسید بدهی" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightBudgetSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="هشدار بودجه" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightGoalSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="عقب‌ماندن از هدف مالی" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightCategorySwingSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="نوسان هزینه‌های یک دسته نسبت به ماه قبل" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightMarketSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="نوسان نرخ طلا/دلار" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightSavingsSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="پیشنهاد امکان پس‌انداز" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightProjectionSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="پیش‌بینی مازاد/کسری پایان ماه" />
+
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>

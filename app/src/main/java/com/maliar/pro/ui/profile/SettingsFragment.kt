@@ -338,10 +338,61 @@ class SettingsFragment : Fragment() {
                 FinancialInsightWorker.cancel(requireContext())
             }
         }
+        setupInsightSubToggles()
 
         setupAutoDueReminders()
         setupFinancialPeriodStartDay()
         setupQuietHours()
+    }
+
+    /** Wires the eight independent insight-type switches to their own preference flags -
+     *  each is a plain on/off with no extra logic, since [FinancialInsightWorker] already
+     *  re-checks every flag on its own each run. */
+    private fun setupInsightSubToggles() {
+        binding.insightPeriodicPaymentSwitch.isChecked = prefs.isInsightPeriodicPaymentEnabled()
+        binding.insightPeriodicPaymentSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightPeriodicPaymentEnabled(isChecked)
+        }
+
+        binding.insightInstallmentSwitch.isChecked = prefs.isInsightInstallmentEnabled()
+        binding.insightInstallmentSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightInstallmentEnabled(isChecked)
+        }
+
+        binding.insightDebtSwitch.isChecked = prefs.isInsightDebtEnabled()
+        binding.insightDebtSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightDebtEnabled(isChecked)
+        }
+
+        binding.insightBudgetSwitch.isChecked = prefs.isInsightBudgetEnabled()
+        binding.insightBudgetSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightBudgetEnabled(isChecked)
+        }
+
+        binding.insightGoalSwitch.isChecked = prefs.isInsightGoalEnabled()
+        binding.insightGoalSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightGoalEnabled(isChecked)
+        }
+
+        binding.insightCategorySwingSwitch.isChecked = prefs.isInsightCategorySwingEnabled()
+        binding.insightCategorySwingSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightCategorySwingEnabled(isChecked)
+        }
+
+        binding.insightMarketSwitch.isChecked = prefs.isInsightMarketEnabled()
+        binding.insightMarketSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightMarketEnabled(isChecked)
+        }
+
+        binding.insightSavingsSwitch.isChecked = prefs.isInsightSavingsEnabled()
+        binding.insightSavingsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightSavingsEnabled(isChecked)
+        }
+
+        binding.insightProjectionSwitch.isChecked = prefs.isInsightProjectionEnabled()
+        binding.insightProjectionSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightProjectionEnabled(isChecked)
+        }
     }
 
     private fun setupAutoDueReminders() {

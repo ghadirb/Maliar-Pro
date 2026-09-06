@@ -10,7 +10,11 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.database.BudgetManager
+import com.maliar.pro.database.Debt
 import com.maliar.pro.database.Expense
+import com.maliar.pro.database.FinancialGoal
+import com.maliar.pro.database.FinancialStatusManager
+import com.maliar.pro.database.Installment
 import com.maliar.pro.database.PeriodicPayment
 import com.maliar.pro.database.PeriodicPaymentManager
 import com.maliar.pro.utils.PersianCalendarHelper.PERSIAN_MONTH_NAMES
@@ -40,7 +44,7 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
 
         return try {
             val accountingManager = AccountingManager(applicationContext)
-            val financialManager = com.maliar.pro.database.FinancialStatusManager(applicationContext)
+            val financialManager = FinancialStatusManager(applicationContext)
             val expenses = accountingManager.getAllExpensesList()
             val incomes = accountingManager.getAllIncomesList()
 
@@ -56,12 +60,35 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
                 runCatching { financialManager.refreshGoldAssetValues() }
             }
 
-            val marketInsight = buildMarketRateInsight(prefs, previousRates, currentRates)
-            val periodicPaymentInsight = buildPeriodicPaymentInsight(
-                PeriodicPaymentManager(applicationContext).getAllList()
-            )
-            val budgetInsight = buildBudgetInsight(applicationContext, expenses)
-            val message = periodicPaymentInsight ?: budgetInsight ?: buildCategorySwingInsight(expenses) ?: marketInsight ?: buildProjectionInsight(incomes, expenses)
+            val marketInsight = if (prefs.isInsightMarketEnabled()) {
+                buildMarketRateInsight(prefs, previousRates, currentRates)
+            } else null
+            val periodicPaymentInsight = if (prefs.isInsightPeriodicPaymentEnabled()) {
+                buildPeriodicPaymentInsight(PeriodicPaymentManager(applicationContext).getAllList())
+            } else null
+            val installmentInsight = if (prefs.isInsightInstallmentEnabled()) {
+                buildInstallmentInsight(accountingManager.getActiveInstallments())
+            } else null
+            val debtInsight = if (prefs.isInsightDebtEnabled()) {
+                buildDebtInsight(financialManager.getAllDebtsList())
+            } else null
+            val budgetInsight = if (prefs.isInsightBudgetEnabled()) {
+                buildBudgetInsight(applicationContext, expenses)
+            } else null
+            val goalInsight = if (prefs.isInsightGoalEnabled()) {
+                buildGoalInsight(financialManager.getActiveGoals())
+            } else null
+            val categorySwingInsight = if (prefs.isInsightCategorySwingEnabled()) {
+                buildCategorySwingInsight(expenses)
+            } else null
+            val savingsInsight = if (prefs.isInsightSavingsEnabled()) {
+                buildSavingsInsight(incomes, expenses)
+            } else null
+            val projectionInsight = if (prefs.isInsightProjectionEnabled()) {
+                buildProjectionInsight(incomes, expenses)
+            } else null
+            val message = periodicPaymentInsight ?: installmentInsight ?: debtInsight ?: budgetInsight
+                ?: goalInsight ?: categorySwingInsight ?: marketInsight ?: savingsInsight ?: projectionInsight
             if (message != null) {
                 val finalMessage = tryRephraseWithAi(message) ?: message
                 NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage, isMarketInsight = message == marketInsight)
@@ -86,6 +113,94 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
             remainingDays == 0 -> "امروز موعد پرداخت دوره‌ای «${due.title}» به مبلغ $amount تومان است."
             else -> "$remainingDays روز دیگر پرداخت دوره‌ای «${due.title}» به مبلغ $amount تومان سررسید می‌شود."
         }
+    }
+
+    /** Nearest active installment due within [FinanceCalendarUtils.nextInstallmentDueDate],
+     *  reported the same way as periodic payments - only when it falls inside the next
+     *  [INSTALLMENT_DEBT_WARNING_DAYS] days, so this doesn't fire for every installment
+     *  every single day. */
+    private fun buildInstallmentInsight(installments: List<Installment>): String? {
+        val now = System.currentTimeMillis()
+        val windowEnd = now + INSTALLMENT_DEBT_WARNING_DAYS * DAY_MILLIS
+        val next = installments
+            .mapNotNull { installment ->
+                val due = FinanceCalendarUtils.nextInstallmentDueDate(installment) ?: return@mapNotNull null
+                if (due > windowEnd) return@mapNotNull null
+                installment to due
+            }
+            .minByOrNull { it.second } ?: return null
+        val (installment, due) = next
+        val remainingDays = ((due - now) / DAY_MILLIS).toInt()
+        val amount = String.format("%,.0f", installment.installmentAmount)
+        return when {
+            remainingDays <= 0 -> "امروز موعد پرداخت قسط «${installment.title}» به مبلغ $amount تومان است."
+            else -> "$remainingDays روز دیگر قسط «${installment.title}» به مبلغ $amount تومان سررسید می‌شود."
+        }
+    }
+
+    /** Nearest unpaid debt with a set end date, within the same warning window as
+     *  installments above. Debts with no [Debt.endDate] are open-ended and never surface
+     *  here - there is nothing time-sensitive to warn about. */
+    private fun buildDebtInsight(debts: List<Debt>): String? {
+        val now = System.currentTimeMillis()
+        val windowEnd = now + INSTALLMENT_DEBT_WARNING_DAYS * DAY_MILLIS
+        val due = debts
+            .filter { !it.isPaid && it.endDate != null && it.endDate <= windowEnd }
+            .minByOrNull { it.endDate!! } ?: return null
+        val remainingDays = ((due.endDate!! - now) / DAY_MILLIS).toInt()
+        val amount = String.format("%,.0f", due.amount)
+        return when {
+            remainingDays < 0 -> "بدهی «${due.title}» به مبلغ $amount تومان سررسید شده است."
+            remainingDays == 0 -> "امروز موعد سررسید بدهی «${due.title}» به مبلغ $amount تومان است."
+            else -> "$remainingDays روز دیگر بدهی «${due.title}» به مبلغ $amount تومان سررسید می‌شود."
+        }
+    }
+
+    /** Compares each active goal's actual progress against the linear progress it *should*
+     *  have by now (elapsed time / total time to [FinancialGoal.targetDate]) and reports the
+     *  goal falling behind by the widest margin, if any is behind by at least
+     *  [MIN_GOAL_BEHIND_PERCENT] percentage points. Goals whose deadline has already passed
+     *  or that started in the future are skipped, since "expected progress" isn't meaningful
+     *  for them. */
+    private fun buildGoalInsight(goals: List<FinancialGoal>): String? {
+        val now = System.currentTimeMillis()
+        var worst: FinancialGoal? = null
+        var worstGapPercent = 0.0
+        for (goal in goals) {
+            if (goal.targetAmount <= 0.0 || goal.targetDate <= goal.createdAt || goal.targetDate <= now) continue
+            val totalSpan = (goal.targetDate - goal.createdAt).toDouble()
+            val elapsed = (now - goal.createdAt).toDouble().coerceIn(0.0, totalSpan)
+            val expectedProgressPercent = (elapsed / totalSpan) * 100.0
+            val actualProgressPercent = (goal.currentProgress / goal.targetAmount * 100.0).coerceIn(0.0, 100.0)
+            val gap = expectedProgressPercent - actualProgressPercent
+            if (gap > worstGapPercent) {
+                worstGapPercent = gap
+                worst = goal
+            }
+        }
+        if (worst == null || worstGapPercent < MIN_GOAL_BEHIND_PERCENT) return null
+        val remaining = (worst.targetAmount - worst.currentProgress).coerceAtLeast(0.0)
+        val amount = String.format("%,.0f", remaining)
+        return "هدف مالی «${worst.title}» از برنامه عقب است؛ برای رسیدن به موعد، حدود $amount تومان دیگر باقی مانده."
+    }
+
+    /** A gentle nudge to save part of this month's positive net so far, only when there is
+     *  a comfortable surplus (net income clearly above expenses) and no more urgent insight
+     *  took priority - this is deliberately the lowest-priority candidate. */
+    private fun buildSavingsInsight(incomes: List<com.maliar.pro.database.Income>, expenses: List<Expense>): String? {
+        val (year, month, day) = PersianCalendarHelper.getCurrentJalaliDate()
+        if (day < 5) return null
+        val monthStart = PersianCalendarHelper.jalaliToGregorianMillis(year, month, 1)
+        val incomeSoFar = incomes.filter { it.date >= monthStart }.sumOf { it.amount }
+        val expenseSoFar = expenses.filter { it.date >= monthStart }.sumOf { it.amount }
+        if (incomeSoFar <= 0.0) return null
+        val netSoFar = incomeSoFar - expenseSoFar
+        val surplusRatio = netSoFar / incomeSoFar
+        if (surplusRatio < MIN_SAVINGS_SURPLUS_RATIO) return null
+        val suggested = (netSoFar * SAVINGS_SUGGESTION_RATIO).coerceAtLeast(0.0)
+        if (suggested < MIN_PROJECTION_AMOUNT) return null
+        val amount = String.format("%,.0f", suggested)
+        return "این ماه تاکنون مازاد خوبی داشته‌اید؛ شاید بد نباشد حدود $amount تومان از آن را پس‌انداز کنید."
     }
 
     /** Local budget alert. It is evaluated before online/AI insights and never sends
@@ -239,6 +354,10 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         private const val MIN_SWING_PERCENT = 15.0
         private const val MIN_PROJECTION_AMOUNT = 50_000.0
         private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+        private const val INSTALLMENT_DEBT_WARNING_DAYS = 3L
+        private const val MIN_GOAL_BEHIND_PERCENT = 15.0
+        private const val MIN_SAVINGS_SURPLUS_RATIO = 0.3
+        private const val SAVINGS_SUGGESTION_RATIO = 0.3
 
         fun schedule(context: Context, runImmediately: Boolean = false) {
             val request = PeriodicWorkRequestBuilder<FinancialInsightWorker>(1, TimeUnit.DAYS).build()

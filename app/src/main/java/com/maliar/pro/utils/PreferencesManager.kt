@@ -35,6 +35,15 @@ class PreferencesManager(context: Context) {
         private const val KEY_MARKET_RATES_TOKEN = "market_rates_token"
         private const val KEY_MARKET_RATES_CACHE = "market_rates_cache"
         private const val KEY_MARKET_SWING_THRESHOLD = "market_swing_threshold_percent"
+        private const val KEY_INSIGHT_PERIODIC_PAYMENT_ENABLED = "insight_periodic_payment_enabled"
+        private const val KEY_INSIGHT_BUDGET_ENABLED = "insight_budget_enabled"
+        private const val KEY_INSIGHT_INSTALLMENT_ENABLED = "insight_installment_enabled"
+        private const val KEY_INSIGHT_DEBT_ENABLED = "insight_debt_enabled"
+        private const val KEY_INSIGHT_GOAL_ENABLED = "insight_goal_enabled"
+        private const val KEY_INSIGHT_SAVINGS_ENABLED = "insight_savings_enabled"
+        private const val KEY_INSIGHT_CATEGORY_SWING_ENABLED = "insight_category_swing_enabled"
+        private const val KEY_INSIGHT_MARKET_ENABLED = "insight_market_enabled"
+        private const val KEY_INSIGHT_PROJECTION_ENABLED = "insight_projection_enabled"
 
         // --- Subscription / entitlement ---
         private const val KEY_DEVICE_ID = "device_id"
@@ -126,6 +135,46 @@ class PreferencesManager(context: Context) {
     }
 
     fun isFinancialInsightsEnabled(): Boolean = prefs.getBoolean(KEY_FINANCIAL_INSIGHTS_ENABLED, true)
+
+    // --- Individual financial-insight toggles (all on by default; only relevant while the
+    //     master switch above is also on). Each corresponds to one candidate insight the
+    //     worker can pick from - see FinancialInsightWorker for the priority order. ---
+
+    fun setInsightPeriodicPaymentEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_PERIODIC_PAYMENT_ENABLED, enabled).apply()
+    fun isInsightPeriodicPaymentEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_PERIODIC_PAYMENT_ENABLED, true)
+
+    fun setInsightInstallmentEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_INSTALLMENT_ENABLED, enabled).apply()
+    fun isInsightInstallmentEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_INSTALLMENT_ENABLED, true)
+
+    fun setInsightDebtEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_DEBT_ENABLED, enabled).apply()
+    fun isInsightDebtEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_DEBT_ENABLED, true)
+
+    fun setInsightBudgetEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_BUDGET_ENABLED, enabled).apply()
+    fun isInsightBudgetEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_BUDGET_ENABLED, true)
+
+    fun setInsightGoalEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_GOAL_ENABLED, enabled).apply()
+    fun isInsightGoalEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_GOAL_ENABLED, true)
+
+    fun setInsightSavingsEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_SAVINGS_ENABLED, enabled).apply()
+    fun isInsightSavingsEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_SAVINGS_ENABLED, true)
+
+    fun setInsightCategorySwingEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_CATEGORY_SWING_ENABLED, enabled).apply()
+    fun isInsightCategorySwingEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_CATEGORY_SWING_ENABLED, true)
+
+    fun setInsightMarketEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_MARKET_ENABLED, enabled).apply()
+    fun isInsightMarketEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_MARKET_ENABLED, true)
+
+    fun setInsightProjectionEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_PROJECTION_ENABLED, enabled).apply()
+    fun isInsightProjectionEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_PROJECTION_ENABLED, true)
 
     // --- Automatic due-date reminders (checks/installments/debts/debtors) ---
 
