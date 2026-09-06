@@ -66,7 +66,44 @@ class AccountingManager(val context: Context) {
             ?.id
         val id = accountingDao.insertExpense(expense.copy(accountId = linkedAccountId))
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
+        checkForUnusualExpense(expense, id)
         return id
+    }
+
+    /** Best-effort, local-only anomaly check: fires a single notification the moment a
+     *  newly-added expense is far above what's typical for its own category this
+     *  financial period, so the user finds out immediately instead of only if they
+     *  happen to ask the assistant "هزینه غیرعادی؟" (see AssistantViewModel for that
+     *  on-demand version, which this reuses the same >2x-average rule as). Needs at
+     *  least [MIN_SAMPLES_FOR_ANOMALY] *other* same-category expenses this period before
+     *  it will flag anything - too little history makes "average" meaningless and would
+     *  otherwise nag on literally the first purchase in any new category. Never throws:
+     *  this must never block or fail the actual expense save above it. */
+    private suspend fun checkForUnusualExpense(expense: Expense, insertedId: Long) {
+        if (expense.category.isBlank() || expense.amount <= 0.0) return
+        try {
+            val prefs = com.maliar.pro.utils.PreferencesManager(appContext)
+            if (!prefs.isFinancialInsightsEnabled()) return
+            val start = getFinancialPeriodStartMillis()
+            val sameCategoryBefore = accountingDao.getAllExpensesList()
+                .filter { it.category == expense.category && it.date >= start && it.id != insertedId }
+            if (sameCategoryBefore.size < MIN_SAMPLES_FOR_ANOMALY) return
+            val average = sameCategoryBefore.map { it.amount }.average()
+            if (average <= 0.0 || expense.amount < average * ANOMALY_MULTIPLIER) return
+            val amountText = com.maliar.pro.utils.CurrencyFormatter.format(expense.amount)
+            val label = expense.description.ifBlank { expense.category }
+            com.maliar.pro.utils.NotificationHelper.notifyFinancialInsight(
+                appContext,
+                "هزینه «$label» به مبلغ $amountText بیش از دو برابر میانگین هزینه‌های «${expense.category}» در این دوره است و می‌تواند غیرعادی باشد."
+            )
+        } catch (e: Exception) {
+            // Best-effort feature; never let a notification failure affect the save above.
+        }
+    }
+
+    companion object {
+        private const val MIN_SAMPLES_FOR_ANOMALY = 3
+        private const val ANOMALY_MULTIPLIER = 2.0
     }
     
     suspend fun updateExpense(expense: Expense) {

@@ -381,10 +381,50 @@ class AccountingViewModel(
                 .mapValues { (_, items) -> items.sumOf { it.amount } }
             val top = categoryTotals.maxByOrNull { it.value }
             val elapsedDays = ((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000)).toInt() + 1
+
+            // Previous period's per-category totals, used to find which category rose or
+            // fell the most (spec: "بیشترین افزایش/کاهش نسبت به ماه قبل") - reuses the
+            // exact same financial-period boundaries as expenseTrend below so "ماه قبل"
+            // always means the previous financial period, not necessarily the 1st-to-1st
+            // calendar month.
+            val periodLength = (System.currentTimeMillis() - start).coerceAtLeast(24L * 60 * 60 * 1000)
+            val previousStart = start - periodLength
+            val previous = list.filter { it.date >= previousStart && it.date < start }
+            val previousCategoryTotals = previous.groupBy { it.category.trim().ifBlank { "عمومی" } }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+            val allCategories = categoryTotals.keys + previousCategoryTotals.keys
+            val categoryChanges = allCategories.mapNotNull { cat ->
+                val curr = categoryTotals[cat] ?: 0.0
+                val prev = previousCategoryTotals[cat] ?: 0.0
+                if (prev <= 0.0) null else CategoryChange(cat, curr, prev, (curr - prev) / prev * 100.0)
+            }
+            val biggestIncrease = categoryChanges.filter { it.changePercent > 0 }.maxByOrNull { it.changePercent }
+            val biggestDecrease = categoryChanges.filter { it.changePercent < 0 }.minByOrNull { it.changePercent }
+
+            // Costliest single calendar day in the current period (spec: "روزهای پرهزینه").
+            val byDay = current.groupBy { expense ->
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = expense.date }
+                cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR)
+            }.mapValues { (_, items) -> items.sumOf { it.amount } }
+            val topDayEntry = byDay.maxByOrNull { it.value }
+            val topDayLabel = topDayEntry?.let { (dayKey, _) ->
+                val sample = current.first { expense ->
+                    val cal = java.util.Calendar.getInstance().apply { timeInMillis = expense.date }
+                    cal.get(java.util.Calendar.YEAR) * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR) == dayKey
+                }
+                val (y, m, d) = com.maliar.pro.utils.PersianCalendarHelper.gregorianMillisToJalali(sample.date)
+                "$y/$m/$d"
+            }
+
             ExpenseAnalysis(
                 topCategory = top?.key ?: "عمومی",
                 topCategoryAmount = top?.value ?: 0.0,
-                dailyAverage = current.sumOf { it.amount } / elapsedDays.coerceAtLeast(1)
+                dailyAverage = current.sumOf { it.amount } / elapsedDays.coerceAtLeast(1),
+                transactionCount = current.size,
+                biggestIncreaseCategory = biggestIncrease,
+                biggestDecreaseCategory = biggestDecrease,
+                topSpendingDayLabel = topDayLabel,
+                topSpendingDayAmount = topDayEntry?.value ?: 0.0
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -415,7 +455,21 @@ class AccountingViewModel(
     data class ExpenseAnalysis(
         val topCategory: String,
         val topCategoryAmount: Double,
-        val dailyAverage: Double
+        val dailyAverage: Double,
+        val transactionCount: Int = 0,
+        val biggestIncreaseCategory: CategoryChange? = null,
+        val biggestDecreaseCategory: CategoryChange? = null,
+        val topSpendingDayLabel: String? = null,
+        val topSpendingDayAmount: Double = 0.0
+    )
+
+    /** One category's change between the current and previous financial period, used by
+     *  [expenseAnalysis]'s "بیشترین افزایش/کاهش نسبت به ماه قبل" breakdown. */
+    data class CategoryChange(
+        val category: String,
+        val currentAmount: Double,
+        val previousAmount: Double,
+        val changePercent: Double
     )
 
     val uncashedChecksCount = checkList.map { list -> list.count { !it.isCashed } }
