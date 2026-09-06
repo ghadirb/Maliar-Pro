@@ -41,10 +41,13 @@ class MealPlanManager(context: Context) {
     fun getEntries(planId: Long): Flow<List<MealPlanEntry>> = dao.getEntries(planId)
 
     /** All of the person's own Expense rows recognized as food purchases (item #1 of the
-     *  spec) - matched by scanning [Expense.description] against FoodCatalog, since
-     *  category text is free-form and can't be relied on. Newest first. */
+     *  spec) - matched via [FoodCatalog.isLikelyFoodExpense], which requires the
+     *  expense's own category to be blank/food-adjacent before scanning its description
+     *  (so e.g. a "خودرو"-categorized "تعویض روغن موتور" entry is never mistaken for a
+     *  cooking-oil purchase just because "روغن" appears in its text). Newest first. */
     private suspend fun getFoodExpenses(): List<Pair<Expense, String>> {
         return accountingManager.getAllExpensesList()
+            .filter { FoodCatalog.isLikelyFoodExpense(it.category, it.description) }
             .mapNotNull { expense -> FoodCatalog.findMatch(expense.description)?.let { expense to it.name } }
             .sortedByDescending { it.first.date }
     }

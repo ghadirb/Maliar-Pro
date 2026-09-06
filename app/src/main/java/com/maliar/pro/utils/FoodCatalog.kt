@@ -125,5 +125,36 @@ object FoodCatalog {
     fun findMatch(description: String): FoodItemDef? {
         return matchName(description)
     }
+
+    /** Category labels the person might reasonably pick for a grocery/food-store
+     *  purchase, distinct from the "خوراک" budget-category name itself (e.g. someone
+     *  categorizing a corner-store run as "سوپر" rather than "خوراک"). */
+    private val FOOD_ADJACENT_CATEGORIES = setOf("سوپر", "فروشگاه", "خواربار", "مواد غذایی")
+
+    /** Generic Persian phrases describing a grocery/food-shopping trip without naming a
+     *  specific catalog ingredient (e.g. "خرید مواد غذایی این هفته" or "خرید خوراکی")، so a
+     *  description-only check can still recognize an everyday grocery run even when it
+     *  doesn't happen to mention rice/oil/etc. by name. */
+    private val GENERIC_FOOD_PHRASES = listOf(
+        "مواد غذایی", "خوراکی", "خواربار", "سوپرمارکت", "سوپر مارکت", "بقالی",
+        "میوه و تره بار", "میوه‌فروشی", "میوه فروشی", "سبزی فروشی", "قصابی", "نانوایی"
+    )
+
+    /**
+     * Best-effort answer to "should this expense count as food/grocery spending?" -
+     * used by both the budget screen (matching expenses against a "خوراک" budget) and
+     * the meal-planning price history. Deliberately requires the expense's own
+     * [category] to be blank/food-adjacent *first*: an expense the person explicitly
+     * filed under a different category (خودرو, حمل‌ونقل, ...) must never be pulled into
+     * food totals just because a food-catalog word or generic grocery phrase happens to
+     * appear in its free-text [description] - e.g. "تعویض روغن موتور" for a car mentions
+     * "روغن" (also a cooking-oil catalog item) but is not a grocery purchase.
+     */
+    fun isLikelyFoodExpense(category: String, description: String): Boolean {
+        val normalizedCategory = category.trim().lowercase(java.util.Locale.ROOT)
+        if (normalizedCategory in FOOD_ADJACENT_CATEGORIES) return true
+        if (normalizedCategory.isNotBlank()) return false
+        return findMatch(description) != null || GENERIC_FOOD_PHRASES.any { description.contains(it) }
+    }
 }
 
