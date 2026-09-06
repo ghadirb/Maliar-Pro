@@ -1,19 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp">
 
+    <!--
+        Category field: previously a plain AutoCompleteTextView with no visual cue that
+        it opens a picker, and its dropdown reused a tiny system row layout that was
+        hard to tap and read (see item_category_dropdown.xml / AddExpenseDialog.kt /
+        EditExpenseDialog.kt for the matching adapter + popup setup). The end icon below
+        gives it an obvious "tap to choose" affordance, and minHeight keeps the field
+        itself comfortably tall instead of shrinking to the text's natural size.
+    -->
     <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/categoryInputLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="دسته‌بندی">
+        android:hint="دسته‌بندی"
+        app:endIconMode="custom"
+        app:endIconDrawable="@drawable/ic_dropdown_arrow"
+        app:endIconContentDescription="نمایش دسته‌بندی‌ها">
 
         <AutoCompleteTextView
             android:id="@+id/categoryInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:minHeight="56dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:textSize="16sp"
             android:inputType="text" />
     </com.google.android.material.textfield.TextInputLayout>
 

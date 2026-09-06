@@ -100,9 +100,12 @@ class ExpenseListFragment : Fragment() {
             })
             val amountInput = input("مبلغ (تومان)", draft.amount?.toLong()?.toString().orEmpty(), true)
             val titleInput = input("عنوان یا فروشگاه", draft.title)
+            // Custom row layout (item_category_dropdown): the previous
+            // android.R.layout.simple_list_item_1 rows were small and hard to tap/read.
             val categoryInput = AutoCompleteTextView(requireContext()).apply {
                 hint = "دسته‌بندی"
-                setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+                setAdapter(ArrayAdapter(requireContext(), com.maliar.pro.R.layout.item_category_dropdown, android.R.id.text1, ExpenseCategory.ALL))
+                setDropDownBackgroundResource(com.maliar.pro.R.drawable.bg_category_dropdown)
                 threshold = 0
                 setOnClickListener { showDropDown() }
                 setText(draft.category, false)

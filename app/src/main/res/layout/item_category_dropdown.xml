@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Row used for each item in the "دسته‌بندی" (category) dropdown list shown when
+    adding/editing an expense.
+
+    Before this, the dropdown reused android.R.layout.simple_list_item_1: a small,
+    tightly-padded system row with a fixed text color that ignored the app's own
+    (day/night-aware) colors and text size. That made the row both hard to tap
+    precisely and hard to read against the app's own background. This row instead:
+      - uses a generous 52dp minimum height + 16dp horizontal padding, well above the
+        48dp touch-target minimum, so each category is easy to tap on a phone screen
+      - uses the app's own text_primary color (defined for both light and dark theme)
+        at 16sp so it's always legible
+      - shows a ripple (selectableItemBackground) on tap for clear feedback
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/text1"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="52dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:gravity="center_vertical|start"
+    android:textSize="16sp"
+    android:textColor="@color/text_primary"
+    android:background="?attr/selectableItemBackground"
+    android:ellipsize="end"
+    android:maxLines="1" />

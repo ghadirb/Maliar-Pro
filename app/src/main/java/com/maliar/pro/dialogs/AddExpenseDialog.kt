@@ -17,11 +17,17 @@ class AddExpenseDialog(private val context: Context, private val viewModel: Acco
         builder.setTitle("افزودن هزینه")
         
         val view = android.view.LayoutInflater.from(context).inflate(com.maliar.pro.R.layout.dialog_add_expense, null)
+        // Custom row layout (item_category_dropdown) + explicit popup background: the
+        // previous android.R.layout.simple_list_item_1 rows were small and hard to tap,
+        // and the popup had no background of its own to stand out against the screen.
         val categoryInput = view.findViewById<AutoCompleteTextView>(com.maliar.pro.R.id.categoryInput).apply {
-            setAdapter(ArrayAdapter(context, android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+            setAdapter(ArrayAdapter(context, com.maliar.pro.R.layout.item_category_dropdown, android.R.id.text1, ExpenseCategory.ALL))
+            setDropDownBackgroundResource(com.maliar.pro.R.drawable.bg_category_dropdown)
             threshold = 0
             setOnClickListener { showDropDown() }
         }
+        view.findViewById<com.google.android.material.textfield.TextInputLayout>(com.maliar.pro.R.id.categoryInputLayout)
+            ?.setEndIconOnClickListener { categoryInput.showDropDown() }
         val amountInput = view.findViewById<EditText>(com.maliar.pro.R.id.amountInput)
         val descriptionInput = view.findViewById<EditText>(com.maliar.pro.R.id.descriptionInput)
         

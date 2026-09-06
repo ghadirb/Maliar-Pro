@@ -335,7 +335,8 @@ class VoiceCommandActivity : AppCompatActivity() {
             val descriptionInput = input("عنوان یا توضیحات", result.description)
             val categoryInput = android.widget.AutoCompleteTextView(this@VoiceCommandActivity).apply {
                 hint = "دسته‌بندی"
-                setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+                setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, com.maliar.pro.R.layout.item_category_dropdown, android.R.id.text1, ExpenseCategory.ALL))
+                setDropDownBackgroundResource(com.maliar.pro.R.drawable.bg_category_dropdown)
                 threshold = 0
                 setOnClickListener { showDropDown() }
                 setText(result.category, false)
@@ -429,7 +430,8 @@ class VoiceCommandActivity : AppCompatActivity() {
                 }
                 val categoryInput = android.widget.AutoCompleteTextView(this@VoiceCommandActivity).apply {
                     hint = "دسته‌بندی"
-                    setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+                    setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, com.maliar.pro.R.layout.item_category_dropdown, android.R.id.text1, ExpenseCategory.ALL))
+                    setDropDownBackgroundResource(com.maliar.pro.R.drawable.bg_category_dropdown)
                     threshold = 0
                     setOnClickListener { showDropDown() }
                     setText(result.category, false)
@@ -556,7 +558,8 @@ class VoiceCommandActivity : AppCompatActivity() {
         }
         val catInput = android.widget.AutoCompleteTextView(this).apply {
             hint = "دسته‌بندی"
-            setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, android.R.layout.simple_list_item_1, ExpenseCategory.ALL))
+            setAdapter(android.widget.ArrayAdapter(this@VoiceCommandActivity, com.maliar.pro.R.layout.item_category_dropdown, android.R.id.text1, ExpenseCategory.ALL))
+            setDropDownBackgroundResource(com.maliar.pro.R.drawable.bg_category_dropdown)
             threshold = 0
             setOnClickListener { showDropDown() }
             container.addView(this)
