@@ -459,14 +459,15 @@ class VoiceCommandActivity : AppCompatActivity() {
                         val accountId = accountSpinner.selectedItemPosition.takeIf { it > 0 }?.let { accounts[it - 1].id }
                         var total = 0.0
                         for ((amount, description, category) in expenses) {
+                            val validAmount = amount!!
                             accountingManager?.addExpense(Expense(
-                                amount = amount!!,
+                                amount = validAmount,
                                 description = description,
                                 date = date,
                                 category = category,
                                 accountId = accountId
                             ))
-                            total += amount
+                            total += validAmount
                         }
                         setStatus("✅ ${expenses.size} هزینه به مبلغ کل ${total.toLong()} تومان ثبت شد")
                         findViewById<View>(R.id.micButton).postDelayed({ finish() }, 1500)
