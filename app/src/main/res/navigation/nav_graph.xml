@@ -38,7 +38,9 @@
         <action
             android:id="@+id/action_homeFragment_to_checkListFragment"
             app:destination="@id/checkListFragment" />
+        <action android:id="@+id/action_homeFragment_to_marketAssistantFragment" app:destination="@id/marketAssistantFragment" />
     </fragment>
+    <fragment android:id="@+id/marketAssistantFragment" android:name="com.maliar.pro.ui.market.MarketAssistantFragment" android:label="بازاریار" />
 
     <fragment
         android:id="@+id/profileFragment"

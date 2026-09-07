@@ -114,6 +114,9 @@ class HomeFragment : Fragment() {
         binding.homeQuickReport.setOnClickListener {
             findNavController().navigate(R.id.action_homeFragment_to_financialReportsFragment)
         }
+        binding.homeMarketAssistantCard.setOnClickListener {
+            findNavController().navigate(R.id.action_homeFragment_to_marketAssistantFragment)
+        }
         binding.homeSeeAllTransactions.setOnClickListener { findNavController().navigate(R.id.accountingFragment) }
 
         binding.homeAssistantCard.setOnClickListener {

@@ -13,8 +13,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
                MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class,
-               MonthlyBudget::class, PeriodicPayment::class],
-    version = 19,
+               MonthlyBudget::class, PeriodicPayment::class, MarketProduct::class,
+               MarketPriceQuote::class, ProductPurchase::class, MarketSource::class],
+    version = 20,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun marketRateHistoryDao(): MarketRateHistoryDao
     abstract fun budgetDao(): BudgetDao
     abstract fun periodicPaymentDao(): PeriodicPaymentDao
+    abstract fun marketAssistantDao(): MarketAssistantDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -264,6 +266,17 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE periodic_payments ADD COLUMN reminderId INTEGER")
             }
         }
+        /** بازاریار: four isolated tables, deliberately not coupled to accounting data. */
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS `market_products` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `brand` TEXT NOT NULL DEFAULT '', `model` TEXT NOT NULL DEFAULT '', `barcode` TEXT NOT NULL DEFAULT '', `createdAt` INTEGER NOT NULL)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `market_price_quotes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `productId` INTEGER NOT NULL, `source` TEXT NOT NULL, `priceType` TEXT NOT NULL, `price` REAL NOT NULL, `minPrice` REAL, `maxPrice` REAL, `checkedAt` INTEGER NOT NULL, `confidence` REAL NOT NULL DEFAULT 0.5, `sourceUrl` TEXT NOT NULL DEFAULT '')")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_market_price_quotes_productId_checkedAt` ON `market_price_quotes` (`productId`, `checkedAt`)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `product_purchases` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `productId` INTEGER NOT NULL, `purchasePrice` REAL NOT NULL, `quantity` REAL NOT NULL DEFAULT 1, `purchasedAt` INTEGER NOT NULL, `supplier` TEXT NOT NULL DEFAULT '')")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_product_purchases_productId_purchasedAt` ON `product_purchases` (`productId`, `purchasedAt`)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `market_sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `url` TEXT NOT NULL, `priceType` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL DEFAULT 1, `createdAt` INTEGER NOT NULL)")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -278,7 +291,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

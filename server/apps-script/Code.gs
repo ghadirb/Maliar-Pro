@@ -180,8 +180,51 @@ function routeRequest_(e) {
   if (path === 'aiChat') return handleAiChat_(params);
   if (path === 'aiStt') return handleAiStt_(params);
   if (path === 'aiTts') return handleAiTts_(params);
+  if (path === 'marketSearch') return handleMarketSearch_(params);
+  if (path === 'marketParseMessage') return handleMarketParseMessage_(params);
 
   return jsonOutput_({ error: 'unknown_path' });
+}
+
+// --- Market Assistant ---------------------------------------------------------------
+// The APK never calls shops/channels directly. Providers live here so credentials,
+// caching, terms of use, and rate limits stay server-side. Add a provider only when its
+// owner has supplied a permitted API/feed; HTML scraping is intentionally not included.
+function handleMarketSearch_(params) {
+  const query = String(params.query || '').trim();
+  const priceType = String(params.priceType || 'retail').toLowerCase();
+  if (!query || query.length > 160) return jsonOutput_({ error: 'query is required' });
+  if (priceType !== 'retail' && priceType !== 'wholesale') return jsonOutput_({ error: 'invalid_price_type' });
+  const cacheKey = 'market_cache_' + Utilities.base64EncodeWebSafe(query + ':' + priceType).replace(/=+$/, '');
+  const cached = CacheService.getScriptCache().get(cacheKey);
+  if (cached) return jsonOutput_(JSON.parse(cached));
+  const results = marketProviders_().reduce(function(all, provider) {
+    try { return all.concat(provider.search(query, priceType) || []); } catch (err) { return all; }
+  }, []);
+  const response = { query: query, priceType: priceType, checkedAt: Date.now(), results: results };
+  CacheService.getScriptCache().put(cacheKey, JSON.stringify(response), 900);
+  return jsonOutput_(response);
+}
+
+function marketProviders_() {
+  // Provider contracts return [{name, price, minPrice, maxPrice, sellerCount, url,
+  // source, confidence}]. Keep this array as the only registry for future Torob,
+  // Digikala, supplier-feed, or approved Telegram-bot adapters.
+  return [];
+}
+
+function handleMarketParseMessage_(params) {
+  const text = String(params.text || '').trim();
+  if (!text || text.length > 8000) return jsonOutput_({ error: 'text is required' });
+  const faDigits = '۰۱۲۳۴۵۶۷۸۹';
+  const prices = [];
+  const re = /(^|[^0-9۰-۹])([0-9۰-۹][0-9۰-۹,٫]*)(?:\s*(?:تومان|ت))?/g;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const value = Number(String(match[2]).replace(/[۰-۹]/g, function(d) { return String(faDigits.indexOf(d)); }).replace(/[٫,]/g, ''));
+    if (value >= 1000) prices.push(value);
+  }
+  return jsonOutput_({ nameHint: text.split('\n')[0].trim(), priceType: /عمده|تعداد|کارتن|همکار/.test(text) ? 'wholesale' : 'retail', prices: prices, minPrice: prices.length ? Math.min.apply(null, prices) : null, maxPrice: prices.length ? Math.max.apply(null, prices) : null, confidence: prices.length ? 0.45 : 0 });
 }
 
 function parseJsonBody_(e) {

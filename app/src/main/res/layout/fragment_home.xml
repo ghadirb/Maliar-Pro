@@ -212,6 +212,29 @@
             </LinearLayout>
         </LinearLayout>
 
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/homeMarketAssistantCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            app:cardBackgroundColor="@color/card_background"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🏪" android:textSize="26sp" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="12dp" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="بازاریار" android:textStyle="bold" android:textSize="16sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="مقایسه قیمت خرید با بازار عمده و خرده" android:textSize="12sp" android:textColor="@color/text_secondary" />
+                </LinearLayout>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="‹" android:textSize="28sp" android:textColor="@color/text_secondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- ===================== 4. این ماه چطور گذشت؟ ===================== -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
