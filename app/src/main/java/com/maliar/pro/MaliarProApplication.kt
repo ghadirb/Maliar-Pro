@@ -40,6 +40,9 @@ class MaliarProApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        com.maliar.pro.utils.PreferencesManager.applyThemeMode(
+            com.maliar.pro.utils.PreferencesManager(this).getThemeMode()
+        )
         createNotificationChannels()
         initializeDatabase()
         scheduleFinancialInsights()

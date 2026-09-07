@@ -11,11 +11,41 @@ class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
+    /** Manual light/dark override for the whole app (design/modern-ui-phase1: previously
+     *  the app only ever followed the system's day/night setting with no in-app control). */
+    enum class ThemeMode(val storageValue: String) {
+        SYSTEM("system"), LIGHT("light"), DARK("dark");
+
+        companion object {
+            fun fromStorageValue(value: String?): ThemeMode = entries.find { it.storageValue == value } ?: SYSTEM
+        }
+    }
+
+    fun getThemeMode(): ThemeMode = ThemeMode.fromStorageValue(prefs.getString(KEY_THEME_MODE, null))
+
+    fun setThemeMode(mode: ThemeMode) {
+        prefs.edit().putString(KEY_THEME_MODE, mode.storageValue).apply()
+        applyThemeMode(mode)
+    }
+
     companion object {
         private const val PREFS_NAME = "maliar_pro_prefs"
+
+        /** Applies [mode] to the whole process via AppCompat's night-mode delegate -
+         *  AppCompat automatically recreates any active Activities for it, so calling
+         *  this from Settings takes effect immediately with no manual restart needed. */
+        fun applyThemeMode(mode: ThemeMode) {
+            val nightMode = when (mode) {
+                ThemeMode.LIGHT -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+                ThemeMode.DARK -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+                ThemeMode.SYSTEM -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            }
+            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(nightMode)
+        }
         private const val KEY_API_KEYS = "api_keys"
         private const val KEY_AUTO_PROVISIONING = "auto_provisioning"
         private const val KEY_NOTIFICATION_MODE = "notification_mode"
+        private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_BACKGROUND_SERVICE_ENABLED = "background_service_enabled"
         private const val KEY_LAST_BACKUP_URI = "last_backup_uri"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"

@@ -76,6 +76,27 @@ class SettingsFragment : Fragment() {
         binding.supportCard.setOnClickListener {
             findNavController().navigate(R.id.action_profileFragment_to_supportFragment)
         }
+
+        setupThemeModeToggle()
+    }
+
+    private fun setupThemeModeToggle() {
+        val currentMode = prefs.getThemeMode()
+        val buttonId = when (currentMode) {
+            PreferencesManager.ThemeMode.SYSTEM -> R.id.themeModeSystemButton
+            PreferencesManager.ThemeMode.LIGHT -> R.id.themeModeLightButton
+            PreferencesManager.ThemeMode.DARK -> R.id.themeModeDarkButton
+        }
+        binding.themeModeToggle.check(buttonId)
+        binding.themeModeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                R.id.themeModeLightButton -> PreferencesManager.ThemeMode.LIGHT
+                R.id.themeModeDarkButton -> PreferencesManager.ThemeMode.DARK
+                else -> PreferencesManager.ThemeMode.SYSTEM
+            }
+            prefs.setThemeMode(mode)
+        }
     }
 
     private fun setupMarketRates() {

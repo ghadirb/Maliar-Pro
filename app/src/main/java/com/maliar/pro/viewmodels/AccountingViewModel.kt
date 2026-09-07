@@ -429,6 +429,22 @@ class AccountingViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    /**
+     * Current financial period's expenses grouped by category, sorted highest first -
+     * shared source of truth for anything that draws a category breakdown (the new
+     * "خانه" tab's donut chart, in particular), reusing the exact same grouping/period
+     * boundary as [expenseAnalysis] above so the two never disagree with each other.
+     */
+    val categoryBreakdown = expenseList.map { list ->
+        val start = accountingManager.getFinancialPeriodStartMillis()
+        list.filter { it.date >= start }
+            .groupBy { it.category.trim().ifBlank { "سایر" } }
+            .mapValues { (_, items) -> items.sumOf { it.amount } }
+            .filterValues { it > 0.0 }
+            .toList()
+            .sortedByDescending { it.second }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val budgetStatus = combine(suggestedMonthlyBudget, monthlyExpense) { budget, spent ->
         when {
             budget <= 0.0 -> "وضعیت بودجه: داده کافی نیست"
