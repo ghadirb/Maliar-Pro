@@ -121,17 +121,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Returning from Android's "Alarms & reminders" settings does not provide an
-        // Activity result. Re-arm saved reminders here as a second reliable path beside
-        // the system permission-change broadcast, so inexact fallbacks become exact as
-        // soon as the person grants access.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true
-        ) {
-            lifecycleScope.launch(Dispatchers.IO) {
-                com.maliar.pro.database.SmartReminderManager(applicationContext)
-                    .rescheduleAllActiveReminders()
-            }
+        // A launch after an APK update must restore every persisted alarm on Android 10
+        // too. On Android 12+ this is also a second path after returning from the
+        // "Alarms & reminders" special-access page.
+        lifecycleScope.launch(Dispatchers.IO) {
+            com.maliar.pro.database.SmartReminderManager(applicationContext)
+                .rescheduleAllActiveReminders()
         }
     }
 

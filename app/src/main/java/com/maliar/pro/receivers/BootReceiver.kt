@@ -10,14 +10,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Re-registers every still-active reminder after boot and after the user grants exact
- * alarm access. Android cancels future exact alarms whenever that special access is
- * revoked, and does not restore them automatically when access is granted again.
+ * Re-registers every still-active reminder after boot, an app update, and after the user
+ * grants exact alarm access. Replacing an installed APK can remove runtime alarm state;
+ * Android 10 therefore needs the package-replaced path even though it does not need the
+ * Android 12 exact-alarm permission.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
+            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED ||
             intent.action == android.app.AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
         ) {
             Log.d("BootReceiver", "Rescheduling active reminders after ${intent.action}")
