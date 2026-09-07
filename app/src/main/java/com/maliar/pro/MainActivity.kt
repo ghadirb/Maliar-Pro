@@ -119,6 +119,22 @@ class MainActivity : AppCompatActivity() {
         handleAssistantDeepLink(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Returning from Android's "Alarms & reminders" settings does not provide an
+        // Activity result. Re-arm saved reminders here as a second reliable path beside
+        // the system permission-change broadcast, so inexact fallbacks become exact as
+        // soon as the person grants access.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true
+        ) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                com.maliar.pro.database.SmartReminderManager(applicationContext)
+                    .rescheduleAllActiveReminders()
+            }
+        }
+    }
+
     /** Routes the "نرخ طلا/ارز نوسان داشت" notification tap to the دستیار هوشمند tab with
      *  a ready-made question, instead of just opening whatever tab the app last had open -
      *  see [com.maliar.pro.utils.NotificationHelper.notifyFinancialInsight] and

@@ -5,22 +5,31 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.maliar.pro.database.SmartReminderManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
- * Without this receiver, all AlarmManager alarms scheduled via SmartReminderManager
- * are wiped by the OS on every device reboot, and reminders silently stop firing
- * until the app is manually reopened. Re-registers every still-active reminder.
+ * Re-registers every still-active reminder after boot and after the user grants exact
+ * alarm access. Android cancels future exact alarms whenever that special access is
+ * revoked, and does not restore them automatically when access is granted again.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
-            intent.action == "android.intent.action.QUICKBOOT_POWERON"
+            intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
+            intent.action == android.app.AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED
         ) {
-            Log.d("BootReceiver", "Device rebooted, rescheduling active reminders")
-            try {
-                SmartReminderManager(context.applicationContext).rescheduleAllActiveReminders()
-            } catch (e: Exception) {
-                Log.e("BootReceiver", "Failed to reschedule reminders after boot", e)
+            Log.d("BootReceiver", "Rescheduling active reminders after ${intent.action}")
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    SmartReminderManager(context.applicationContext).rescheduleAllActiveReminders()
+                } catch (e: Exception) {
+                    Log.e("BootReceiver", "Failed to reschedule active reminders", e)
+                } finally {
+                    pendingResult.finish()
+                }
             }
         }
     }

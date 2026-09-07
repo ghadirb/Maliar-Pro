@@ -201,12 +201,13 @@ class SmartReminderManager(private val context: Context) {
     }
 
     private fun scheduleAlarm(reminder: ReminderEntity) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (!alarmManager.canScheduleExactAlarms()) {
-                Log.w(TAG, "Cannot schedule exact alarms - permission needed")
-                return
-            }
-        }
+        // Android 12+ can deny the special "Alarms & reminders" permission on a
+        // fresh install. Never treat that as "do not schedule": the previous early
+        // return made a saved reminder completely silent forever. Use an inexact
+        // allow-while-idle alarm as a delivery fallback; once the permission is granted,
+        // the permission-change receiver reschedules every active row exactly.
+        val canScheduleExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            alarmManager.canScheduleExactAlarms()
 
         // FULL_SCREEN and SMART reminders both need to fire at the exact instant they're
         // due (an alarm-clock style alarm survives Doze better than a plain exact alarm),
@@ -250,7 +251,7 @@ class SmartReminderManager(private val context: Context) {
                 triggerTime = now + 1000
             }
 
-            if (useAlarm) {
+            if (useAlarm && canScheduleExact) {
                 val showIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra("reminder_id", reminder.id)
@@ -276,10 +277,17 @@ class SmartReminderManager(private val context: Context) {
                         AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
                     )
                 }
-            } else {
+            } else if (canScheduleExact) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
                 )
+            } else {
+                // This API remains available without SCHEDULE_EXACT_ALARM. It can be
+                // deferred by Android, but it preserves the reminder instead of losing it.
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
+                )
+                Log.w(TAG, "Exact-alarm permission unavailable; scheduled inexact fallback for ${reminder.id}")
             }
             Log.d(TAG, "✅ Alarm scheduled for: ${reminder.title} at $triggerTime")
         } catch (e: SecurityException) {
