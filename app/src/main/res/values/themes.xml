@@ -7,6 +7,9 @@
         <item name="android:windowBackground">@color/background</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="materialCardViewStyle">@style/Widget.MaliarPro.Card</item>
+        <item name="materialButtonStyle">@style/Widget.MaliarPro.Button.Primary</item>
+        <item name="floatingActionButtonStyle">@style/Widget.MaliarPro.FloatingActionButton</item>
     </style>
 
     <!-- Alarm Theme for FullScreenAlarmActivity -->
@@ -61,5 +64,72 @@
         <item name="chipStrokeWidth">1.5dp</item>
         <item name="checkedIconVisible">false</item>
         <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Shared UI components. Keep semantic names so XML screens can adopt a common
+         visual language without coupling any financial/domain logic to the UI. -->
+    <style name="Widget.MaliarPro.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/card_background</item>
+        <item name="cardCornerRadius">20dp</item>
+        <item name="cardElevation">1dp</item>
+        <item name="strokeColor">@color/ds_outline</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="Widget.MaliarPro.Card.Hero" parent="Widget.MaliarPro.Card">
+        <item name="cardBackgroundColor">@color/hero_card_background</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="cardElevation">0dp</item>
+    </style>
+
+    <!-- Semantic card aliases document intent at call sites while sharing one visual base. -->
+    <style name="Widget.MaliarPro.FinancialCard" parent="Widget.MaliarPro.Card" />
+    <style name="Widget.MaliarPro.AccountCard" parent="Widget.MaliarPro.Card" />
+    <style name="Widget.MaliarPro.TransactionCard" parent="Widget.MaliarPro.Card" />
+    <style name="Widget.MaliarPro.ReminderCard" parent="Widget.MaliarPro.Card" />
+    <style name="Widget.MaliarPro.InstallmentCard" parent="Widget.MaliarPro.Card" />
+    <style name="Widget.MaliarPro.DebtCard" parent="Widget.MaliarPro.Card" />
+    <style name="Widget.MaliarPro.GoalCard" parent="Widget.MaliarPro.Card" />
+    <style name="Widget.MaliarPro.InsightCard" parent="Widget.MaliarPro.Card" />
+    <style name="Widget.MaliarPro.ReportCard" parent="Widget.MaliarPro.Card" />
+
+    <style name="Widget.MaliarPro.Button.Primary" parent="Widget.Material3.Button">
+        <item name="android:minHeight">48dp</item>
+        <item name="cornerRadius">14dp</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="Widget.MaliarPro.Button.Secondary" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="cornerRadius">14dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="strokeColor">@color/ds_outline</item>
+    </style>
+
+    <style name="Widget.MaliarPro.Button.Icon" parent="Widget.Material3.Button.IconButton">
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+
+    <style name="Widget.MaliarPro.FloatingActionButton" parent="Widget.Material3.FloatingActionButton.Primary">
+        <item name="backgroundTint">@color/primary</item>
+        <item name="tint">@android:color/white</item>
+    </style>
+
+    <style name="TextAppearance.MaliarPro.SectionHeader" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.MaliarPro.Amount" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Widget.MaliarPro.FilterChip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/ds_surface_variant</item>
+        <item name="chipStrokeColor">@color/ds_outline</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="checkedIconVisible">false</item>
     </style>
 </resources>

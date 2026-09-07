@@ -19,6 +19,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:paddingHorizontal="16dp"
+        android:paddingBottom="24dp"
         android:clipToPadding="false" />
 
     <LinearLayout

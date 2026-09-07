@@ -10,7 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:paddingBottom="32dp">
 
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/periodChipGroup"
@@ -20,7 +21,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipDaily"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
@@ -28,7 +29,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipWeekly"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
@@ -36,7 +37,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipMonthly"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
@@ -45,7 +46,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipYearly"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"

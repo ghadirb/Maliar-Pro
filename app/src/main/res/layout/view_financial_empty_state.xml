@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reusable EmptyState component. Hosts control its visibility and content. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:id="@+id/emptyStateIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="◌"
+        android:textSize="36sp" />
+
+    <TextView
+        android:id="@+id/emptyStateTitle"
+        style="@style/TextAppearance.MaliarPro.SectionHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="موردی برای نمایش نیست" />
+
+    <TextView
+        android:id="@+id/emptyStateSubtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+</LinearLayout>

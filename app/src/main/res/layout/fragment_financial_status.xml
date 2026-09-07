@@ -9,7 +9,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:paddingBottom="32dp">
 
         <include
             android:id="@+id/marketRateBar"
@@ -192,7 +193,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="@color/primary"
+            style="@style/Widget.MaliarPro.Card.Hero"
+            app:cardBackgroundColor="@color/hero_card_background"
             app:cardCornerRadius="20dp"
             app:cardElevation="1dp">
 

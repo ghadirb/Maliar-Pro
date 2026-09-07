@@ -9,19 +9,21 @@
         android:id="@+id/incomeRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="8dp"
-        android:paddingTop="64dp" />
+        android:clipToPadding="false"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="76dp"
+        android:paddingBottom="96dp" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
         android:gravity="center_vertical"
-        android:padding="8dp"
+        android:padding="12dp"
         android:background="@color/background">
         <com.google.android.material.button.MaterialButton
             android:id="@+id/incomeMonthFilterButton"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            style="@style/Widget.MaliarPro.Button.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="فیلتر ماه/سال" />
@@ -40,7 +42,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
+        android:layout_margin="20dp"
         android:contentDescription="افزودن درآمد"
         android:src="@android:drawable/ic_input_add" />
 

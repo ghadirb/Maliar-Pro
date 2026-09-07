@@ -14,7 +14,8 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="12dp"
+            android:layout_margin="16dp"
+            style="@style/Widget.MaliarPro.Card.Hero"
             app:cardCornerRadius="24dp"
             app:cardElevation="0dp"
             app:cardBackgroundColor="@color/hero_card_background">
@@ -58,7 +59,10 @@
             android:id="@+id/remindersRecyclerView"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="96dp" />
 
     </LinearLayout>
 
@@ -67,7 +71,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
+        android:layout_margin="20dp"
         android:src="@android:drawable/ic_menu_add" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
