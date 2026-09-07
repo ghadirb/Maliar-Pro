@@ -83,9 +83,9 @@ class MarketAssistantFragment : Fragment() {
         }
     }
 
-    private fun card(styleRes: Int): MaterialCardView = MaterialCardView(requireContext(), null, 0, styleRes)
-    private fun primaryButton(label: String, styleRes: Int): MaterialButton = MaterialButton(requireContext(), null, 0, styleRes).apply { text = label; isAllCaps = false }
-    private fun sectionHeader(label: String) = TextView(requireContext(), null, 0, R.style.TextAppearance_MaliarPro_SectionHeader).apply { text = label }
+    private fun card(styleRes: Int): MaterialCardView = MaterialCardView(android.view.ContextThemeWrapper(requireContext(), styleRes))
+    private fun primaryButton(label: String, styleRes: Int): MaterialButton = MaterialButton(android.view.ContextThemeWrapper(requireContext(), styleRes)).apply { text = label; isAllCaps = false }
+    private fun sectionHeader(label: String) = TextView(android.view.ContextThemeWrapper(requireContext(), R.style.TextAppearance_MaliarPro_SectionHeader)).apply { text = label }
     private fun themeColor(colorRes: Int) = androidx.core.content.ContextCompat.getColor(requireContext(), colorRes)
 
     private fun field(box: LinearLayout, hint: String, value: String = ""): EditText = EditText(requireContext()).also { it.hint = hint; it.setText(value); box.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8 }) }
