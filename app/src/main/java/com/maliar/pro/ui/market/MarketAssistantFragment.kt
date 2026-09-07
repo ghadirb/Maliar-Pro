@@ -118,8 +118,10 @@ class MarketAssistantFragment : Fragment() {
                 TextView(requireContext()).apply { text = listOf(p.name, p.category, p.brand, p.model).filter { it.isNotBlank() }.joinToString(" · ") }
             }
             row.setOnClickListener { showMarket(p) }
+            row.setOnLongClickListener { showProductOptions(p); true }
             productsBox.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
         }
+        if (products.isNotEmpty()) productsBox.addView(TextView(requireContext()).apply { text = "برای ویرایش یا حذف، روی کالا نگه دارید."; setTextColor(themeColor(R.color.text_secondary)); textSize = 12f; setPadding(4, 6, 0, 0) })
     }
 
     private fun sectionHeader(inflater: android.view.LayoutInflater, parent: ViewGroup, label: String): TextView =
@@ -128,6 +130,32 @@ class MarketAssistantFragment : Fragment() {
 
     private fun field(box: LinearLayout, hint: String, value: String = ""): EditText = EditText(requireContext()).also { it.hint = hint; it.setText(value); box.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8 }) }
     private fun showAddProduct() { val box = form(); val name = field(box, "نام کالا *"); val category = field(box, "دسته‌بندی"); val brand = field(box, "برند"); val model = field(box, "مدل"); val barcode = field(box, "بارکد"); AlertDialog.Builder(requireContext()).setTitle("کالای جدید").setView(box).setNegativeButton("لغو", null).setPositiveButton("ذخیره") { _, _ -> if (name.text.isNotBlank()) viewLifecycleOwner.lifecycleScope.launch { manager.addProduct(name.text.toString(), category.text.toString(), brand.text.toString(), model.text.toString(), barcode.text.toString()) } else toast("نام کالا الزامی است.") }.show() }
+    private fun showProductOptions(product: MarketProduct) {
+        AlertDialog.Builder(requireContext()).setTitle(product.name)
+            .setItems(arrayOf("✏️ ویرایش", "🗑️ حذف", "لغو")) { _, index ->
+                when (index) {
+                    0 -> showEditProduct(product)
+                    1 -> AlertDialog.Builder(requireContext()).setTitle("حذف کالا")
+                        .setMessage("«${product.name}» و تمام قیمت‌ها/خریدهای ثبت‌شده برای آن حذف شود؟")
+                        .setNegativeButton("لغو", null)
+                        .setPositiveButton("حذف") { _, _ -> viewLifecycleOwner.lifecycleScope.launch { manager.deleteProduct(product.id); toast("«${product.name}» حذف شد.") } }
+                        .show()
+                }
+            }.show()
+    }
+    private fun showEditProduct(product: MarketProduct) {
+        val box = form()
+        val name = field(box, "نام کالا *", product.name)
+        val category = field(box, "دسته‌بندی", product.category)
+        val brand = field(box, "برند", product.brand)
+        val model = field(box, "مدل", product.model)
+        val barcode = field(box, "بارکد", product.barcode)
+        AlertDialog.Builder(requireContext()).setTitle("ویرایش کالا").setView(box).setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                if (name.text.isNotBlank()) viewLifecycleOwner.lifecycleScope.launch { manager.updateProduct(product, name.text.toString(), category.text.toString(), brand.text.toString(), model.text.toString(), barcode.text.toString()) }
+                else toast("نام کالا الزامی است.")
+            }.show()
+    }
     private fun showMarket(product: MarketProduct) {
         val box = form()
         box.addView(TextView(requireContext()).apply { text = "«دریافت قیمت آنلاین» ترب و دیجی‌کالا (برای خرده) و کانال‌های تلگرامی شما را که در «منابع عمده و خرده» ثبت کرده‌اید جست‌وجو می‌کند."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) })
@@ -140,8 +168,11 @@ class MarketAssistantFragment : Fragment() {
                 viewLifecycleOwner.lifecycleScope.launch {
                     val userSources = manager.sources().first().filter { it.isEnabled && it.priceType == matchingKind }.map { it.name to it.url }
                     val rows = MarketBackendClient.search(requireContext(), product.name, remoteType, userSources)
-                    if (rows.isNullOrEmpty()) toast("نتیجه‌ای دریافت نشد؛ ممکن است ترب/دیجی‌کالا موقتاً مسدود باشند یا کانالی برای این نوع ثبت نکرده باشید.")
-                    else { rows.filter { it.price > 0 }.forEach { manager.addQuote(product.id, it.source, if (it.priceType.lowercase() == "wholesale") "WHOLESALE" else "RETAIL", it.price, it.min, it.max, it.confidence) }; toast("${rows.size} قیمت بازار ثبت شد.") }
+                    when {
+                        rows == null -> toast("ارتباط با سرویس آنلاین برقرار نشد. اتصال اینترنت و آدرس سرور (AI_BACKEND_URL / Apps Script) را بررسی کنید.")
+                        rows.isEmpty() -> toast("نتیجه‌ای پیدا نشد؛ ممکن است ترب/دیجی‌کالا موقتاً این جست‌وجو را مسدود کرده باشند، یا کانالی برای «${if (matchingKind == "WHOLESALE") "عمده" else "خرده"}» ثبت نکرده باشید.")
+                        else -> { rows.filter { it.price > 0 }.forEach { manager.addQuote(product.id, it.source, if (it.priceType.lowercase() == "wholesale") "WHOLESALE" else "RETAIL", it.price, it.min, it.max, it.confidence) }; toast("${rows.size} قیمت بازار ثبت شد.") }
+                    }
                 }
             }
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 })
@@ -150,11 +181,56 @@ class MarketAssistantFragment : Fragment() {
     }
     private fun showPurchase(product: MarketProduct) { val box = form(); val price = field(box, "قیمت خرید هر واحد (تومان) *"); val quantity = field(box, "تعداد", "1"); val supplier = field(box, "فروشنده"); AlertDialog.Builder(requireContext()).setTitle("ثبت خرید: ${product.name}").setView(box).setNegativeButton("لغو", null).setPositiveButton("ذخیره") { _, _ -> val p = price.text.toString().cleanNumber(); val q = quantity.text.toString().cleanNumber() ?: 1.0; if (p != null && p > 0) viewLifecycleOwner.lifecycleScope.launch { manager.addPurchase(product.id, p, q, supplier.text.toString()) } else toast("قیمت معتبر وارد کنید.") }.show() }
     private fun showSources() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val list = manager.sources().first()
+            val box = form()
+            box.addView(TextView(requireContext()).apply { text = "منابع عمده و خرده"; textSize = 16f; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
+            if (list.isEmpty()) {
+                box.addView(TextView(requireContext()).apply { text = "هنوز منبعی ثبت نشده است."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 8, 0, 12) })
+            } else {
+                list.forEach { src ->
+                    val row = LinearLayout(requireContext()).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, 8, 0, 8) }
+                    val info = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) }
+                    val kindLabel = if (src.priceType == "WHOLESALE") "عمده" else "خرده"
+                    info.addView(TextView(requireContext()).apply { text = "${if (src.isEnabled) "" else "❌ (غیرفعال) "}${src.name}"; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
+                    info.addView(TextView(requireContext()).apply { text = "$kindLabel · ${src.url}"; setTextColor(themeColor(R.color.text_secondary)); textSize = 12f })
+                    row.addView(info)
+                    row.addView(TextView(requireContext()).apply { text = "✏️"; textSize = 18f; setPadding(20, 0, 20, 0); setOnClickListener { showEditSource(src) } })
+                    row.addView(TextView(requireContext()).apply { text = "🗑️"; textSize = 18f; setOnClickListener {
+                        AlertDialog.Builder(requireContext()).setTitle("حذف منبع").setMessage("«${src.name}» حذف شود؟").setNegativeButton("لغو", null)
+                            .setPositiveButton("حذف") { _, _ -> viewLifecycleOwner.lifecycleScope.launch { manager.deleteSource(src.id); toast("«${src.name}» حذف شد.") } }.show()
+                    } })
+                    box.addView(row)
+                }
+            }
+            box.addView(TextView(requireContext()).apply { text = "برای جست‌وجوی خودکار، آدرس کانال تلگرام را به‌صورت t.me/channel وارد کنید (فقط کانال‌های عمومی)."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 12, 0, 10) })
+            val name = field(box, "نام منبع *"); val url = field(box, "آدرس کانال (t.me/channel) یا لینک منبع *")
+            val kind = Spinner(requireContext()).also { it.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, arrayOf("عمده", "خرده")); box.addView(it) }
+            val scroller = ScrollView(requireContext()).apply { addView(box) }
+            AlertDialog.Builder(requireContext()).setTitle("منابع عمده و خرده").setView(scroller)
+                .setNeutralButton("ثبت پیام فروشنده") { _, _ -> showPasteMessage() }
+                .setNegativeButton("بستن", null)
+                .setPositiveButton("افزودن منبع") { _, _ -> if (name.text.isNotBlank() && url.text.isNotBlank()) viewLifecycleOwner.lifecycleScope.launch { manager.addSource(name.text.toString(), url.text.toString(), if (kind.selectedItemPosition == 0) "WHOLESALE" else "RETAIL") } else toast("نام و آدرس الزامی است.") }
+                .show()
+        }
+    }
+    private fun showEditSource(source: MarketSource) {
         val box = form()
-        box.addView(TextView(requireContext()).apply { text = "برای جست‌وجوی خودکار، آدرس کانال تلگرام را به‌صورت t.me/channel وارد کنید (فقط کانال‌های عمومی)."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 10) })
-        val name = field(box, "نام منبع *"); val url = field(box, "آدرس کانال (t.me/channel) یا لینک منبع *")
-        val kind = Spinner(requireContext()).also { it.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, arrayOf("عمده", "خرده")); box.addView(it) }
-        AlertDialog.Builder(requireContext()).setTitle("افزودن منبع").setView(box).setNeutralButton("ثبت پیام فروشنده") { _, _ -> showPasteMessage() }.setNegativeButton("لغو", null).setPositiveButton("ذخیره") { _, _ -> if (name.text.isNotBlank() && url.text.isNotBlank()) viewLifecycleOwner.lifecycleScope.launch { manager.addSource(name.text.toString(), url.text.toString(), if (kind.selectedItemPosition == 0) "WHOLESALE" else "RETAIL") } else toast("نام و آدرس الزامی است.") }.show()
+        val name = field(box, "نام منبع *", source.name)
+        val url = field(box, "آدرس کانال یا لینک منبع *", source.url)
+        val kind = Spinner(requireContext()).also {
+            it.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, arrayOf("عمده", "خرده"))
+            it.setSelection(if (source.priceType == "WHOLESALE") 0 else 1)
+            box.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8 })
+        }
+        var enabled = source.isEnabled
+        val enabledToggle = CheckBox(requireContext()).apply { text = "فعال (در جست‌وجوی آنلاین استفاده شود)"; isChecked = enabled; setOnCheckedChangeListener { _, checked -> enabled = checked } }
+        box.addView(enabledToggle)
+        AlertDialog.Builder(requireContext()).setTitle("ویرایش منبع").setView(box).setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                if (name.text.isNotBlank() && url.text.isNotBlank()) viewLifecycleOwner.lifecycleScope.launch { manager.updateSource(source, name.text.toString(), url.text.toString(), if (kind.selectedItemPosition == 0) "WHOLESALE" else "RETAIL", enabled) }
+                else toast("نام و آدرس الزامی است.")
+            }.show()
     }
     private fun showPasteMessage() { chooseProduct { product -> val box = form(); val message = field(box, "متن پیام فروشنده"); AlertDialog.Builder(requireContext()).setTitle("خواندن پیام فروشنده").setView(box).setNegativeButton("لغو", null).setPositiveButton("استخراج و ثبت") { _, _ -> val prices = MarketAssistantManager.pricesFromText(message.text.toString()); if (prices.isEmpty()) toast("قیمت قابل تشخیصی پیدا نشد.") else viewLifecycleOwner.lifecycleScope.launch { prices.forEach { manager.addQuote(product.id, "پیام فروشنده", "WHOLESALE", it, prices.minOrNull(), prices.maxOrNull(), .45) }; toast("${prices.size} قیمت ثبت شد.") } }.show() } }
     private fun showAdvice(product: MarketProduct) { viewLifecycleOwner.lifecycleScope.launch {

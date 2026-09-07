@@ -7,6 +7,7 @@ import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "market_products")
@@ -30,14 +31,24 @@ data class MarketSource(@PrimaryKey(autoGenerate = true) val id: Long = 0, val n
     @Insert suspend fun addQuote(item: MarketPriceQuote): Long
     @Insert suspend fun addPurchase(item: ProductPurchase): Long
     @Insert suspend fun addSource(item: MarketSource): Long
+    @Update suspend fun updateProduct(item: MarketProduct)
+    @Update suspend fun updateSource(item: MarketSource)
+    @Query("DELETE FROM market_products WHERE id = :id") suspend fun deleteProduct(id: Long)
+    @Query("DELETE FROM market_price_quotes WHERE productId = :id") suspend fun deleteQuotesForProduct(id: Long)
+    @Query("DELETE FROM product_purchases WHERE productId = :id") suspend fun deletePurchasesForProduct(id: Long)
+    @Query("DELETE FROM market_sources WHERE id = :id") suspend fun deleteSource(id: Long)
 }
 
 class MarketAssistantManager(context: Context) {
     private val dao = AppDatabase.getDatabase(context).marketAssistantDao()
     fun products() = dao.products(); fun sources() = dao.sources(); fun quotes(id: Long) = dao.quotes(id); fun purchases(id: Long) = dao.purchases(id)
     suspend fun addProduct(name: String, category: String, brand: String, model: String, barcode: String): Long = dao.addProduct(MarketProduct(name = name.trim(), category = category.trim(), brand = brand.trim(), model = model.trim(), barcode = barcode.trim()))
+    suspend fun updateProduct(product: MarketProduct, name: String, category: String, brand: String, model: String, barcode: String) = dao.updateProduct(product.copy(name = name.trim(), category = category.trim(), brand = brand.trim(), model = model.trim(), barcode = barcode.trim()))
+    suspend fun deleteProduct(productId: Long) { dao.deleteQuotesForProduct(productId); dao.deletePurchasesForProduct(productId); dao.deleteProduct(productId) }
     suspend fun addPurchase(productId: Long, price: Double, quantity: Double, supplier: String) = dao.addPurchase(ProductPurchase(productId = productId, purchasePrice = price, quantity = quantity, supplier = supplier.trim()))
     suspend fun addSource(name: String, url: String, priceType: String) = dao.addSource(MarketSource(name = name.trim(), url = url.trim(), priceType = priceType))
+    suspend fun updateSource(source: MarketSource, name: String, url: String, priceType: String, isEnabled: Boolean) = dao.updateSource(source.copy(name = name.trim(), url = url.trim(), priceType = priceType, isEnabled = isEnabled))
+    suspend fun deleteSource(sourceId: Long) = dao.deleteSource(sourceId)
     suspend fun addQuote(productId: Long, source: String, priceType: String, price: Double, min: Double? = null, max: Double? = null, confidence: Double = .6) = dao.addQuote(MarketPriceQuote(productId = productId, source = source.trim(), priceType = priceType, price = price, minPrice = min, maxPrice = max, confidence = confidence))
     companion object {
         fun recommendation(purchases: List<ProductPurchase>, quotes: List<MarketPriceQuote>): String {
