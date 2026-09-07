@@ -122,6 +122,12 @@ class HomeFragment : Fragment() {
         binding.homeGoalsCard.setOnClickListener {
             findNavController().navigate(R.id.action_homeFragment_to_goalListFragment)
         }
+        binding.homeAccountsCard.setOnClickListener {
+            findNavController().navigate(R.id.action_homeFragment_to_assetListFragment)
+        }
+        binding.homeFinancialManagementCard.setOnClickListener {
+            findNavController().navigate(R.id.action_homeFragment_to_financialStatusFragment)
+        }
         binding.homeBudgetCard.setOnClickListener {
             findNavController().navigate(R.id.action_homeFragment_to_budgetFragment)
         }
@@ -429,17 +435,20 @@ class HomeFragment : Fragment() {
         )
     }
 
-    /** Only shown when there is more than one liquid account (spec: "اگر کاربر چند
-     *  حساب دارد") - a single account is already fully represented by the hero card's
-     *  balance, so listing it again here would be redundant, not informative. */
+    /** Keeps the accounts entry point visible even on first use, so a person can always
+     *  add their first cash/bank account from Home. */
     private fun renderAccounts(assets: List<com.maliar.pro.database.Asset>) {
         val accounts = assets.filter { it.type == AssetType.CASH || it.type == AssetType.BANK_ACCOUNT || it.type == AssetType.DEPOSIT }
         binding.homeAccountsContainer.removeAllViews()
-        if (accounts.size < 2) {
-            binding.homeAccountsCard.visibility = View.GONE
+        binding.homeAccountsCard.visibility = View.VISIBLE
+        if (accounts.isEmpty()) {
+            binding.homeAccountsContainer.addView(TextView(requireContext()).apply {
+                text = "برای ثبت اولین حساب، این کارت را لمس کنید"
+                textSize = 12f
+                setTextColor(requireContext().getColor(R.color.text_secondary))
+            })
             return
         }
-        binding.homeAccountsCard.visibility = View.VISIBLE
         accounts.forEachIndexed { index, asset ->
             val row = LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL

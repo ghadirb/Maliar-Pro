@@ -33,6 +33,9 @@
             android:id="@+id/action_homeFragment_to_assetListFragment"
             app:destination="@id/assetListFragment" />
         <action
+            android:id="@+id/action_homeFragment_to_financialStatusFragment"
+            app:destination="@id/financialStatusFragment" />
+        <action
             android:id="@+id/action_homeFragment_to_checkListFragment"
             app:destination="@id/checkListFragment" />
     </fragment>
