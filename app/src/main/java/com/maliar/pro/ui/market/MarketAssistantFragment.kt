@@ -2,7 +2,6 @@ package com.maliar.pro.ui.market
 
 import android.app.AlertDialog
 import android.os.Bundle
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -18,11 +17,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * Local-first Market Assistant. Built programmatically (no XML layout), so every view
- * below is constructed with the app's shared style resources (Widget.MaliarPro.*) applied
- * via the defStyleRes constructor - this keeps its cards/buttons/text visually identical
- * to the rest of the app's redesigned screens instead of falling back to plain system
- * widgets, which is what a plain `Button(context)`/`LinearLayout(context)` would render as.
+ * Local-first Market Assistant. Built without a screen-level XML layout, but every
+ * styled widget (cards/buttons/section header) is inflated from a tiny dedicated XML
+ * resource with `style="@style/Widget.MaliarPro.*"` set declaratively. This is the
+ * standard, guaranteed-safe way to apply those style resources to a view - unlike the
+ * `ContextThemeWrapper(context, styleRes)` "style-as-theme-overlay" trick this fragment
+ * used previously, which is not guaranteed to satisfy Material Components' internal
+ * theme/attribute checks on every OEM build and was the suspected cause of a crash the
+ * moment this screen opened.
  */
 class MarketAssistantFragment : Fragment() {
     private val manager by lazy { MarketAssistantManager(requireContext()) }
@@ -30,39 +32,71 @@ class MarketAssistantFragment : Fragment() {
     private var products: List<MarketProduct> = emptyList()
 
     override fun onCreateView(inflater: android.view.LayoutInflater, container: ViewGroup?, state: Bundle?): View {
+        return try {
+            buildScreen(inflater)
+        } catch (t: Throwable) {
+            // Never let a styling/inflation problem on this screen crash the whole app -
+            // fall back to a minimal, unstyled but fully functional screen instead.
+            android.util.Log.e("MarketAssistantFragment", "Falling back to plain layout", t)
+            buildFallbackScreen()
+        }
+    }
+
+    private fun buildScreen(inflater: android.view.LayoutInflater): View {
         val scroll = ScrollView(requireContext())
         val root = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 28, 32, 48) }
 
-        root.addView(heroCard())
-        root.addView(actionsCard(), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 16 })
-        root.addView(sectionHeader("کالاهای ثبت‌شده"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 20 })
+        root.addView(heroCard(inflater, root))
+        root.addView(actionsCard(inflater, root), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 16 })
+        root.addView(sectionHeader(inflater, root, "کالاهای ثبت‌شده"), LinearLayout.LayoutParams(-1, -2).apply { topMargin = 20 })
         productsBox = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
         root.addView(productsBox)
         scroll.addView(root); return scroll
     }
 
-    private fun heroCard(): MaterialCardView = card(R.style.Widget_MaliarPro_Card_Hero).apply {
-        addView(LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(28, 24, 28, 24)
-            addView(TextView(requireContext()).apply { text = "بازاریار"; textSize = 22f; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
-            addView(TextView(requireContext()).apply { text = "قیمت خرید خود را با بازار عمده و خرده مقایسه کنید."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 6, 0, 0) })
-        })
+    /** Plain-widget fallback with no custom styles at all, so this screen can never hard-crash. */
+    private fun buildFallbackScreen(): View {
+        val scroll = ScrollView(requireContext())
+        val root = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 28, 32, 48) }
+        root.addView(TextView(requireContext()).apply { text = "بازاریار"; textSize = 22f; setTypeface(null, 1) })
+        root.addView(TextView(requireContext()).apply { text = "قیمت خرید خود را با بازار عمده و خرده مقایسه کنید."; setPadding(0, 8, 0, 18) })
+        listOf(
+            "🔎 جستجوی قیمت بازار" to { chooseProduct { showMarket(it) } },
+            "📦 کالاهای من" to { showAddProduct() },
+            "🏪 منابع عمده و خرده" to { showSources() },
+            "🤖 مشاور خرید" to { chooseProduct { showAdvice(it) } }
+        ).forEach { (label, action) ->
+            root.addView(Button(requireContext()).apply { text = label; setOnClickListener { action() } }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8 })
+        }
+        root.addView(TextView(requireContext()).apply { text = "کالاهای ثبت‌شده"; textSize = 18f; setTypeface(null, 1); setPadding(0, 18, 0, 8) })
+        productsBox = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(productsBox)
+        scroll.addView(root); return scroll
     }
 
-    private fun actionsCard(): MaterialCardView = card(R.style.Widget_MaliarPro_Card).apply {
-        addView(LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(24, 20, 24, 20)
-            listOf(
-                "🔎 جستجوی قیمت بازار" to { chooseProduct { showMarket(it) } },
-                "📦 کالاهای من" to { showAddProduct() },
-                "🏪 منابع عمده و خرده" to { showSources() },
-                "🤖 مشاور خرید" to { chooseProduct { showAdvice(it) } }
-            ).forEachIndexed { index, (label, action) ->
-                addView(primaryButton(label, if (index == 0) R.style.Widget_MaliarPro_Button_Primary else R.style.Widget_MaliarPro_Button_Secondary).apply {
-                    gravity = Gravity.CENTER; setOnClickListener { action() }
-                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = if (index == 0) 0 else 10 })
-            }
-        })
+    private fun heroCard(inflater: android.view.LayoutInflater, parent: ViewGroup): MaterialCardView {
+        val cardView = inflater.inflate(R.layout.view_market_hero_card, parent, false) as MaterialCardView
+        val content = cardView.findViewById<LinearLayout>(R.id.marketHeroContent)
+        content.addView(TextView(requireContext()).apply { text = "بازاریار"; textSize = 22f; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
+        content.addView(TextView(requireContext()).apply { text = "قیمت خرید خود را با بازار عمده و خرده مقایسه کنید."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 6, 0, 0) })
+        return cardView
+    }
+
+    private fun actionsCard(inflater: android.view.LayoutInflater, parent: ViewGroup): MaterialCardView {
+        val cardView = inflater.inflate(R.layout.view_market_card, parent, false) as MaterialCardView
+        val content = cardView.findViewById<LinearLayout>(R.id.marketCardContent)
+        listOf(
+            "🔎 جستجوی قیمت بازار" to { chooseProduct { showMarket(it) } },
+            "📦 کالاهای من" to { showAddProduct() },
+            "🏪 منابع عمده و خرده" to { showSources() },
+            "🤖 مشاور خرید" to { chooseProduct { showAdvice(it) } }
+        ).forEachIndexed { index, (label, action) ->
+            val button = inflater.inflate(if (index == 0) R.layout.view_market_button_primary else R.layout.view_market_button_secondary, content, false) as MaterialButton
+            button.text = label
+            button.setOnClickListener { action() }
+            content.addView(button, LinearLayout.LayoutParams(-1, -2).apply { topMargin = if (index == 0) 0 else 10 })
+        }
+        return cardView
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) { viewLifecycleOwner.lifecycleScope.launch { manager.products().collectLatest { items -> products = items; renderProducts() } } }
@@ -70,22 +104,26 @@ class MarketAssistantFragment : Fragment() {
     private fun renderProducts() {
         productsBox.removeAllViews()
         if (products.isEmpty()) { productsBox.addView(TextView(requireContext()).apply { text = "هنوز کالایی ثبت نشده است."; setTextColor(themeColor(R.color.text_secondary)) }); return }
+        val inflater = android.view.LayoutInflater.from(requireContext())
         products.forEach { p ->
-            productsBox.addView(card(R.style.Widget_MaliarPro_TransactionCard).apply {
-                addView(LinearLayout(requireContext()).apply {
-                    orientation = LinearLayout.VERTICAL; setPadding(20, 16, 20, 16)
-                    addView(TextView(requireContext()).apply { text = p.name; textSize = 16f; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
-                    val meta = listOf(p.category, p.brand, p.model).filter { it.isNotBlank() }.joinToString(" · ")
-                    if (meta.isNotBlank()) addView(TextView(requireContext()).apply { text = meta; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 4, 0, 0) })
-                })
-                setOnClickListener { showMarket(p) }
-            }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
+            val row = try {
+                val cardView = inflater.inflate(R.layout.view_market_transaction_card, productsBox, false) as MaterialCardView
+                val content = cardView.findViewById<LinearLayout>(R.id.marketTransactionContent)
+                content.addView(TextView(requireContext()).apply { text = p.name; textSize = 16f; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
+                val meta = listOf(p.category, p.brand, p.model).filter { it.isNotBlank() }.joinToString(" · ")
+                if (meta.isNotBlank()) content.addView(TextView(requireContext()).apply { text = meta; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 4, 0, 0) })
+                cardView
+            } catch (t: Throwable) {
+                android.util.Log.e("MarketAssistantFragment", "Falling back to plain product row", t)
+                TextView(requireContext()).apply { text = listOf(p.name, p.category, p.brand, p.model).filter { it.isNotBlank() }.joinToString(" · ") }
+            }
+            row.setOnClickListener { showMarket(p) }
+            productsBox.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 10 })
         }
     }
 
-    private fun card(styleRes: Int): MaterialCardView = MaterialCardView(android.view.ContextThemeWrapper(requireContext(), styleRes))
-    private fun primaryButton(label: String, styleRes: Int): MaterialButton = MaterialButton(android.view.ContextThemeWrapper(requireContext(), styleRes)).apply { text = label; isAllCaps = false }
-    private fun sectionHeader(label: String) = TextView(android.view.ContextThemeWrapper(requireContext(), R.style.TextAppearance_MaliarPro_SectionHeader)).apply { text = label }
+    private fun sectionHeader(inflater: android.view.LayoutInflater, parent: ViewGroup, label: String): TextView =
+        TextView(requireContext(), null, 0, R.style.TextAppearance_MaliarPro_SectionHeader).apply { text = label }
     private fun themeColor(colorRes: Int) = androidx.core.content.ContextCompat.getColor(requireContext(), colorRes)
 
     private fun field(box: LinearLayout, hint: String, value: String = ""): EditText = EditText(requireContext()).also { it.hint = hint; it.setText(value); box.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8 }) }
@@ -94,7 +132,8 @@ class MarketAssistantFragment : Fragment() {
         val box = form()
         box.addView(TextView(requireContext()).apply { text = "«دریافت قیمت آنلاین» ترب و دیجی‌کالا (برای خرده) و کانال‌های تلگرامی شما را که در «منابع عمده و خرده» ثبت کرده‌اید جست‌وجو می‌کند."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) })
         val kind = Spinner(requireContext()).also { it.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, arrayOf("عمده", "خرده")); box.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 }) }
-        box.addView(primaryButton("دریافت قیمت آنلاین", R.style.Widget_MaliarPro_Button_Secondary).apply {
+        box.addView((android.view.LayoutInflater.from(requireContext()).inflate(R.layout.view_market_button_secondary, box, false) as MaterialButton).apply {
+            text = "دریافت قیمت آنلاین"
             setOnClickListener {
                 val remoteType = if (kind.selectedItemPosition == 0) "wholesale" else "retail"
                 val matchingKind = if (remoteType == "wholesale") "WHOLESALE" else "RETAIL"
