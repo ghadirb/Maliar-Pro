@@ -17,6 +17,24 @@
         <action
             android:id="@+id/action_homeFragment_to_supportFragment"
             app:destination="@id/supportFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_financialReportsFragment"
+            app:destination="@id/financialReportsFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_installmentListFragment"
+            app:destination="@id/installmentListFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_debtListFragment"
+            app:destination="@id/debtListFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_goalListFragment"
+            app:destination="@id/goalListFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_assetListFragment"
+            app:destination="@id/assetListFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_checkListFragment"
+            app:destination="@id/checkListFragment" />
     </fragment>
 
     <fragment

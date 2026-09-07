@@ -31,6 +31,8 @@ import kotlin.math.ceil
  * recreated. Deriving every total from the live Flow means ANY writer (this screen, the
  * assistant, a dialog, anything) shows up immediately, everywhere.
  */
+private const val ATTENTION_WINDOW_DAYS = 7L
+
 class AccountingViewModel(
     private val accountingManager: AccountingManager,
     private val financialStatusManager: FinancialStatusManager? = null
@@ -70,12 +72,22 @@ class AccountingViewModel(
         ?: kotlinx.coroutines.flow.flowOf(emptyList()))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val forecastAssetList = (financialStatusManager?.getAllAssets()
+    val assetList = (financialStatusManager?.getAllAssets()
         ?: kotlinx.coroutines.flow.flowOf(emptyList()))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val forecastAssetList = assetList
 
-    private val forecastDebtList = (financialStatusManager?.getAllDebts()
+    val debtList = (financialStatusManager?.getAllDebts()
         ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val forecastDebtList = debtList
+
+    /** Active (not completed) financial goals, nearest target date first - for the Home
+     *  tab's "اهداف مالی" card (spec: only show this section if the feature genuinely
+     *  has data, never a placeholder goal). */
+    val goalList = (financialStatusManager?.getAllGoals()
+        ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+        .map { goals -> goals.filter { !it.isCompleted }.sortedBy { it.targetDate } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val periodicPaymentManager = PeriodicPaymentManager(accountingManager.context)
@@ -505,6 +517,48 @@ class AccountingViewModel(
     val activeInstallmentsMonthlyTotal = installmentList.map { list ->
         list.filter { it.paidInstallments < it.totalInstallments }.sumOf { it.installmentAmount }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    enum class AttentionType { INSTALLMENT, DEBT, CHECK }
+
+    /** One thing genuinely worth the person's attention soon - an unpaid installment,
+     *  debt, or uncashed check within [ATTENTION_WINDOW_DAYS]. [dueInDays] is negative
+     *  for something already overdue. */
+    data class AttentionItem(
+        val type: AttentionType,
+        val title: String,
+        val amount: Double,
+        val dueInDays: Long
+    )
+
+    /**
+     * Feeds the Home tab's "نیازمند توجه" card - built from installments/debts/checks
+     * only (the same three financial-status pieces AccountingViewModel already tracks
+     * elsewhere, e.g. [dueSoonChecksCount]/[activeInstallmentsCount]); reminders are a
+     * separate manager entirely ([com.maliar.pro.database.SmartReminderManager]) and are
+     * read directly by HomeFragment itself rather than threaded through here, so this
+     * ViewModel's own scope doesn't need to grow to cover a different domain.
+     * Sorted soonest-first; nothing here when nothing is actually due soon (spec: only
+     * show this section when there's a real item, never an empty placeholder).
+     */
+    val attentionItems = combine(installmentList, debtList, checkList) { installments, debts, checks ->
+        val now = System.currentTimeMillis()
+        val horizon = now + ATTENTION_WINDOW_DAYS * 24L * 60 * 60 * 1000
+        val fromInstallments = installments
+            .filter { it.paidInstallments < it.totalInstallments }
+            .mapNotNull { installment ->
+                com.maliar.pro.utils.FinanceCalendarUtils.nextInstallmentDueDate(installment)?.let { due ->
+                    if (due <= horizon) AttentionItem(AttentionType.INSTALLMENT, installment.title, installment.installmentAmount, (due - now) / (24L * 60 * 60 * 1000))
+                    else null
+                }
+            }
+        val fromDebts = debts
+            .filter { !it.isPaid && it.endDate != null && it.endDate <= horizon }
+            .map { AttentionItem(AttentionType.DEBT, it.title, it.amount, (it.endDate!! - now) / (24L * 60 * 60 * 1000)) }
+        val fromChecks = checks
+            .filter { !it.isCashed && it.dueDate <= horizon }
+            .map { AttentionItem(AttentionType.CHECK, "چک ${it.checkNumber}".trim(), it.amount, (it.dueDate - now) / (24L * 60 * 60 * 1000)) }
+        (fromInstallments + fromDebts + fromChecks).sortedBy { it.dueInDays }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun deleteIncome(income: Income) {
         viewModelScope.launch { accountingManager.deleteIncome(income) }
