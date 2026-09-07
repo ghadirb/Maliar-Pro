@@ -4,13 +4,20 @@ import android.content.Context
 import com.maliar.pro.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
 /** Market data crosses the network only through the configured Apps Script proxy. */
 object MarketBackendClient {
-    suspend fun search(context: Context, query: String, priceType: String): List<RemoteQuote>? = withContext(Dispatchers.IO) {
+    /**
+     * [sources] are the user's own saved entries from "منابع عمده و خرده" (name + url) for
+     * the requested [priceType]. Public marketplaces (Torob/Digikala) are always searched
+     * for retail on the server side; any Telegram channel among [sources] is searched too,
+     * for either price type, since that's where most Iranian wholesale pricing actually lives.
+     */
+    suspend fun search(context: Context, query: String, priceType: String, sources: List<Pair<String, String>> = emptyList()): List<RemoteQuote>? = withContext(Dispatchers.IO) {
         runCatching {
             val root = BuildConfig.AI_BACKEND_URL.trimEnd('/')
             if (root.isBlank() || root.contains("CHANGE-ME", true)) return@runCatching null
@@ -19,7 +26,8 @@ object MarketBackendClient {
                 requestMethod = "POST"; doOutput = true; connectTimeout = 20_000; readTimeout = 30_000
                 setRequestProperty("Content-Type", "application/json")
             }
-            val body = JSONObject().put("query", query).put("priceType", priceType).put("deviceId", PreferencesManager(context).getOrCreateDeviceId())
+            val sourcesJson = JSONArray().apply { sources.forEach { (name, url) -> put(JSONObject().put("name", name).put("url", url)) } }
+            val body = JSONObject().put("query", query).put("priceType", priceType).put("sources", sourcesJson).put("deviceId", PreferencesManager(context).getOrCreateDeviceId())
             connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             if (connection.responseCode !in 200..299) return@runCatching null
             val response = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })

@@ -188,34 +188,134 @@ function routeRequest_(e) {
 
 // --- Market Assistant ---------------------------------------------------------------
 // The APK never calls shops/channels directly. Providers live here so credentials,
-// caching, terms of use, and rate limits stay server-side. Add a provider only when its
-// owner has supplied a permitted API/feed; HTML scraping is intentionally not included.
+// caching, terms of use, and rate limits stay server-side.
+//  - Torob/Digikala: unofficial public JSON endpoints their own web/app clients use.
+//    No API key. Google's outbound IPs are occasionally rate-limited by their anti-bot
+//    layer (seen as an "ok":false / empty response) - this is a known, external
+//    limitation, not a bug in this script. Failures are swallowed per-provider so one
+//    blocked source never breaks the others.
+//  - Telegram: only the *user's own* saved sources (from "منابع عمده و خرده") are
+//    queried, via the public https://t.me/s/<channel> preview page (no bot token, no
+//    login - this is the same page a browser sees for any public channel).
 function handleMarketSearch_(params) {
   const query = String(params.query || '').trim();
   const priceType = String(params.priceType || 'retail').toLowerCase();
   if (!query || query.length > 160) return jsonOutput_({ error: 'query is required' });
   if (priceType !== 'retail' && priceType !== 'wholesale') return jsonOutput_({ error: 'invalid_price_type' });
-  const cacheKey = 'market_cache_' + Utilities.base64EncodeWebSafe(query + ':' + priceType).replace(/=+$/, '');
+  const sources = parseUserSources_(params.sources);
+  const cacheKey = 'market_cache_' + Utilities.base64EncodeWebSafe(query + ':' + priceType + ':' + sources.map(function(s) { return s.url; }).join(',')).replace(/[+/=]/g, '').slice(0, 180);
   const cached = CacheService.getScriptCache().get(cacheKey);
   if (cached) return jsonOutput_(JSON.parse(cached));
-  const results = marketProviders_().reduce(function(all, provider) {
-    try { return all.concat(provider.search(query, priceType) || []); } catch (err) { return all; }
+  const results = marketProviders_(priceType, sources).reduce(function(all, provider) {
+    try { return all.concat(provider(query, priceType) || []); } catch (err) { return all; }
   }, []);
   const response = { query: query, priceType: priceType, checkedAt: Date.now(), results: results };
   CacheService.getScriptCache().put(cacheKey, JSON.stringify(response), 900);
   return jsonOutput_(response);
 }
 
-function marketProviders_() {
-  // Provider contracts return [{name, price, minPrice, maxPrice, sellerCount, url,
-  // source, confidence}]. Keep this array as the only registry for future Torob,
-  // Digikala, supplier-feed, or approved Telegram-bot adapters.
-  return [];
+// Only accepts {name, url} pairs the user already saved on-device via "افزودن منبع"
+// (MarketSource). Capped and length-limited before any network call is made from them.
+function parseUserSources_(raw) {
+  if (!raw) return [];
+  let list = raw;
+  if (typeof raw === 'string') { try { list = JSON.parse(raw); } catch (err) { return []; } }
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, 8).map(function(s) {
+    return { name: String((s && s.name) || '').trim().slice(0, 80), url: String((s && s.url) || '').trim().slice(0, 300) };
+  }).filter(function(s) { return s.url; });
 }
 
-function handleMarketParseMessage_(params) {
-  const text = String(params.text || '').trim();
-  if (!text || text.length > 8000) return jsonOutput_({ error: 'text is required' });
+function marketProviders_(priceType, sources) {
+  // Each provider is a (query, priceType) -> [{name, price, minPrice, maxPrice, url,
+  // source, confidence}] function. Torob/Digikala only make sense for retail; wholesale
+  // pricing in Iran mostly lives in Telegram supplier channels, which is why those are
+  // driven entirely by the user's own saved sources for both price types.
+  const providers = [];
+  if (priceType === 'retail') { providers.push(torobSearch_); providers.push(digikalaSearch_); }
+  (sources || []).forEach(function(src) {
+    const channel = telegramChannelUsername_(src.url);
+    if (channel) providers.push(function(query, type) { return telegramChannelSearch_(channel, src.name || channel, query, type); });
+  });
+  return providers;
+}
+
+function telegramChannelUsername_(url) {
+  const m = String(url || '').match(/t(?:elegram)?\.me\/(?:s\/)?@?([A-Za-z0-9_]{4,})/i);
+  return m ? m[1] : null;
+}
+
+function torobSearch_(query) {
+  const url = 'https://api.torob.com/v4/base-product/search/?page=0&sort=popularity&size=8&source=next_desktop&query=' + encodeURIComponent(query) + '&q=' + encodeURIComponent(query);
+  const res = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true, followRedirects: true,
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json', 'Referer': 'https://torob.com/search/?query=' + encodeURIComponent(query) }
+  });
+  if (res.getResponseCode() !== 200) return [];
+  const data = JSON.parse(res.getContentText());
+  const list = (data && data.results) || [];
+  return list.slice(0, 6).map(function(item) {
+    const price = Number(item.price1 || item.price || 0);
+    if (!(price > 0)) return null;
+    return {
+      source: 'ترب' + (item.shop_text ? ' · ' + item.shop_text : ''), priceType: 'retail', price: price,
+      minPrice: price, maxPrice: Number(item.price2 || price) || price, confidence: 0.7,
+      name: item.name1 || item.name || '', url: item.web_client_absolute_url ? ('https://torob.com' + item.web_client_absolute_url) : ''
+    };
+  }).filter(function(r) { return r; });
+}
+
+function digikalaSearch_(query) {
+  const url = 'https://api.digikala.com/v1/search/?q=' + encodeURIComponent(query) + '&page=1';
+  const res = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true, followRedirects: true,
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json', 'Referer': 'https://www.digikala.com/search/?q=' + encodeURIComponent(query) }
+  });
+  if (res.getResponseCode() !== 200) return [];
+  const data = JSON.parse(res.getContentText());
+  const list = (data && data.data && (data.data.products || data.data.sellable_products)) || [];
+  return list.slice(0, 6).map(function(item) {
+    const variant = item.default_variant || (item.variants && item.variants[0]) || {};
+    const rial = Number((variant.price && (variant.price.selling_price || variant.price.rrp_price)) || item.price || 0);
+    const price = Math.round(rial / 10); // Digikala prices are in Rial; app uses Toman.
+    if (!(price > 0)) return null;
+    return {
+      source: 'دیجی‌کالا', priceType: 'retail', price: price, confidence: 0.7,
+      name: item.title_fa || item.title || '', url: item.url && item.url.uri ? ('https://www.digikala.com' + item.url.uri) : ''
+    };
+  }).filter(function(r) { return r; });
+}
+
+// Reads the public "instant view" preview of a Telegram channel (what a browser sees
+// with no login) and reuses the same price-extraction pass as pasted-message parsing.
+// Only channels the user explicitly saved as a source are ever fetched.
+function telegramChannelSearch_(channel, label, query) {
+  const res = UrlFetchApp.fetch('https://t.me/s/' + encodeURIComponent(channel), {
+    muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+  });
+  if (res.getResponseCode() !== 200) return [];
+  const html = res.getContentText();
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(function(t) { return t.length > 1; });
+  const blocks = html.split('tgme_widget_message ').slice(1).slice(-25); // most recent ~25 posts
+  const results = [];
+  blocks.forEach(function(block) {
+    const text = block.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+    const lower = text.toLowerCase();
+    if (terms.length && !terms.some(function(t) { return lower.indexOf(t) !== -1; })) return;
+    const parsed = extractPriceInfo_(text);
+    if (!parsed.prices.length) return;
+    results.push({
+      source: label, priceType: parsed.priceType, price: parsed.prices[0], minPrice: parsed.minPrice,
+      maxPrice: parsed.maxPrice, confidence: 0.5, name: parsed.nameHint, url: 'https://t.me/' + channel
+    });
+  });
+  return results.slice(0, 5);
+}
+
+// Shared plain-text -> price extraction used by both pasted-message parsing
+// (handleMarketParseMessage_) and the Telegram channel adapter above.
+function extractPriceInfo_(text) {
   const faDigits = '۰۱۲۳۴۵۶۷۸۹';
   const prices = [];
   const re = /(^|[^0-9۰-۹])([0-9۰-۹][0-9۰-۹,٫]*)(?:\s*(?:تومان|ت))?/g;
@@ -224,7 +324,18 @@ function handleMarketParseMessage_(params) {
     const value = Number(String(match[2]).replace(/[۰-۹]/g, function(d) { return String(faDigits.indexOf(d)); }).replace(/[٫,]/g, ''));
     if (value >= 1000) prices.push(value);
   }
-  return jsonOutput_({ nameHint: text.split('\n')[0].trim(), priceType: /عمده|تعداد|کارتن|همکار/.test(text) ? 'wholesale' : 'retail', prices: prices, minPrice: prices.length ? Math.min.apply(null, prices) : null, maxPrice: prices.length ? Math.max.apply(null, prices) : null, confidence: prices.length ? 0.45 : 0 });
+  return {
+    nameHint: text.split('\n')[0].trim().slice(0, 120),
+    priceType: /عمده|تعداد|کارتن|همکار/.test(text) ? 'wholesale' : 'retail',
+    prices: prices, minPrice: prices.length ? Math.min.apply(null, prices) : null,
+    maxPrice: prices.length ? Math.max.apply(null, prices) : null, confidence: prices.length ? 0.45 : 0
+  };
+}
+
+function handleMarketParseMessage_(params) {
+  const text = String(params.text || '').trim();
+  if (!text || text.length > 8000) return jsonOutput_({ error: 'text is required' });
+  return jsonOutput_(extractPriceInfo_(text));
 }
 
 function parseJsonBody_(e) {
