@@ -22,7 +22,33 @@ class AccountingManager(val context: Context) {
     suspend fun getTotalIncome(): Double {
         return accountingDao.getTotalIncome() ?: 0.0
     }
-    
+
+    /** سود کل (تمام دوره) - amount minus costOfGoods across every income; equals
+     *  getTotalIncome() for anyone who has never used «فروش کالا», since costOfGoods is 0
+     *  for plain service income. */
+    suspend fun getTotalProfit(): Double {
+        return accountingDao.getTotalProfit() ?: 0.0
+    }
+
+    /** سود دوره جاری - see getPeriodBalance()/getMonthlyIncome() for the matching cash
+     *  figures; this is the profit-based counterpart used by reports. */
+    suspend fun getMonthlyProfit(): Double {
+        val start = getFinancialPeriodStartMillis()
+        return accountingDao.getMonthlyProfit(start) ?: 0.0
+    }
+
+    /** بهای تمام‌شده کالاهای فروخته‌شده در دوره جاری. */
+    suspend fun getMonthlyCostOfGoods(): Double {
+        val start = getFinancialPeriodStartMillis()
+        return accountingDao.getMonthlyCostOfGoods(start) ?: 0.0
+    }
+
+    /** مجموع مبلغ فروش کالا (نه سود آن) در دوره جاری - بخشی از getMonthlyIncome(). */
+    suspend fun getMonthlyProductSales(): Double {
+        val start = getFinancialPeriodStartMillis()
+        return accountingDao.getMonthlyProductSales(start) ?: 0.0
+    }
+
     suspend fun addIncome(income: Income): Long {
         val id = accountingDao.insertIncome(income)
         financialStatusManager.adjustAssetBalance(income.accountId, income.amount)

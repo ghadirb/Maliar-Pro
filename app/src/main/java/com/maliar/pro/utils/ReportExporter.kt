@@ -30,7 +30,14 @@ object ReportExporter {
                 writer.appendLine("خلاصه گزارش مالی")
                 writer.appendLine("مجموع درآمد,${report.totalIncome}")
                 writer.appendLine("مجموع هزینه,${report.totalExpense}")
-                writer.appendLine("خالص,${report.net}")
+                writer.appendLine("خالص (گردش نقدی),${report.net}")
+                // «فروش کالا»: فقط وقتی داده‌ای برای نمایش هست این سطرها اضافه می‌شوند.
+                if (report.totalProductSales > 0 || report.totalCostOfGoods > 0) {
+                    writer.appendLine("فروش کالا,${report.totalProductSales}")
+                    writer.appendLine("بهای تمام‌شده کالا,${report.totalCostOfGoods}")
+                    writer.appendLine("درآمد خدمات,${report.totalServiceIncome}")
+                    writer.appendLine("سود کل,${report.totalProfit}")
+                }
                 writer.appendLine()
                 writer.appendLine("بیشترین هزینه‌ها")
                 writer.appendLine("توضیحات,دسته,مبلغ")
@@ -63,7 +70,13 @@ object ReportExporter {
         y += 10f
         y = drawParagraph(canvas, "مجموع درآمد: ${format(report.totalIncome)} تومان", pageWidth, margin, y, 13f)
         y = drawParagraph(canvas, "مجموع هزینه: ${format(report.totalExpense)} تومان", pageWidth, margin, y, 13f)
-        y = drawParagraph(canvas, "خالص: ${format(report.net)} تومان", pageWidth, margin, y, 13f, true)
+        y = drawParagraph(canvas, "خالص (گردش نقدی): ${format(report.net)} تومان", pageWidth, margin, y, 13f, true)
+        if (report.totalProductSales > 0 || report.totalCostOfGoods > 0) {
+            y = drawParagraph(canvas, "فروش کالا: ${format(report.totalProductSales)} تومان", pageWidth, margin, y, 12f)
+            y = drawParagraph(canvas, "بهای تمام‌شده کالا: ${format(report.totalCostOfGoods)} تومان", pageWidth, margin, y, 12f)
+            y = drawParagraph(canvas, "درآمد خدمات: ${format(report.totalServiceIncome)} تومان", pageWidth, margin, y, 12f)
+            y = drawParagraph(canvas, "سود کل: ${format(report.totalProfit)} تومان", pageWidth, margin, y, 13f, true)
+        }
         if (report.topExpenseCategory != null) {
             y = drawParagraph(
                 canvas,

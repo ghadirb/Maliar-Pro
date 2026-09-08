@@ -7,6 +7,7 @@ import android.widget.Spinner
 import com.maliar.pro.database.Asset
 import com.maliar.pro.database.Income
 import com.maliar.pro.utils.AccountSpinnerHelper
+import com.maliar.pro.utils.IncomeTypeSectionHelper
 import com.maliar.pro.viewmodels.AccountingViewModel
 
 class EditIncomeDialog(private val context: Context, private val viewModel: AccountingViewModel, private val income: Income) {
@@ -27,6 +28,8 @@ class EditIncomeDialog(private val context: Context, private val viewModel: Acco
         categoryInput.setText(income.category)
         amountInput.setText(income.amount.toString())
         descriptionInput.setText(income.description)
+        val typeSection = IncomeTypeSectionHelper.bind(view)
+        typeSection.preset(income.isProductSale, income.costOfGoods)
 
         builder.setView(view)
         builder.setPositiveButton("ذخیره") { _, _ ->
@@ -39,7 +42,9 @@ class EditIncomeDialog(private val context: Context, private val viewModel: Acco
                     category = category,
                     amount = amount,
                     description = description,
-                    accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts)
+                    accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts),
+                    isProductSale = typeSection.isProductSale(),
+                    costOfGoods = typeSection.costOfGoods()
                 )
                 viewModel.updateIncome(updatedIncome)
             }

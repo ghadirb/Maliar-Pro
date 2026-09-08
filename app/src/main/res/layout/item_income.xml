@@ -50,6 +50,17 @@
             android:text="توضیحات"
             android:textSize="14sp" />
 
+        <!-- «فروش کالا»: only shown when isProductSale is true (see IncomeAdapter), so
+             plain service income entries look exactly as before. -->
+        <TextView
+            android:id="@+id/profitBadgeText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
         <Button
             android:id="@+id/deleteButton"
             android:layout_width="match_parent"

@@ -64,6 +64,17 @@ class IncomeAdapter(
             binding.dateText.text = formatJalaliDate(income.date)
             binding.descriptionText.text = income.description
 
+            // «فروش کالا»: extra line showing بهای تمام‌شده/سود for product sales only -
+            // plain service income rows (isProductSale == false) keep the exact same look
+            // as before this feature existed.
+            if (income.isProductSale) {
+                binding.profitBadgeText.visibility = android.view.View.VISIBLE
+                binding.profitBadgeText.text = "فروش کالا · بهای تمام‌شده: ${CurrencyFormatter.format(income.costOfGoods, "")}" +
+                    " · سود: ${CurrencyFormatter.format(income.profit, "")}"
+            } else {
+                binding.profitBadgeText.visibility = android.view.View.GONE
+            }
+
             binding.root.setOnClickListener { onItemClick(income) }
             binding.deleteButton.setOnClickListener { onDeleteClick(income) }
         }

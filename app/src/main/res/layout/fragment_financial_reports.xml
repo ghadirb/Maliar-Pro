@@ -178,6 +178,47 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- «فروش کالا»: تفکیک سود واقعی از گردش نقدی. فقط وقتی در این دوره فروش کالا ثبت
+             شده باشد نمایش داده می‌شود (کاربرانی که فقط خدمات دارند این کارت را نمی‌بینند). -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/profitBreakdownCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="تفکیک فروش کالا"
+                    android:textStyle="bold"
+                    android:textSize="14sp" />
+
+                <TextView android:id="@+id/productSalesText" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textSize="13sp"
+                    android:text="فروش کالا: 0" />
+                <TextView android:id="@+id/costOfGoodsText" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="13sp"
+                    android:text="بهای تمام‌شده: 0" />
+                <TextView android:id="@+id/serviceIncomeText" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="13sp"
+                    android:text="درآمد خدمات: 0" />
+                <TextView android:id="@+id/totalProfitText" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textSize="14sp"
+                    android:textStyle="bold" android:text="سود کل: 0" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -302,6 +302,21 @@ class FinancialReportsFragment : Fragment() {
             if (report.net >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
         )
 
+        // «فروش کالا»: کارت تفکیک فقط وقتی این دوره فروش کالا ثبت شده باشد نمایش داده
+        // می‌شود، تا کاربران فقط-خدمات هیچ تغییری در صفحه نبینند.
+        if (report.totalProductSales > 0 || report.totalCostOfGoods > 0) {
+            binding.profitBreakdownCard.visibility = View.VISIBLE
+            binding.productSalesText.text = "فروش کالا: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalProductSales)}"
+            binding.costOfGoodsText.text = "بهای تمام‌شده: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalCostOfGoods)}"
+            binding.serviceIncomeText.text = "درآمد خدمات: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalServiceIncome)}"
+            binding.totalProfitText.text = "سود کل: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalProfit)}"
+            binding.totalProfitText.setTextColor(
+                if (report.totalProfit >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
+            )
+        } else {
+            binding.profitBreakdownCard.visibility = View.GONE
+        }
+
         if (report.topExpenseCategory != null) {
             binding.topCategoryLabel.visibility = View.VISIBLE
             binding.topCategoryLabel.text = String.format(
