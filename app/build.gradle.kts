@@ -45,8 +45,8 @@ android {
         applicationId = "com.maliar.pro"
         minSdk = 24
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.8"
+        versionCode = 11
+        versionName = "1.9"
         buildConfigField("String", "AI_BACKEND_URL", buildConfigString(aiBackendUrl))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
