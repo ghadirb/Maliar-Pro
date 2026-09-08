@@ -24,7 +24,8 @@ data class FinancialEntryItem(
 
 class FinancialEntryAdapter(
     private val onItemClick: (FinancialEntryItem) -> Unit,
-    private val onDeleteClick: (FinancialEntryItem) -> Unit
+    private val onDeleteClick: (FinancialEntryItem) -> Unit,
+    private val onLongClick: (FinancialEntryItem) -> Unit = {}
 ) : ListAdapter<FinancialEntryItem, FinancialEntryAdapter.ViewHolder>(DiffCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -57,6 +58,7 @@ class FinancialEntryAdapter(
             }
 
             binding.root.setOnClickListener { onItemClick(item) }
+            binding.root.setOnLongClickListener { onLongClick(item); true }
             binding.deleteIcon.setOnClickListener { onDeleteClick(item) }
         }
     }

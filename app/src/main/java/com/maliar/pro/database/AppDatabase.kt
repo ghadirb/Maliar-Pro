@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class,
                MonthlyBudget::class, PeriodicPayment::class, MarketProduct::class,
                MarketPriceQuote::class, ProductPurchase::class, MarketSource::class],
-    version = 20,
+    version = 21,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -277,6 +277,14 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("CREATE TABLE IF NOT EXISTS `market_sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `url` TEXT NOT NULL, `priceType` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL DEFAULT 1, `createdAt` INTEGER NOT NULL)")
             }
         }
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Lets an income be linked to the account it was deposited into, mirroring
+                // Expense.accountId (which already existed) - the missing half needed for
+                // account balances to actually track real money in/out automatically.
+                database.execSQL("ALTER TABLE incomes ADD COLUMN accountId INTEGER")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -291,7 +299,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

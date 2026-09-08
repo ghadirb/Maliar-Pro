@@ -17,7 +17,10 @@ interface FinancialStatusDao {
     
     @Query("SELECT * FROM assets ORDER BY value DESC")
     suspend fun getAllAssetsList(): List<Asset>
-    
+
+    @Query("SELECT * FROM assets WHERE id = :id LIMIT 1")
+    suspend fun getAssetById(id: Long): Asset?
+
     @Query("SELECT SUM(value) FROM assets")
     suspend fun getTotalAssets(): Double?
     

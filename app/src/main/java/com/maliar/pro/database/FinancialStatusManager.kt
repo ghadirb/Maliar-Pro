@@ -102,7 +102,32 @@ class FinancialStatusManager(context: Context) {
     suspend fun updateAsset(asset: Asset) {
         financialDao.updateAsset(asset)
     }
-    
+
+    /**
+     * Adjusts one account's stored balance by [delta] (positive to add, negative to
+     * subtract) - the single mechanism that keeps "حساب‌های من"/"کل دارایی‌ها" showing
+     * the real, current amount as income/expense/installment/debt transactions linked to
+     * an account are added, edited, or deleted, instead of Asset.value only ever being a
+     * number the person typed in by hand. Every caller (AccountingManager for income/
+     * expense, and anywhere else a transaction can be linked to an account) goes through
+     * this one function so the reverse-then-reapply arithmetic an edit needs is never
+     * duplicated or done inconsistently between call sites.
+     *
+     * No-ops silently (never throws) when [accountId] is null (an unlinked transaction -
+     * the pre-existing, still fully-supported behavior) or the account no longer exists
+     * (e.g. deleted after a transaction referenced it) - a missing account must never
+     * block saving the transaction that triggered this call.
+     */
+    suspend fun adjustAssetBalance(accountId: Long?, delta: Double) {
+        if (accountId == null || delta == 0.0) return
+        try {
+            val asset = financialDao.getAssetById(accountId) ?: return
+            financialDao.updateAsset(asset.copy(value = asset.value + delta, updatedAt = System.currentTimeMillis()))
+        } catch (e: Exception) {
+            // Best-effort; a balance-sync failure must never block the transaction itself.
+        }
+    }
+
     suspend fun deleteAsset(asset: Asset) {
         financialDao.deleteAsset(asset)
     }

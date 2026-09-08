@@ -8,7 +8,8 @@ class AccountingManager(val context: Context) {
     private val appContext = context.applicationContext
     private val database = AppDatabase.getDatabase(context)
     private val accountingDao = database.accountingDao()
-    
+    private val financialStatusManager = FinancialStatusManager(context)
+
     // Income
     fun getAllIncomes(): Flow<List<Income>> {
         return accountingDao.getAllIncomes()
@@ -24,17 +25,28 @@ class AccountingManager(val context: Context) {
     
     suspend fun addIncome(income: Income): Long {
         val id = accountingDao.insertIncome(income)
+        financialStatusManager.adjustAssetBalance(income.accountId, income.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
         return id
     }
     
     suspend fun updateIncome(income: Income) {
+        val previous = accountingDao.getIncomeById(income.id)
+        if (previous != null) {
+            // Reverse the old transaction's effect on its (possibly different) account,
+            // then apply the new one - this is what makes editing an income's amount or
+            // switching which account it's linked to keep every affected balance correct,
+            // instead of just re-applying the new amount on top of the old one.
+            financialStatusManager.adjustAssetBalance(previous.accountId, -previous.amount)
+        }
         accountingDao.updateIncome(income)
+        financialStatusManager.adjustAssetBalance(income.accountId, income.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     suspend fun deleteIncome(income: Income) {
         accountingDao.deleteIncome(income)
+        financialStatusManager.adjustAssetBalance(income.accountId, -income.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
@@ -64,7 +76,9 @@ class AccountingManager(val context: Context) {
             .getAssetsByPurposeList(AccountPurpose.DAILY_SPENDING)
             .firstOrNull()
             ?.id
-        val id = accountingDao.insertExpense(expense.copy(accountId = linkedAccountId))
+        val toSave = expense.copy(accountId = linkedAccountId)
+        val id = accountingDao.insertExpense(toSave)
+        financialStatusManager.adjustAssetBalance(linkedAccountId, -toSave.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
         checkForUnusualExpense(expense, id)
         return id
@@ -107,12 +121,21 @@ class AccountingManager(val context: Context) {
     }
     
     suspend fun updateExpense(expense: Expense) {
+        val previous = accountingDao.getExpenseById(expense.id)
+        if (previous != null) {
+            // Same reverse-then-reapply pattern as updateIncome: undo the old amount's
+            // effect on its old account first, then apply the new amount to the (possibly
+            // different) new account.
+            financialStatusManager.adjustAssetBalance(previous.accountId, previous.amount)
+        }
         accountingDao.updateExpense(expense)
+        financialStatusManager.adjustAssetBalance(expense.accountId, -expense.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     suspend fun deleteExpense(expense: Expense) {
         accountingDao.deleteExpense(expense)
+        financialStatusManager.adjustAssetBalance(expense.accountId, expense.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
