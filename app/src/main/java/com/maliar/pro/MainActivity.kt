@@ -113,6 +113,26 @@ class MainActivity : AppCompatActivity() {
         handleAssistantDeepLink(intent)
     }
 
+    /**
+     * Self-heals recurring reminders every time the app is opened or resumed from the
+     * background - not just when the person happens to visit the یادآوری‌ها tab (the
+     * only place [SmartReminderManager.reconcileRecurringReminders] used to run from).
+     * Some OEM ROMs (MIUI etc. - see checkBatteryOptimization's own comment) silently
+     * kill the underlying AlarmManager alarm without the app ever finding out, so a
+     * recurring reminder can sit stale - past its trigger time, never fired - until
+     * something re-arms it. Reconciling here means simply reopening the app to any
+     * screen does that automatically, instead of requiring a trip to the reminders tab
+     * or toggling a reminder off/on by hand to force a fresh schedule.
+     */
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch {
+            runCatching {
+                com.maliar.pro.database.SmartReminderManager(applicationContext).reconcileRecurringReminders()
+            }
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

@@ -65,6 +65,18 @@ class AssetListViewModel(private val financialManager: FinancialStatusManager) :
         viewModelScope.launch { financialManager.deleteAsset(asset) }
     }
 
+    /** Edits an existing account/asset in place - name, amount, and type. This is the
+     *  one place a person can directly correct a balance (e.g. after reconciling with
+     *  their real bank statement), independent of whatever transactions are or aren't
+     *  linked to it. */
+    fun updateAsset(asset: Asset, name: String, amount: Double, type: AssetType) {
+        viewModelScope.launch {
+            financialManager.updateAsset(
+                asset.copy(title = name, value = amount, type = type, updatedAt = System.currentTimeMillis())
+            )
+        }
+    }
+
     /** Best-effort re-price of any weight-based gold assets against the current rate;
      *  called when this screen opens so the list is fresh without waiting for the daily
      *  background worker. Room's Flow-backed [assets] picks up the change automatically. */

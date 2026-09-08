@@ -67,11 +67,15 @@ class AssetListFragment : Fragment() {
         adapter = FinancialEntryAdapter(
             onItemClick = { item ->
                 val asset = viewModel.assets.value.firstOrNull { it.id == item.id } ?: return@FinancialEntryAdapter
-                showPurposeDialog(asset)
+                showEditAssetDialog(asset)
             },
             onDeleteClick = { item ->
                 val asset = viewModel.assets.value.firstOrNull { it.id == item.id } ?: return@FinancialEntryAdapter
                 confirmDelete(asset)
+            },
+            onLongClick = { item ->
+                val asset = viewModel.assets.value.firstOrNull { it.id == item.id } ?: return@FinancialEntryAdapter
+                showPurposeDialog(asset)
             }
         )
         binding.entryRecyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -114,6 +118,62 @@ class AssetListFragment : Fragment() {
         // Re-prices weight-based gold assets against the latest rate every time this
         // screen is opened, so the user doesn't have to wait for the once-a-day worker.
         viewModel.refreshGoldValues()
+    }
+
+    private fun showEditAssetDialog(asset: Asset) {
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = (20 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding / 2, padding, 0)
+        }
+        val nameInput = EditText(requireContext()).apply {
+            hint = "نام حساب"
+            setText(asset.title)
+            container.addView(this)
+        }
+        val amountInput = EditText(requireContext()).apply {
+            hint = "موجودی (تومان)"
+            setText(asset.value.toLong().toString())
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            val topMarginPx = (10 * resources.displayMetrics.density).toInt()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = topMarginPx }
+            container.addView(this)
+        }
+        val types = AssetType.values()
+        val typeSpinner = Spinner(requireContext()).apply {
+            adapter = ArrayAdapter(
+                requireContext(), android.R.layout.simple_spinner_dropdown_item,
+                types.map { typeLabels[it] ?: it.name }
+            )
+            setSelection(types.indexOf(asset.type))
+            val topMargin = (10 * resources.displayMetrics.density).toInt()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, topMargin, 0, 0) }
+            container.addView(this)
+        }
+        if (asset.goldGrams != null && asset.goldGrams > 0) {
+            android.widget.TextView(requireContext()).apply {
+                text = "این دارایی طلاست و موجودی‌اش خودکار از روی نرخ روز و وزن (${CurrencyFormatter.formatPlainNumber(asset.goldGrams)} گرم) محاسبه می‌شود؛ مبلغی که اینجا وارد کنید تا رسیدن نرخ بعدی موقتاً جایگزین می‌شود."
+                textSize = 11f
+                setPadding(0, (10 * resources.displayMetrics.density).toInt(), 0, 0)
+                container.addView(this)
+            }
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("ویرایش حساب")
+            .setView(container)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val name = nameInput.text.toString().trim()
+                val amount = amountInput.text.toString().toDoubleOrNull()
+                if (name.isBlank() || amount == null || amount < 0.0) return@setPositiveButton
+                viewModel.updateAsset(asset, name, amount, types[typeSpinner.selectedItemPosition])
+            }
+            .setNegativeButton("لغو", null)
+            .show()
     }
 
     private fun confirmDelete(asset: Asset) {

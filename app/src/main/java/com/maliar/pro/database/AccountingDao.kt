@@ -21,6 +21,9 @@ interface AccountingDao {
     @Query("SELECT SUM(amount) FROM incomes")
     suspend fun getTotalIncome(): Double?
 
+    @Query("SELECT * FROM incomes WHERE id = :id LIMIT 1")
+    suspend fun getIncomeById(id: Long): Income?
+
     @Query("SELECT SUM(amount) FROM incomes WHERE date >= :startDate")
     suspend fun getMonthlyIncome(startDate: Long): Double?
     
@@ -45,6 +48,9 @@ interface AccountingDao {
     
     @Query("SELECT SUM(amount) FROM expenses")
     suspend fun getTotalExpense(): Double?
+
+    @Query("SELECT * FROM expenses WHERE id = :id LIMIT 1")
+    suspend fun getExpenseById(id: Long): Expense?
 
     @Query("SELECT SUM(amount) FROM expenses WHERE date >= :startDate")
     suspend fun getMonthlyExpense(startDate: Long): Double?
