@@ -19,14 +19,14 @@ class DebtListViewModel(private val financialManager: FinancialStatusManager) : 
     val totalUnpaidDebts = debts.map { list -> list.filter { !it.isPaid }.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    fun addDebt(type: DebtType, name: String, amount: Double, description: String = "") {
+    fun addDebt(type: DebtType, name: String, amount: Double, description: String = "", accountId: Long? = null) {
         viewModelScope.launch {
-            financialManager.addDebt(Debt(type = type, title = name, amount = amount, description = description))
+            financialManager.addDebt(Debt(type = type, title = name, amount = amount, description = description, accountId = accountId))
         }
     }
 
     fun toggleDebtPaid(debt: Debt) {
-        viewModelScope.launch { financialManager.updateDebt(debt.copy(isPaid = !debt.isPaid)) }
+        viewModelScope.launch { financialManager.toggleDebtPaid(debt) }
     }
 
     fun deleteDebt(debt: Debt) {

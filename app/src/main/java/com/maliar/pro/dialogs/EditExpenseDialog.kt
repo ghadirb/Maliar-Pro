@@ -5,11 +5,16 @@ import android.content.Context
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.EditText
+import android.widget.Spinner
+import com.maliar.pro.database.Asset
 import com.maliar.pro.database.Expense
 import com.maliar.pro.database.ExpenseCategory
+import com.maliar.pro.utils.AccountSpinnerHelper
 import com.maliar.pro.viewmodels.AccountingViewModel
 
 class EditExpenseDialog(private val context: Context, private val viewModel: AccountingViewModel, private val expense: Expense) {
+
+    private var loadedAccounts: List<Asset> = emptyList()
 
     fun show() {
         val builder = AlertDialog.Builder(context)
@@ -29,6 +34,8 @@ class EditExpenseDialog(private val context: Context, private val viewModel: Acc
             ?.setEndIconOnClickListener { categoryInput.showDropDown() }
         val amountInput = view.findViewById<EditText>(com.maliar.pro.R.id.amountInput)
         val descriptionInput = view.findViewById<EditText>(com.maliar.pro.R.id.descriptionInput)
+        val accountSpinner = view.findViewById<Spinner>(com.maliar.pro.R.id.accountSpinner)
+        AccountSpinnerHelper.populate(context, accountSpinner, preselectAccountId = expense.accountId) { loadedAccounts = it }
 
         categoryInput.setText(expense.category, false)
         amountInput.setText(expense.amount.toString())
@@ -44,7 +51,8 @@ class EditExpenseDialog(private val context: Context, private val viewModel: Acc
                 val updatedExpense = expense.copy(
                     category = category,
                     amount = amount,
-                    description = description
+                    description = description,
+                    accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts)
                 )
                 viewModel.updateExpense(updatedExpense)
             }

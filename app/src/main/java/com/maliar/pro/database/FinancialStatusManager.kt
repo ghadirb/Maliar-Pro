@@ -157,6 +157,41 @@ class FinancialStatusManager(context: Context) {
     suspend fun updateDebt(debt: Debt) {
         financialDao.updateDebt(debt)
     }
+
+    /** Flips [debt.isPaid] and, when it has a linked account, keeps that account's
+     *  balance honest: marking a debt paid deducts [Debt.amount] from the account (money
+     *  leaving to settle it) and records a matching [Expense] for reporting/history,
+     *  exactly like AccountingManager.payInstallment does for installments. Un-marking a
+     *  debt as paid (undo) reverses the balance adjustment, but deliberately leaves the
+     *  earlier expense record in place - an audit trail of "this was paid, then reopened"
+     *  is more useful than silently deleting history, and mirrors how nothing else in
+     *  this app auto-deletes expense rows when an unrelated flag changes. */
+    suspend fun toggleDebtPaid(debt: Debt) {
+        val updated = debt.copy(isPaid = !debt.isPaid, updatedAt = System.currentTimeMillis())
+        // Only touch a balance when the debt actually has a linked account - an
+        // unlinked debt (the old, still fully-supported case) stays a plain flag flip,
+        // exactly as before. When linked, addExpense() below is the single place that
+        // deducts from the account (same as payInstallment/markPaid do for their own
+        // flows), so it's never double-applied here.
+        if (debt.accountId != null) {
+            if (updated.isPaid) {
+                AccountingManager(appContext).addExpense(
+                    Expense(
+                        category = "بدهی/وام",
+                        amount = debt.amount,
+                        description = "تسویه: ${debt.title}",
+                        date = System.currentTimeMillis(),
+                        accountId = debt.accountId
+                    )
+                )
+            } else {
+                // Undo: give the money back to the account. The earlier expense record
+                // is deliberately left in place as an audit trail rather than deleted.
+                adjustAssetBalance(debt.accountId, debt.amount)
+            }
+        }
+        financialDao.updateDebt(updated)
+    }
     
     suspend fun deleteDebt(debt: Debt) {
         financialDao.deleteDebt(debt)

@@ -5,13 +5,18 @@ import android.content.Context
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.EditText
+import android.widget.Spinner
+import com.maliar.pro.database.Asset
 import com.maliar.pro.database.Expense
 import com.maliar.pro.database.ExpenseCategory
+import com.maliar.pro.utils.AccountSpinnerHelper
 import com.maliar.pro.viewmodels.AccountingViewModel
 import java.util.Date
 
 class AddExpenseDialog(private val context: Context, private val viewModel: AccountingViewModel) {
-    
+
+    private var loadedAccounts: List<Asset> = emptyList()
+
     fun show() {
         val builder = AlertDialog.Builder(context)
         builder.setTitle("افزودن هزینه")
@@ -30,6 +35,8 @@ class AddExpenseDialog(private val context: Context, private val viewModel: Acco
             ?.setEndIconOnClickListener { categoryInput.showDropDown() }
         val amountInput = view.findViewById<EditText>(com.maliar.pro.R.id.amountInput)
         val descriptionInput = view.findViewById<EditText>(com.maliar.pro.R.id.descriptionInput)
+        val accountSpinner = view.findViewById<Spinner>(com.maliar.pro.R.id.accountSpinner)
+        AccountSpinnerHelper.populate(context, accountSpinner) { loadedAccounts = it }
         
         builder.setView(view)
         builder.setPositiveButton("ذخیره") { _, _ ->
@@ -42,7 +49,8 @@ class AddExpenseDialog(private val context: Context, private val viewModel: Acco
                     category = category,
                     amount = amount,
                     description = description,
-                    date = Date().time
+                    date = Date().time,
+                    accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts)
                 )
                 viewModel.addExpense(expense)
             }

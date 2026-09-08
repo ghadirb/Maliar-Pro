@@ -26,5 +26,9 @@ data class DebtorPayment(
     val amount: Double,
     val date: Long = System.currentTimeMillis(),
     val note: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** Account this payment moves money into (THEY_OWE_ME - the person paid the user
+     *  back) or out of (I_OWE_THEM - the user paid them back). Null keeps the old
+     *  behavior of not touching any account balance - see DebtorManager.addPayment. */
+    val accountId: Long? = null
 )

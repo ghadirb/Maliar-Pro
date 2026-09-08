@@ -43,4 +43,19 @@
             android:inputType="textMultiLine" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- Account picker - see dialog_add_expense.xml for the matching comment; this
+         income is added to the chosen account's balance instead of subtracted. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="حساب"
+        android:layout_marginTop="16dp"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/accountSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" />
+
 </LinearLayout>

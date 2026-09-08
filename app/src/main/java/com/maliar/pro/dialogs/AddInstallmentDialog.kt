@@ -4,13 +4,17 @@ import android.app.AlertDialog
 import android.content.Context
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Spinner
+import com.maliar.pro.database.Asset
 import com.maliar.pro.database.Installment
 import com.maliar.pro.ui.common.PersianDatePickerDialog
+import com.maliar.pro.utils.AccountSpinnerHelper
 import com.maliar.pro.utils.PersianCalendarHelper
 import com.maliar.pro.viewmodels.AccountingViewModel
 
 class AddInstallmentDialog(private val context: Context, private val viewModel: AccountingViewModel) {
 
+    private var loadedAccounts: List<Asset> = emptyList()
     private val today = PersianCalendarHelper.getCurrentJalaliDate()
     private var selectedJalaliYear: Int = today.first
     private var selectedJalaliMonth: Int = today.second
@@ -30,6 +34,8 @@ class AddInstallmentDialog(private val context: Context, private val viewModel: 
         val monthlyAmountInput = view.findViewById<EditText>(com.maliar.pro.R.id.monthlyAmountInput)
         val lenderInput = view.findViewById<EditText>(com.maliar.pro.R.id.lenderInput)
         val startDateButton = view.findViewById<Button>(com.maliar.pro.R.id.startDateButton)
+        val accountSpinner = view.findViewById<Spinner>(com.maliar.pro.R.id.accountSpinner)
+        AccountSpinnerHelper.populate(context, accountSpinner) { loadedAccounts = it }
 
         fun refreshDateButtonText() {
             startDateButton.text = PersianCalendarHelper.formatJalali(
@@ -70,7 +76,8 @@ class AddInstallmentDialog(private val context: Context, private val viewModel: 
                     paidInstallments = 0,
                     startDate = selectedStartDate,
                     paymentDay = 1,
-                    recipient = lender
+                    recipient = lender,
+                    accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts)
                 )
                 viewModel.addInstallment(installment)
             }

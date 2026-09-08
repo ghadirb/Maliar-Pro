@@ -3,11 +3,15 @@ package com.maliar.pro.dialogs
 import android.app.AlertDialog
 import android.content.Context
 import android.widget.EditText
+import android.widget.Spinner
+import com.maliar.pro.database.Asset
 import com.maliar.pro.database.Income
+import com.maliar.pro.utils.AccountSpinnerHelper
 import com.maliar.pro.viewmodels.AccountingViewModel
-import java.util.Date
 
 class EditIncomeDialog(private val context: Context, private val viewModel: AccountingViewModel, private val income: Income) {
+
+    private var loadedAccounts: List<Asset> = emptyList()
 
     fun show() {
         val builder = AlertDialog.Builder(context)
@@ -17,6 +21,8 @@ class EditIncomeDialog(private val context: Context, private val viewModel: Acco
         val categoryInput = view.findViewById<EditText>(com.maliar.pro.R.id.sourceInput)
         val amountInput = view.findViewById<EditText>(com.maliar.pro.R.id.amountInput)
         val descriptionInput = view.findViewById<EditText>(com.maliar.pro.R.id.descriptionInput)
+        val accountSpinner = view.findViewById<Spinner>(com.maliar.pro.R.id.accountSpinner)
+        AccountSpinnerHelper.populate(context, accountSpinner, preselectAccountId = income.accountId) { loadedAccounts = it }
 
         categoryInput.setText(income.category)
         amountInput.setText(income.amount.toString())
@@ -32,7 +38,8 @@ class EditIncomeDialog(private val context: Context, private val viewModel: Acco
                 val updatedIncome = income.copy(
                     category = category,
                     amount = amount,
-                    description = description
+                    description = description,
+                    accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts)
                 )
                 viewModel.updateIncome(updatedIncome)
             }

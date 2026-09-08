@@ -20,6 +20,7 @@ import com.maliar.pro.database.Debt
 import com.maliar.pro.database.DebtType
 import com.maliar.pro.database.FinancialStatusManager
 import com.maliar.pro.databinding.FragmentFinancialEntryListBinding
+import com.maliar.pro.utils.AccountSpinnerHelper
 import com.maliar.pro.utils.CurrencyFormatter
 import com.maliar.pro.viewmodels.DebtListViewModel
 import com.maliar.pro.viewmodels.DebtListViewModelFactory
@@ -119,12 +120,24 @@ class DebtListFragment : Fragment() {
             hint = "مبلغ (تومان)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
+        // Account this debt will be settled from when later marked "پرداخت شده" - see
+        // FinancialStatusManager.toggleDebtPaid. Left unlinked (default) keeps the old
+        // behavior of a plain paid/unpaid flag with no balance effect.
+        val accountLabel = android.widget.TextView(requireContext()).apply {
+            text = "حساب تسویه (اختیاری)"
+            setPadding(0, 24, 0, 8)
+        }
+        val accountSpinner = Spinner(requireContext())
+        var loadedAccounts: List<com.maliar.pro.database.Asset> = emptyList()
+        AccountSpinnerHelper.populate(requireContext(), accountSpinner) { loadedAccounts = it }
         val container = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 0)
             addView(typeSpinner)
             addView(nameInput)
             addView(amountInput)
+            addView(accountLabel)
+            addView(accountSpinner)
         }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("افزودن بدهی")
@@ -134,7 +147,8 @@ class DebtListFragment : Fragment() {
                 val amount = amountInput.text.toString().toDoubleOrNull() ?: 0.0
                 if (name.isNotEmpty()) {
                     val type = types[typeSpinner.selectedItemPosition]
-                    viewModel.addDebt(type, name, amount)
+                    val accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts)
+                    viewModel.addDebt(type, name, amount, accountId = accountId)
                 }
             }
             .setNegativeButton("لغو", null)

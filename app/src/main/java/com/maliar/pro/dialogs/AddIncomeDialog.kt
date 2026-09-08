@@ -3,12 +3,17 @@ package com.maliar.pro.dialogs
 import android.app.AlertDialog
 import android.content.Context
 import android.widget.EditText
+import android.widget.Spinner
+import com.maliar.pro.database.Asset
 import com.maliar.pro.database.Income
+import com.maliar.pro.utils.AccountSpinnerHelper
 import com.maliar.pro.viewmodels.AccountingViewModel
 import java.util.Date
 
 class AddIncomeDialog(private val context: Context, private val viewModel: AccountingViewModel) {
-    
+
+    private var loadedAccounts: List<Asset> = emptyList()
+
     fun show() {
         val builder = AlertDialog.Builder(context)
         builder.setTitle("افزودن درآمد")
@@ -17,6 +22,8 @@ class AddIncomeDialog(private val context: Context, private val viewModel: Accou
         val sourceInput = view.findViewById<EditText>(com.maliar.pro.R.id.sourceInput)
         val amountInput = view.findViewById<EditText>(com.maliar.pro.R.id.amountInput)
         val descriptionInput = view.findViewById<EditText>(com.maliar.pro.R.id.descriptionInput)
+        val accountSpinner = view.findViewById<Spinner>(com.maliar.pro.R.id.accountSpinner)
+        AccountSpinnerHelper.populate(context, accountSpinner) { loadedAccounts = it }
         
         builder.setView(view)
         builder.setPositiveButton("ذخیره") { _, _ ->
@@ -29,7 +36,8 @@ class AddIncomeDialog(private val context: Context, private val viewModel: Accou
                     category = source,
                     amount = amount,
                     description = description,
-                    date = Date().time
+                    date = Date().time,
+                    accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts)
                 )
                 viewModel.addIncome(income)
             }

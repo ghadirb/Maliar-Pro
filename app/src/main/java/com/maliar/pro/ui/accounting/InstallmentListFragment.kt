@@ -55,8 +55,9 @@ class InstallmentListFragment : Fragment() {
     private fun payInstallment(installment: com.maliar.pro.database.Installment) {
         if (installment.paidInstallments < installment.totalInstallments) {
             lifecycleScope.launch {
-                val updatedInstallment = installment.copy(paidInstallments = installment.paidInstallments + 1)
-                viewModel.updateInstallment(updatedInstallment)
+                // Records a real expense (deducted from the installment's linked account,
+                // if any) and advances the paid count - see AccountingManager.payInstallment.
+                viewModel.payInstallment(installment)
                 loadInstallments()
             }
         }

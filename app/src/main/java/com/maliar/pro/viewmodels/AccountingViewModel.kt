@@ -607,4 +607,10 @@ class AccountingViewModel(
     fun addInstallment(installment: Installment) {
         viewModelScope.launch { accountingManager.addInstallment(installment) }
     }
+
+    /** See AccountingManager.payInstallment: records a real expense linked to the
+     *  installment's account (if any) and advances its paid count. */
+    fun payInstallment(installment: Installment) {
+        viewModelScope.launch { accountingManager.payInstallment(installment) }
+    }
 }

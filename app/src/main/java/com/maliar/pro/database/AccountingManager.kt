@@ -192,6 +192,31 @@ class AccountingManager(val context: Context) {
     suspend fun deleteInstallment(installment: Installment) {
         accountingDao.deleteInstallment(installment)
     }
+
+    /** Marks one more occurrence of [installment] as paid: records a real [Expense]
+     *  (so it shows up in reports/history exactly like any other spending, and - via
+     *  [addExpense] - automatically deducts it from [installment.accountId] when one is
+     *  set) and advances [Installment.paidInstallments]. No-ops and returns null if the
+     *  installment is already fully paid, mirroring PeriodicPaymentManager.markPaid's
+     *  duplicate-guard. */
+    suspend fun payInstallment(installment: Installment): Installment? {
+        if (installment.paidInstallments >= installment.totalInstallments) return null
+        addExpense(
+            Expense(
+                category = "اقساط",
+                amount = installment.installmentAmount,
+                description = "قسط: ${installment.title}",
+                date = System.currentTimeMillis(),
+                accountId = installment.accountId
+            )
+        )
+        val updated = installment.copy(
+            paidInstallments = installment.paidInstallments + 1,
+            lastPaymentDate = System.currentTimeMillis()
+        )
+        accountingDao.updateInstallment(updated)
+        return updated
+    }
     
     // Balance
     /** "تراز کل" - scoped to the current Jalali year (1 Farvardin onward), per the person's

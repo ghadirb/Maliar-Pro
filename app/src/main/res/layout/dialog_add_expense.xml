@@ -60,4 +60,25 @@
             android:inputType="textMultiLine" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!--
+        Account picker: lets this expense be linked to one of "حساب‌های من" so its
+        balance is deducted automatically (see FinancialStatusManager.adjustAssetBalance
+        via AccountingManager.addExpense/updateExpense). First entry is always "بدون
+        حساب مشخص" (unlinked, falls back to the daily-spending account exactly like
+        before this picker existed) - see AddExpenseDialog.kt / EditExpenseDialog.kt for
+        how the list is populated.
+    -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="حساب"
+        android:layout_marginTop="16dp"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/accountSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" />
+
 </LinearLayout>
