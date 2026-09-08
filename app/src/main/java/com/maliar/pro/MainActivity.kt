@@ -144,6 +144,31 @@ class MainActivity : AppCompatActivity() {
                 .rescheduleAllActiveReminders()
         }
         restartBackgroundServiceIfEnabled()
+        reapplySystemThemeIfNeeded()
+    }
+
+    /**
+     * "حالت سیستم" (ThemeMode.SYSTEM) sets AppCompat to MODE_NIGHT_FOLLOW_SYSTEM once, in
+     * [MaliarProApplication.onCreate]. Normally that alone is enough - AppCompat is
+     * supposed to recreate the current Activity by itself whenever the OS delivers a
+     * uiMode configuration change. The problem: on several common OEM ROMs (MIUI,
+     * some Samsung/Huawei builds - the same family of vendors already worked around for
+     * alarms/battery elsewhere in this file), that broadcast is not reliably delivered to
+     * an app sitting in the background, so if the person switches the *phone's* dark mode
+     * while Maliar Pro isn't in the foreground, AppCompat's cached notion of "current
+     * system night state" goes stale and the app keeps showing whatever it last rendered
+     * until something forces a re-check.
+     * Re-issuing [AppCompatDelegate.setDefaultNightMode] with the same value is the
+     * documented way to force that re-check: AppCompat always re-evaluates and recreates
+     * the Activity if the computed mode actually differs, even when the passed-in value
+     * itself didn't change - so this is a safe, cheap no-op the rest of the time. Only
+     * runs when the person actually chose "سیستم" (a manual لایت/دارک choice never needs
+     * this - it doesn't depend on the OS setting at all).
+     */
+    private fun reapplySystemThemeIfNeeded() {
+        if (PreferencesManager(this).getThemeMode() == PreferencesManager.ThemeMode.SYSTEM) {
+            PreferencesManager.applyThemeMode(PreferencesManager.ThemeMode.SYSTEM)
+        }
     }
 
     /**
