@@ -124,15 +124,16 @@ class MainActivity : AppCompatActivity() {
      * screen does that automatically, instead of requiring a trip to the reminders tab
      * or toggling a reminder off/on by hand to force a fresh schedule.
      */
-    override fun onResume() {
-        super.onResume()
-        lifecycleScope.launch {
-            runCatching {
-                com.maliar.pro.database.SmartReminderManager(applicationContext).reconcileRecurringReminders()
-            }
-        }
-    }
-
+    /**
+     * Self-heals reminders every time the app is opened or resumed from the background.
+     * Some OEM ROMs (MIUI etc. - see checkBatteryOptimization's own comment) silently
+     * kill the underlying AlarmManager alarm without the app ever finding out, so a
+     * reminder can sit stale - past its trigger time, never fired - until something
+     * re-arms it. [SmartReminderManager.rescheduleAllActiveReminders] below (called on
+     * every resume, not just after an app update or the exact-alarm settings page)
+     * already covers this - a full re-arm is strictly more thorough than reconciling
+     * only the stale recurring ones, so there's no need for a second, narrower pass here.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -143,7 +144,9 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // A launch after an APK update must restore every persisted alarm on Android 10
         // too. On Android 12+ this is also a second path after returning from the
-        // "Alarms & reminders" special-access page.
+        // "Alarms & reminders" special-access page. Also doubles as the general
+        // "reopening the app should self-heal any reminder an OEM silently killed"
+        // safety net (see the doc comment above).
         lifecycleScope.launch(Dispatchers.IO) {
             com.maliar.pro.database.SmartReminderManager(applicationContext)
                 .rescheduleAllActiveReminders()
