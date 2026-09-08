@@ -113,33 +113,25 @@ class MainActivity : AppCompatActivity() {
         handleAssistantDeepLink(intent)
     }
 
-    /**
-     * Self-heals recurring reminders every time the app is opened or resumed from the
-     * background - not just when the person happens to visit the یادآوری‌ها tab (the
-     * only place [SmartReminderManager.reconcileRecurringReminders] used to run from).
-     * Some OEM ROMs (MIUI etc. - see checkBatteryOptimization's own comment) silently
-     * kill the underlying AlarmManager alarm without the app ever finding out, so a
-     * recurring reminder can sit stale - past its trigger time, never fired - until
-     * something re-arms it. Reconciling here means simply reopening the app to any
-     * screen does that automatically, instead of requiring a trip to the reminders tab
-     * or toggling a reminder off/on by hand to force a fresh schedule.
-     */
-    /**
-     * Self-heals reminders every time the app is opened or resumed from the background.
-     * Some OEM ROMs (MIUI etc. - see checkBatteryOptimization's own comment) silently
-     * kill the underlying AlarmManager alarm without the app ever finding out, so a
-     * reminder can sit stale - past its trigger time, never fired - until something
-     * re-arms it. [SmartReminderManager.rescheduleAllActiveReminders] below (called on
-     * every resume, not just after an app update or the exact-alarm settings page)
-     * already covers this - a full re-arm is strictly more thorough than reconciling
-     * only the stale recurring ones, so there's no need for a second, narrower pass here.
-     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleAssistantDeepLink(intent)
     }
 
+    /**
+     * Self-heals reminders (and, below, the optional background service) every time the
+     * app is opened or resumed from the background - not just when the person happens to
+     * visit the یادآوری‌ها tab (the only place
+     * [SmartReminderManager.reconcileRecurringReminders] used to run from). Some OEM ROMs
+     * (MIUI etc. - see checkBatteryOptimization's own comment) silently kill the
+     * underlying AlarmManager alarm without the app ever finding out, so a reminder can
+     * sit stale - past its trigger time, never fired - until something re-arms it.
+     * [SmartReminderManager.rescheduleAllActiveReminders] below (called on every resume,
+     * not just after an app update or the exact-alarm settings page) covers this - a full
+     * re-arm is strictly more thorough than reconciling only the stale recurring ones, so
+     * there's no separate narrower pass here.
+     */
     override fun onResume() {
         super.onResume()
         // A launch after an APK update must restore every persisted alarm on Android 10
@@ -150,6 +142,27 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             com.maliar.pro.database.SmartReminderManager(applicationContext)
                 .rescheduleAllActiveReminders()
+        }
+        restartBackgroundServiceIfEnabled()
+    }
+
+    /**
+     * MaliarBackgroundService (the optional "پایداری یادآوری" foreground service some
+     * people enable from Settings) uses START_NOT_STICKY on purpose - it must never
+     * restart itself in the background without the person's say-so. But that also means
+     * that when Android kills it under memory pressure (e.g. several other apps open at
+     * once on a low-RAM device), it simply stays dead: the person reopens Maliar Pro and
+     * the "پایداری یادآوری فعال است" notification never comes back, even though the
+     * Settings switch still shows it as on - previously the only fix was toggling that
+     * switch off and back on by hand. Re-issuing start() here every time the app is
+     * resumed is safe and cheap when the service is already alive (it just rebuilds the
+     * same foreground notification, no duplicate instance is created), so this makes
+     * simply reopening the app repair it automatically, matching what the switch already
+     * implies is supposed to be running.
+     */
+    private fun restartBackgroundServiceIfEnabled() {
+        if (PreferencesManager(this).isBackgroundServiceEnabled()) {
+            com.maliar.pro.services.MaliarBackgroundService.start(applicationContext)
         }
     }
 

@@ -33,6 +33,18 @@ class BootReceiver : BroadcastReceiver() {
                     pendingResult.finish()
                 }
             }
+            // MaliarBackgroundService (the opt-in "پایداری یادآوری" foreground service - see
+            // its own class doc) is never auto-started; it previously only ever came back
+            // to life via the Settings switch, even after a reboot wiped it out entirely.
+            // A device reboot is exactly one more way it can go missing without the person
+            // noticing, so restore it here too when they'd already turned it on. Starting a
+            // foreground service from a BOOT_COMPLETED receiver is one of the exemptions
+            // Android still allows post-O, so this is safe on every supported API level.
+            if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON") {
+                if (com.maliar.pro.utils.PreferencesManager(context.applicationContext).isBackgroundServiceEnabled()) {
+                    com.maliar.pro.services.MaliarBackgroundService.start(context.applicationContext)
+                }
+            }
         }
     }
 }
