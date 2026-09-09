@@ -30,6 +30,7 @@ class EditIncomeDialog(private val context: Context, private val viewModel: Acco
         descriptionInput.setText(income.description)
         val typeSection = IncomeTypeSectionHelper.bind(view)
         typeSection.preset(income.isProductSale, income.costOfGoods)
+        typeSection.presetDetails(income)
 
         builder.setView(view)
         builder.setPositiveButton("ذخیره") { _, _ ->
@@ -44,7 +45,11 @@ class EditIncomeDialog(private val context: Context, private val viewModel: Acco
                     description = description,
                     accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts),
                     isProductSale = typeSection.isProductSale(),
-                    costOfGoods = typeSection.costOfGoods()
+                    costOfGoods = typeSection.costOfGoods(),
+                    productName = typeSection.productName(),
+                    productQuantity = typeSection.quantity(),
+                    listPrice = typeSection.listPrice(),
+                    discountAmount = typeSection.discount()
                 )
                 viewModel.updateIncome(updatedIncome)
             }

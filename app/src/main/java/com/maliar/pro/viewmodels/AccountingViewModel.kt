@@ -115,7 +115,10 @@ class AccountingViewModel(
     val yearlyExpense = expenseList.map { list -> list.filter { isThisYear(it.date) }.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    val balance = combine(yearlyIncome, yearlyExpense) { inc, exp -> inc - exp }
+    /** Annual net profit: product revenue becomes profit only after cost of goods. */
+    val balance = combine(incomeList, yearlyExpense) { incomes, exp ->
+        incomes.filter { isThisYear(it.date) }.sumOf { it.profit } - exp
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val monthlyIncome = incomeList.map { list -> list.filter { isThisMonth(it.date) }.sumOf { it.amount } }
@@ -124,7 +127,8 @@ class AccountingViewModel(
     val monthlyExpense = expenseList.map { list -> list.filter { isThisMonth(it.date) }.sumOf { it.amount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    val monthlyBalance = combine(monthlyIncome, monthlyExpense) { inc, exp -> inc - exp }
+    val monthlyProfit = incomeList.map { list -> list.filter { isThisMonth(it.date) }.sumOf { it.profit } }
+    val monthlyBalance = combine(monthlyProfit, monthlyExpense) { profit, exp -> profit - exp }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     private fun startOfToday(): Long = java.util.Calendar.getInstance().apply {

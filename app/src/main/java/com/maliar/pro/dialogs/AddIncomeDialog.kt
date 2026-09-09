@@ -41,7 +41,11 @@ class AddIncomeDialog(private val context: Context, private val viewModel: Accou
                     date = Date().time,
                     accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts),
                     isProductSale = typeSection.isProductSale(),
-                    costOfGoods = typeSection.costOfGoods()
+                    costOfGoods = typeSection.costOfGoods(),
+                    productName = typeSection.productName(),
+                    productQuantity = typeSection.quantity(),
+                    listPrice = typeSection.listPrice(),
+                    discountAmount = typeSection.discount()
                 )
                 viewModel.addIncome(income)
             }

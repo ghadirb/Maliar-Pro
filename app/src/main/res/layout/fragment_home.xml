@@ -111,7 +111,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="↑ درآمد این ماه"
+                            android:text="↑ سود ناخالص این ماه"
                             android:textColor="@color/hero_positive_accent"
                             android:textSize="12sp" />
                         <TextView

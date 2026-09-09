@@ -17,6 +17,7 @@ import com.maliar.pro.dialogs.AddIncomeDialog
 import com.maliar.pro.dialogs.AddExpenseDialog
 import com.maliar.pro.dialogs.AddCheckDialog
 import com.maliar.pro.dialogs.AddInstallmentDialog
+import com.maliar.pro.dialogs.BusinessTransactionDialog
 import com.maliar.pro.viewmodels.AccountingViewModel
 import com.maliar.pro.viewmodels.AccountingViewModelFactory
 import com.maliar.pro.viewmodels.DueSoonViewModel
@@ -87,6 +88,9 @@ class AccountingFragment : Fragment() {
 
         binding.addExpenseButton.setOnClickListener {
             showAddExpenseDialog()
+        }
+        binding.businessTransactionButton.setOnClickListener {
+            BusinessTransactionDialog(requireContext()).show()
         }
 
         binding.addCheckButton.setOnClickListener {
@@ -179,7 +183,7 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
-            // "تراز همین دوره" answers exactly the question people keep asking: the big
+            // "سود خالص همین دوره" answers exactly the question people keep asking: the big
             // "تراز کل" number above is the all-time total (by design - it never changes
             // just because you change the period), so this row shows the period-scoped
             // net (period income − period expense) right next to it, colored red when

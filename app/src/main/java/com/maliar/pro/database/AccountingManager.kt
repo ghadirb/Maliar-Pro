@@ -9,6 +9,7 @@ class AccountingManager(val context: Context) {
     private val database = AppDatabase.getDatabase(context)
     private val accountingDao = database.accountingDao()
     private val financialStatusManager = FinancialStatusManager(context)
+    private val businessManager = BusinessManager(context)
 
     // Income
     fun getAllIncomes(): Flow<List<Income>> {
@@ -50,8 +51,10 @@ class AccountingManager(val context: Context) {
     }
 
     suspend fun addIncome(income: Income): Long {
-        val id = accountingDao.insertIncome(income)
-        financialStatusManager.adjustAssetBalance(income.accountId, income.amount)
+        val toSave = resolveSaleCost(income)
+        val id = accountingDao.insertIncome(toSave)
+        financialStatusManager.adjustAssetBalance(toSave.accountId, toSave.amount)
+        businessManager.adjustStockForSale(toSave.copy(id = id), 1.0)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
         return id
     }
@@ -64,15 +67,19 @@ class AccountingManager(val context: Context) {
             // switching which account it's linked to keep every affected balance correct,
             // instead of just re-applying the new amount on top of the old one.
             financialStatusManager.adjustAssetBalance(previous.accountId, -previous.amount)
+            businessManager.adjustStockForSale(previous, -1.0)
         }
-        accountingDao.updateIncome(income)
-        financialStatusManager.adjustAssetBalance(income.accountId, income.amount)
+        val toSave = resolveSaleCost(income)
+        accountingDao.updateIncome(toSave)
+        financialStatusManager.adjustAssetBalance(toSave.accountId, toSave.amount)
+        businessManager.adjustStockForSale(toSave, 1.0)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     suspend fun deleteIncome(income: Income) {
         accountingDao.deleteIncome(income)
         financialStatusManager.adjustAssetBalance(income.accountId, -income.amount)
+        businessManager.adjustStockForSale(income, -1.0)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
@@ -275,6 +282,14 @@ class AccountingManager(val context: Context) {
      *  above ("تراز کل"), which is scoped to the whole Jalali year on purpose and
      *  shouldn't change just because the person picks a different period-start-day. */
     suspend fun getPeriodBalance(): Double = getMonthlyIncome() - getMonthlyExpense()
+
+    /** A blank/zero cost on a named product means "use recorded stock cost"; a typed
+     * value remains authoritative for old inventory or special cases. */
+    private suspend fun resolveSaleCost(income: Income): Income {
+        if (!income.isProductSale || income.productName.isBlank() || income.costOfGoods > 0) return income
+        val stockCost = businessManager.inventoryCost(income.productName, income.productQuantity)
+        return if (stockCost > 0) income.copy(costOfGoods = stockCost) else income
+    }
 
     /** Epoch millis for the start of the *current* financial period, based on the
      *  period-start-day the user picked in the Profile tab (defaults to the 1st of the

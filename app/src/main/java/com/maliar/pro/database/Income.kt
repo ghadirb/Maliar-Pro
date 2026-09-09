@@ -29,7 +29,12 @@ data class Income(
     val isProductSale: Boolean = false,
     /** بهای تمام‌شده کالا - only meaningful when [isProductSale] is true. Never affects
      *  [amount]/account balance; only reduces this entry's contribution to profit reports. */
-    val costOfGoods: Double = 0.0
+    val costOfGoods: Double = 0.0,
+    /** Explicit product-sale details. Defaults preserve all v1.9 entries. */
+    val productName: String = "",
+    val productQuantity: Double = 1.0,
+    val listPrice: Double = 0.0,
+    val discountAmount: Double = 0.0
 ) {
     /** سود واقعی این تراکنش: for a product sale this is amount - costOfGoods (can be
      *  negative on a loss-making sale); for plain service income it's the full amount,

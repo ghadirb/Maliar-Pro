@@ -297,9 +297,9 @@ class FinancialReportsFragment : Fragment() {
     private fun renderReport(report: FinancialReport) {
         binding.totalIncomeText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.totalIncome, "")
         binding.totalExpenseText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.totalExpense, "")
-        binding.netText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.net, "")
+        binding.netText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.netProfit, "")
         binding.netText.setTextColor(
-            if (report.net >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
+            if (report.netProfit >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
         )
 
         // «فروش کالا»: کارت تفکیک فقط وقتی این دوره فروش کالا ثبت شده باشد نمایش داده
@@ -309,7 +309,7 @@ class FinancialReportsFragment : Fragment() {
             binding.productSalesText.text = "فروش کالا: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalProductSales)}"
             binding.costOfGoodsText.text = "بهای تمام‌شده: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalCostOfGoods)}"
             binding.serviceIncomeText.text = "درآمد خدمات: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalServiceIncome)}"
-            binding.totalProfitText.text = "سود کل: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalProfit)}"
+            binding.totalProfitText.text = "سود ناخالص: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalProfit)} · سود خالص: ${com.maliar.pro.utils.CurrencyFormatter.format(report.netProfit)}"
             binding.totalProfitText.setTextColor(
                 if (report.totalProfit >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
             )

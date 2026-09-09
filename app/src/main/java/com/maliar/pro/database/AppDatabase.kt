@@ -14,8 +14,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
                MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class,
                MonthlyBudget::class, PeriodicPayment::class, MarketProduct::class,
-               MarketPriceQuote::class, ProductPurchase::class, MarketSource::class],
-    version = 23,
+               MarketPriceQuote::class, ProductPurchase::class, MarketSource::class,
+               BusinessTransaction::class, ProductInventory::class],
+    version = 24,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun periodicPaymentDao(): PeriodicPaymentDao
     abstract fun marketAssistantDao(): MarketAssistantDao
+    abstract fun businessDao(): BusinessDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -308,6 +310,18 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE incomes ADD COLUMN costOfGoods REAL NOT NULL DEFAULT 0")
             }
         }
+        /** Business accounting is additive: existing incomes remain valid service/product
+         * sales, while stock and non-profit cash movements get their own audit tables. */
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE incomes ADD COLUMN productName TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE incomes ADD COLUMN productQuantity REAL NOT NULL DEFAULT 1")
+                database.execSQL("ALTER TABLE incomes ADD COLUMN listPrice REAL NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE incomes ADD COLUMN discountAmount REAL NOT NULL DEFAULT 0")
+                database.execSQL("CREATE TABLE IF NOT EXISTS business_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, fromAccountId INTEGER, toAccountId INTEGER, date INTEGER NOT NULL, description TEXT NOT NULL DEFAULT '', supplier TEXT NOT NULL DEFAULT '', productName TEXT NOT NULL DEFAULT '', quantity REAL NOT NULL DEFAULT 0, unitCost REAL NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS product_inventory (name TEXT NOT NULL PRIMARY KEY, quantity REAL NOT NULL DEFAULT 0, averageUnitCost REAL NOT NULL DEFAULT 0, updatedAt INTEGER NOT NULL)")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -322,7 +336,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

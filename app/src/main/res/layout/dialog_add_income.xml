@@ -97,6 +97,38 @@
                 android:inputType="numberDecimal" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="نام کالا">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/productNameInput" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="text" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="تعداد">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/productQuantityInput" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="numberDecimal" android:text="1" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="قیمت اولیه (پیش از تخفیف)">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/listPriceInput" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="مبلغ تخفیف">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/discountAmountInput" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
         <TextView
             android:id="@+id/profitPreviewText"
             android:layout_width="match_parent"

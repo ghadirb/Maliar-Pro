@@ -76,9 +76,11 @@ class HomeFragment : Fragment() {
         // Hero card income/expense + qualitative month status + "این ماه چطور گذشت؟" bars,
         // all driven off the same two numbers so they can never disagree with each other.
         lifecycleScope.launch {
-            kotlinx.coroutines.flow.combine(viewModel.monthlyIncome, viewModel.monthlyExpense) { income, expense ->
-                income to expense
-            }.collect { (income, expense) -> renderMonthSummary(income, expense) }
+            // Product sale cash is not profit: use gross profit (service income + sale
+            // profit) here, so the home status and accounting dashboard agree.
+            kotlinx.coroutines.flow.combine(viewModel.monthlyProfit, viewModel.monthlyExpense) { profit, expense ->
+                profit to expense
+            }.collect { (profit, expense) -> renderMonthSummary(profit, expense) }
         }
 
         lifecycleScope.launch { viewModel.categoryBreakdown.collect { renderCategoryChart(it) } }
@@ -171,7 +173,7 @@ class HomeFragment : Fragment() {
             width = (totalBarWidth * (expense / maxValue)).toInt().coerceAtLeast(4)
         }
         val balance = income - expense
-        binding.homeMonthBalanceText.text = "مانده این ماه: ${CurrencyFormatter.format(balance)}"
+        binding.homeMonthBalanceText.text = "سود خالص این ماه: ${CurrencyFormatter.format(balance)}"
     }
 
     private fun renderCategoryChart(breakdown: List<Pair<String, Double>>) {
