@@ -19,6 +19,7 @@ class BusinessManager(context: Context) {
         val id = dao.insertTransaction(item)
         apply(item, 1.0)
         reconcileInventory(item.productName)
+        syncProductPricing(item)
         return id
     }
     suspend fun update(item: BusinessTransaction) {
@@ -28,6 +29,7 @@ class BusinessManager(context: Context) {
         apply(item, 1.0)
         reconcileInventory(previous?.productName.orEmpty())
         reconcileInventory(item.productName)
+        syncProductPricing(item)
     }
     suspend fun delete(item: BusinessTransaction) {
         dao.deleteTransaction(item)
@@ -57,6 +59,14 @@ class BusinessManager(context: Context) {
             BusinessTransactionType.OWNER_DRAW -> accounts.adjustAssetBalance(item.fromAccountId, -item.amount * direction)
             BusinessTransactionType.CAPITAL_INJECTION -> accounts.adjustAssetBalance(item.toAccountId, item.amount * direction)
             BusinessTransactionType.BANK_FEE -> accounts.adjustAssetBalance(item.fromAccountId, -item.amount * direction)
+        }
+    }
+
+    /** A product bought in accounting becomes visible in «قیمت کالاها» automatically.
+     * Purchase history stays in the accounting ledger, which is the source of truth. */
+    private suspend fun syncProductPricing(item: BusinessTransaction) {
+        if (item.type == BusinessTransactionType.PRODUCT_PURCHASE && item.productName.isNotBlank()) {
+            MarketAssistantManager(appContext).ensureProduct(item.productName)
         }
     }
 

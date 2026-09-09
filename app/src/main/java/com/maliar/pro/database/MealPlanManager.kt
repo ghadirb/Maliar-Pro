@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
  *  [isEstimated] = true means this is the static fallback price, not something the person
  *  actually paid - the UI must always label it "تقریبی" per the spec, never show it as a
  *  confirmed price. */
-enum class FoodPriceSource { MANUAL, EXPENSE_HISTORY, CATALOG_ESTIMATE }
+enum class FoodPriceSource { MANUAL, EXPENSE_HISTORY, MARKET_CHECK, CATALOG_ESTIMATE }
 
 data class FoodPrice(
     val amount: Double,
@@ -35,6 +35,7 @@ class MealPlanManager(context: Context) {
     private val dao = AppDatabase.getDatabase(context).mealPlanDao()
     private val accountingManager = AccountingManager(context)
     private val foodPriceManager = FoodPriceManager(context)
+    private val productPricing = MarketAssistantManager(context)
 
     fun getAllPlans(): Flow<List<MealPlan>> = dao.getAllPlans()
     fun getLatestPlan(): Flow<MealPlan?> = dao.getLatestPlan()
@@ -73,14 +74,11 @@ class MealPlanManager(context: Context) {
             ?.first?.amount
         return if (lastUserPrice != null) {
             FoodPrice(lastUserPrice, isEstimated = false, unitLabel = unitLabel, source = FoodPriceSource.EXPENSE_HISTORY)
-        } else {
-            FoodPrice(
-                catalogItem?.fallbackPricePerUnit ?: 0.0,
-                isEstimated = true,
-                unitLabel = unitLabel,
-                source = FoodPriceSource.CATALOG_ESTIMATE
-            )
         }
+        else productPricing.localPrice(ingredientName)?.let { quote ->
+            FoodPrice(quote.price, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.MARKET_CHECK)
+        }
+        ?: FoodPrice(catalogItem?.fallbackPricePerUnit ?: 0.0, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.CATALOG_ESTIMATE)
     }
 
     private fun recipeCost(recipe: Recipe, prices: Map<String, FoodPrice>): Double =

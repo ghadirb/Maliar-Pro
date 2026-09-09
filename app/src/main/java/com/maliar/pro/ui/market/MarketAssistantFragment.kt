@@ -58,8 +58,8 @@ class MarketAssistantFragment : Fragment() {
     private fun buildFallbackScreen(): View {
         val scroll = ScrollView(requireContext())
         val root = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 28, 32, 48) }
-        root.addView(TextView(requireContext()).apply { text = "بازاریار"; textSize = 22f; setTypeface(null, 1) })
-        root.addView(TextView(requireContext()).apply { text = "قیمت خرید خود را با بازار عمده و خرده مقایسه کنید."; setPadding(0, 8, 0, 18) })
+        root.addView(TextView(requireContext()).apply { text = "قیمت کالاها"; textSize = 22f; setTypeface(null, 1) })
+        root.addView(TextView(requireContext()).apply { text = "قیمت‌های دستی، سابقه خرید شما و قیمت‌های بررسی‌شده بازار."; setPadding(0, 8, 0, 18) })
         listOf(
             "🔎 جستجوی قیمت بازار" to { chooseProduct { showMarket(it) } },
             "📦 کالاهای من" to { showAddProduct() },
@@ -77,8 +77,8 @@ class MarketAssistantFragment : Fragment() {
     private fun heroCard(inflater: android.view.LayoutInflater, parent: ViewGroup): MaterialCardView {
         val cardView = inflater.inflate(R.layout.view_market_hero_card, parent, false) as MaterialCardView
         val content = cardView.findViewById<LinearLayout>(R.id.marketHeroContent)
-        content.addView(TextView(requireContext()).apply { text = "بازاریار"; textSize = 22f; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
-        content.addView(TextView(requireContext()).apply { text = "قیمت خرید خود را با بازار عمده و خرده مقایسه کنید."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 6, 0, 0) })
+        content.addView(TextView(requireContext()).apply { text = "قیمت کالاها"; textSize = 22f; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
+        content.addView(TextView(requireContext()).apply { text = "اول قیمت خودتان، سپس سابقه خرید و در صورت درخواست بازار."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 6, 0, 0) })
         return cardView
     }
 
@@ -99,7 +99,10 @@ class MarketAssistantFragment : Fragment() {
         return cardView
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) { viewLifecycleOwner.lifecycleScope.launch { manager.products().collectLatest { items -> products = items; renderProducts() } } }
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        viewLifecycleOwner.lifecycleScope.launch { manager.syncExistingBusinessPurchases() }
+        viewLifecycleOwner.lifecycleScope.launch { manager.products().collectLatest { items -> products = items; renderProducts() } }
+    }
 
     private fun renderProducts() {
         productsBox.removeAllViews()
@@ -158,6 +161,8 @@ class MarketAssistantFragment : Fragment() {
     }
     private fun showMarket(product: MarketProduct) {
         val box = form()
+        val insight = TextView(requireContext()).apply { setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) }
+        box.addView(insight)
         box.addView(TextView(requireContext()).apply { text = "«دریافت قیمت آنلاین» ترب و دیجی‌کالا (برای خرده) و کانال‌های تلگرامی شما را که در «منابع عمده و خرده» ثبت کرده‌اید جست‌وجو می‌کند."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) })
         val kind = Spinner(requireContext()).also { it.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, arrayOf("عمده", "خرده")); box.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 }) }
         box.addView((android.view.LayoutInflater.from(requireContext()).inflate(R.layout.view_market_button_secondary, box, false) as MaterialButton).apply {
@@ -177,7 +182,20 @@ class MarketAssistantFragment : Fragment() {
             }
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 })
         val price = field(box, "قیمت دستی (تومان)"); val source = field(box, "منبع (مثلاً ترب یا کانال فروشنده)")
-        AlertDialog.Builder(requireContext()).setTitle(product.name).setView(box).setNeutralButton("ثبت خرید") { _, _ -> showPurchase(product) }.setNegativeButton("لغو", null).setPositiveButton("ثبت قیمت") { _, _ -> val amount = price.text.toString().cleanNumber(); if (amount != null && amount > 0) viewLifecycleOwner.lifecycleScope.launch { manager.addQuote(product.id, source.text.toString().ifBlank { "ثبت دستی" }, if (kind.selectedItemPosition == 0) "WHOLESALE" else "RETAIL", amount) } else toast("قیمت معتبر وارد کنید.") }.show()
+        val dialog = AlertDialog.Builder(requireContext()).setTitle(product.name).setView(box).setNeutralButton("ثبت خرید") { _, _ -> showPurchase(product) }.setNegativeButton("لغو", null).setPositiveButton("ثبت قیمت") { _, _ -> val amount = price.text.toString().cleanNumber(); if (amount != null && amount > 0) viewLifecycleOwner.lifecycleScope.launch { manager.addQuote(product.id, source.text.toString().ifBlank { "ثبت دستی" }, if (kind.selectedItemPosition == 0) "WHOLESALE" else "RETAIL", amount) } else toast("قیمت معتبر وارد کنید.") }.show()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val purchases = manager.purchaseHistory(product)
+            val quotes = manager.quotes(product.id).first()
+            val last = purchases.firstOrNull()?.purchasePrice
+            val average = purchases.map { it.purchasePrice }.average().takeIf { !it.isNaN() }
+            val latest = quotes.firstOrNull()
+            insight.text = buildString {
+                if (last != null) append("آخرین خرید شما: ${last.toLong()} تومان\n")
+                if (average != null) append("میانگین خرید شما: ${average.toLong()} تومان\n")
+                if (latest != null) append("آخرین بررسی بازار: ${latest.price.toLong()} تومان · ${latest.source}\n")
+                append("پیشنهاد قیمت فروش/خرید تقریبی است و با شهر، برند و فروشگاه تغییر می‌کند.")
+            }
+        }
     }
     private fun showPurchase(product: MarketProduct) { val box = form(); val price = field(box, "قیمت خرید هر واحد (تومان) *"); val quantity = field(box, "تعداد", "1"); val supplier = field(box, "فروشنده"); AlertDialog.Builder(requireContext()).setTitle("ثبت خرید: ${product.name}").setView(box).setNegativeButton("لغو", null).setPositiveButton("ذخیره") { _, _ -> val p = price.text.toString().cleanNumber(); val q = quantity.text.toString().cleanNumber() ?: 1.0; if (p != null && p > 0) viewLifecycleOwner.lifecycleScope.launch { manager.addPurchase(product.id, p, q, supplier.text.toString()) } else toast("قیمت معتبر وارد کنید.") }.show() }
     private fun showSources() {
@@ -234,7 +252,7 @@ class MarketAssistantFragment : Fragment() {
     }
     private fun showPasteMessage() { chooseProduct { product -> val box = form(); val message = field(box, "متن پیام فروشنده"); AlertDialog.Builder(requireContext()).setTitle("خواندن پیام فروشنده").setView(box).setNegativeButton("لغو", null).setPositiveButton("استخراج و ثبت") { _, _ -> val prices = MarketAssistantManager.pricesFromText(message.text.toString()); if (prices.isEmpty()) toast("قیمت قابل تشخیصی پیدا نشد.") else viewLifecycleOwner.lifecycleScope.launch { prices.forEach { manager.addQuote(product.id, "پیام فروشنده", "WHOLESALE", it, prices.minOrNull(), prices.maxOrNull(), .45) }; toast("${prices.size} قیمت ثبت شد.") } }.show() } }
     private fun showAdvice(product: MarketProduct) { viewLifecycleOwner.lifecycleScope.launch {
-        val purchases = manager.purchases(product.id).first()
+        val purchases = manager.purchaseHistory(product)
         val quotes = manager.quotes(product.id).first()
         AlertDialog.Builder(requireContext()).setTitle("مشاور خرید: ${product.name}")
             .setMessage(MarketAssistantManager.recommendation(purchases, quotes)).setPositiveButton("متوجه شدم", null).show()

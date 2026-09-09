@@ -27,6 +27,7 @@ data class MarketSource(@PrimaryKey(autoGenerate = true) val id: Long = 0, val n
     @Query("SELECT * FROM market_sources ORDER BY createdAt DESC") fun sources(): Flow<List<MarketSource>>
     @Query("SELECT * FROM market_price_quotes WHERE productId = :productId ORDER BY checkedAt DESC") fun quotes(productId: Long): Flow<List<MarketPriceQuote>>
     @Query("SELECT * FROM product_purchases WHERE productId = :productId ORDER BY purchasedAt DESC") fun purchases(productId: Long): Flow<List<ProductPurchase>>
+    @Query("SELECT * FROM market_products WHERE lower(name) = lower(:name) LIMIT 1") suspend fun productByName(name: String): MarketProduct?
     @Insert suspend fun addProduct(item: MarketProduct): Long
     @Insert suspend fun addQuote(item: MarketPriceQuote): Long
     @Insert suspend fun addPurchase(item: ProductPurchase): Long
@@ -40,9 +41,38 @@ data class MarketSource(@PrimaryKey(autoGenerate = true) val id: Long = 0, val n
 }
 
 class MarketAssistantManager(context: Context) {
-    private val dao = AppDatabase.getDatabase(context).marketAssistantDao()
+    private val database = AppDatabase.getDatabase(context)
+    private val dao = database.marketAssistantDao()
     fun products() = dao.products(); fun sources() = dao.sources(); fun quotes(id: Long) = dao.quotes(id); fun purchases(id: Long) = dao.purchases(id)
+    /** Includes legacy/manual price-screen purchases plus the accounting ledger's product
+     * purchases. The ledger rows are derived at read time so edit/delete stays correct. */
+    suspend fun purchaseHistory(product: MarketProduct): List<ProductPurchase> {
+        val saved = kotlinx.coroutines.flow.first(dao.purchases(product.id))
+        val accounting = database.businessDao().getAllTransactionsList()
+            .filter { it.type == BusinessTransactionType.PRODUCT_PURCHASE && it.productName.trim().equals(product.name.trim(), ignoreCase = true) }
+            .map { ProductPurchase(id = -it.id, productId = product.id, purchasePrice = it.unitCost, quantity = it.quantity, purchasedAt = it.date, supplier = it.supplier) }
+        return (saved + accounting).sortedByDescending { it.purchasedAt }
+    }
     suspend fun addProduct(name: String, category: String, brand: String, model: String, barcode: String): Long = dao.addProduct(MarketProduct(name = name.trim(), category = category.trim(), brand = brand.trim(), model = model.trim(), barcode = barcode.trim()))
+    /** The product-price engine's stable bridge from accounting purchases. It intentionally
+     * only creates a missing product: it never overwrites category/manual-price data the
+     * person has curated in the price screen. */
+    suspend fun ensureProduct(name: String, category: String = ""): MarketProduct? {
+        val clean = name.trim()
+        if (clean.isBlank()) return null
+        return dao.productByName(clean) ?: MarketProduct(name = clean, category = category).let { draft ->
+            val id = dao.addProduct(draft)
+            draft.copy(id = id)
+        }
+    }
+    suspend fun findProduct(name: String): MarketProduct? = dao.productByName(name.trim())
+    /** Imports purchases made before this screen was first opened, without duplicating
+     * accounting history. Called when the price screen opens and safe to repeat. */
+    suspend fun syncExistingBusinessPurchases() {
+        database.businessDao().getAllTransactionsList()
+            .filter { it.type == BusinessTransactionType.PRODUCT_PURCHASE && it.productName.isNotBlank() }
+            .forEach { ensureProduct(it.productName) }
+    }
     suspend fun updateProduct(product: MarketProduct, name: String, category: String, brand: String, model: String, barcode: String) = dao.updateProduct(product.copy(name = name.trim(), category = category.trim(), brand = brand.trim(), model = model.trim(), barcode = barcode.trim()))
     suspend fun deleteProduct(productId: Long) { dao.deleteQuotesForProduct(productId); dao.deletePurchasesForProduct(productId); dao.deleteProduct(productId) }
     suspend fun addPurchase(productId: Long, price: Double, quantity: Double, supplier: String) = dao.addPurchase(ProductPurchase(productId = productId, purchasePrice = price, quantity = quantity, supplier = supplier.trim()))
@@ -50,6 +80,16 @@ class MarketAssistantManager(context: Context) {
     suspend fun updateSource(source: MarketSource, name: String, url: String, priceType: String, isEnabled: Boolean) = dao.updateSource(source.copy(name = name.trim(), url = url.trim(), priceType = priceType, isEnabled = isEnabled))
     suspend fun deleteSource(sourceId: Long) = dao.deleteSource(sourceId)
     suspend fun addQuote(productId: Long, source: String, priceType: String, price: Double, min: Double? = null, max: Double? = null, confidence: Double = .6) = dao.addQuote(MarketPriceQuote(productId = productId, source = source.trim(), priceType = priceType, price = price, minPrice = min, maxPrice = max, confidence = confidence))
+
+    /** One place for price selection throughout the app. It never performs a hidden
+     * network request: online quotes are used only after the person explicitly refreshed
+     * them on the price screen. */
+    suspend fun localPrice(name: String): MarketPriceQuote? {
+        val product = findProduct(name) ?: return null
+        return quotes(product.id).let { flow -> kotlinx.coroutines.flow.first(flow) }
+            .firstOrNull { it.source == "ثبت دستی" }
+            ?: quotes(product.id).let { flow -> kotlinx.coroutines.flow.first(flow) }.firstOrNull()
+    }
     companion object {
         fun recommendation(purchases: List<ProductPurchase>, quotes: List<MarketPriceQuote>): String {
             val wholesale = quotes.filter { it.priceType == "WHOLESALE" }

@@ -242,8 +242,12 @@ class MealPlanFragment : Fragment() {
                 .inflate(R.layout.item_shopping_list_row, binding.shoppingListContainer, false)
             row.findViewById<TextView>(R.id.itemNameText).text =
                 "${item.ingredientName} · ${formatUnits(item.approxUnits)} ${item.unitLabel}"
-            row.findViewById<TextView>(R.id.itemPriceNoteText).text =
-                if (item.unitPrice.isEstimated) "قیمت تقریبی (بدون سابقهٔ خرید)" else "بر اساس آخرین خرید شما"
+            row.findViewById<TextView>(R.id.itemPriceNoteText).text = when (item.unitPrice.source) {
+                com.maliar.pro.database.FoodPriceSource.MANUAL -> "قیمت ثبت‌شده توسط شما"
+                com.maliar.pro.database.FoodPriceSource.EXPENSE_HISTORY -> "بر اساس آخرین خرید شما"
+                com.maliar.pro.database.FoodPriceSource.MARKET_CHECK -> "قیمت تقریبی از آخرین بررسی بازار"
+                com.maliar.pro.database.FoodPriceSource.CATALOG_ESTIMATE -> "قیمت تقریبی؛ برای دقت بیشتر قیمت را وارد یا بازار را بررسی کنید"
+            }
             row.findViewById<TextView>(R.id.itemCostText).text = formatCurrency(item.totalCost)
             binding.shoppingListContainer.addView(row)
         }

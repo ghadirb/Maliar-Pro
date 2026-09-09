@@ -39,6 +39,7 @@
 //      AI_PROVIDER          = gapgpt (or liara)
 //      GAPGPT_API_KEY       = provider key (Script Property only)
 //      AI_MODEL             = gpt-4o-mini
+//      AI_MARKET_MODEL      = grok-4  (optional live-web fallback for product prices)
 //      AI_STT_MODEL         = whisper-1  (یا gapgpt/whisper-1 برای GapGPT)
 //      AI_TTS_MODEL         = gpt-4o-mini-tts  (یا tts-1)
 // 4. Deploy -> New deployment -> type: "Web app".
@@ -181,6 +182,7 @@ function routeRequest_(e) {
   if (path === 'aiStt') return handleAiStt_(params);
   if (path === 'aiTts') return handleAiTts_(params);
   if (path === 'marketSearch') return handleMarketSearch_(params);
+  if (path === 'marketAiSearch') return handleMarketAiSearch_(params);
   if (path === 'marketParseMessage') return handleMarketParseMessage_(params);
 
   return jsonOutput_({ error: 'unknown_path' });
@@ -212,6 +214,38 @@ function handleMarketSearch_(params) {
   const response = { query: query, priceType: priceType, checkedAt: Date.now(), results: results };
   CacheService.getScriptCache().put(cacheKey, JSON.stringify(response), 900);
   return jsonOutput_(response);
+}
+
+/** Last-resort live web search. This is called only after the deterministic shop/channel
+ * search returned no price and only after an explicit tap in the app. Grok 4 was verified
+ * on GapGPT's OpenAI-like endpoint to execute web_search; gpt-4o-mini rejected the tool. */
+function handleMarketAiSearch_(params) {
+  const query = String(params.query || '').trim();
+  if (!query || query.length > 160) return jsonOutput_({ error: 'query is required' });
+  const denied = requireAiFields_(params);
+  if (denied) return denied;
+  const cfg = aiConfig_();
+  if (cfg.provider !== 'gapgpt') return jsonOutput_({ error: 'market_web_search_requires_gapgpt' });
+  try {
+    const response = aiFetch_(cfg.baseUrl + '/chat/completions', {
+      apiKey: cfg.key,
+      body: {
+        model: getSetting_('AI_MARKET_MODEL', 'grok-4'), tools: [{ type: 'web_search' }], temperature: 0.1, max_tokens: 350,
+        messages: [
+          { role: 'system', content: 'Use web search for Iranian prices. Return ONLY valid JSON: {"price":number,"minPrice":number,"maxPrice":number,"source":"","sourceUrl":""}. Prices must be TOMAN. With insufficient evidence return price 0. Never invent a price or URL.' },
+          { role: 'user', content: 'Find an approximate current retail market price in Iran for: ' + query }
+        ]
+      }
+    });
+    if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) return jsonOutput_({ error: 'ai_unavailable' });
+    const data = JSON.parse(response.getContentText());
+    const text = String(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '');
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return jsonOutput_({ results: [], checkedAt: Date.now() });
+    const result = JSON.parse(match[0]); const price = Number(result.price || 0);
+    if (!(price > 0) || !isFinite(price)) return jsonOutput_({ results: [], checkedAt: Date.now() });
+    return jsonOutput_({ checkedAt: Date.now(), results: [{ source: String(result.source || 'جست‌وجوی وب Grok').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] });
+  } catch (err) { return jsonOutput_({ error: 'ai_unavailable' }); }
 }
 
 // Only accepts {name, url} pairs the user already saved on-device via "افزودن منبع"
