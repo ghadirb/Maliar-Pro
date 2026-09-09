@@ -15,8 +15,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class,
                MonthlyBudget::class, PeriodicPayment::class, MarketProduct::class,
                MarketPriceQuote::class, ProductPurchase::class, MarketSource::class,
-               BusinessTransaction::class, ProductInventory::class],
-    version = 24,
+               BusinessTransaction::class, ProductInventory::class, GoldTransaction::class, GoldPriceAlert::class],
+    version = 25,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +35,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun periodicPaymentDao(): PeriodicPaymentDao
     abstract fun marketAssistantDao(): MarketAssistantDao
     abstract fun businessDao(): BusinessDao
+    abstract fun goldPortfolioDao(): GoldPortfolioDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -322,6 +323,12 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("CREATE TABLE IF NOT EXISTS product_inventory (name TEXT NOT NULL PRIMARY KEY, quantity REAL NOT NULL DEFAULT 0, averageUnitCost REAL NOT NULL DEFAULT 0, updatedAt INTEGER NOT NULL)")
             }
         }
+        private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS gold_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, kind TEXT NOT NULL, type TEXT NOT NULL, quantity REAL NOT NULL, unitPrice REAL NOT NULL, fee REAL NOT NULL DEFAULT 0, date INTEGER NOT NULL, notes TEXT NOT NULL DEFAULT '', accountId INTEGER)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS gold_price_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, kind TEXT NOT NULL, targetPrice REAL NOT NULL, direction TEXT NOT NULL, isActive INTEGER NOT NULL DEFAULT 1, createdAt INTEGER NOT NULL)")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -336,7 +343,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

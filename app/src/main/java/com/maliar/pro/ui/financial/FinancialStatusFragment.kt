@@ -49,6 +49,9 @@ class FinancialStatusFragment : Fragment() {
         binding.assetsCard.setOnClickListener {
             findNavController().navigate(R.id.action_financialStatusFragment_to_assetListFragment)
         }
+        binding.goldPortfolioCard.setOnClickListener {
+            findNavController().navigate(R.id.action_financialStatusFragment_to_goldPortfolioFragment)
+        }
         binding.debtsCard.setOnClickListener {
             findNavController().navigate(R.id.action_financialStatusFragment_to_debtListFragment)
         }

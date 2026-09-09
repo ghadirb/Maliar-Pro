@@ -271,6 +271,14 @@
             app:popExitAnim="@anim/nav_fade_out" />
 
         <action
+            android:id="@+id/action_financialStatusFragment_to_goldPortfolioFragment"
+            app:destination="@id/goldPortfolioFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
             android:id="@+id/action_financialStatusFragment_to_debtListFragment"
             app:destination="@id/debtListFragment"
             app:enterAnim="@anim/nav_fade_in"
@@ -307,6 +315,11 @@
         android:id="@+id/assetListFragment"
         android:name="com.maliar.pro.ui.financial.AssetListFragment"
         android:label="دارایی‌ها" />
+
+    <fragment
+        android:id="@+id/goldPortfolioFragment"
+        android:name="com.maliar.pro.ui.financial.GoldPortfolioFragment"
+        android:label="طلا و سکه" />
 
     <fragment
         android:id="@+id/debtListFragment"
