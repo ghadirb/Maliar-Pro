@@ -1,4 +1,4 @@
-package com.maliar.pro.utils
+﻿package com.maliar.pro.utils
 
 /**
  * The "دیکشنری" of food ingredients the meal-planning module recognizes. Used two ways:
@@ -48,13 +48,113 @@ object FoodCatalog {
         FoodItemDef("دوغ", "لیتر", 200_000.0)
     )
 
+    private val aliases: Map<String, List<String>> = mapOf(
+        "سیب‌زمینی" to listOf("سیب زمینی", "سیبزمینی", "سیب زمینی تازه", "سیب زمینی سرخ کرده", "چیپس سیب زمینی"),
+        "گوجه‌فرنگی" to listOf(
+            "گوجه", "گوجه فرنگی", "گوجهفرنگی",
+            "گرجه", "گرجه فرنگی", "گرجه‌فرنگی", "گرجهفرنگی",
+            "گوجه گیلاسی", "گوجه ریز", "رب گوجه فرنگی"
+        ),
+        "تخم‌مرغ" to listOf("تخم مرغ", "تخممرغ"),
+        "رب گوجه" to listOf("رب گوجه‌فرنگی", "رب گوجه فرنگی", "ربگوجه", "رب"),
+        "لوبیا" to listOf("لوبیا چیتی", "لوبیا قرمز", "لوبیا سفید", "لوبیا سبز"),
+        "سبزی" to listOf("سبزی خوردن", "سبزی آش", "سبزی پلو", "سبزیجات"),
+        "میوه" to listOf("میوه جات", "میوهجات", "ميو"),
+        "برنج" to listOf("برنج ایرانی", "برنج هندی", "برنج دم سیاه", "برنج طارم", "برنج هاشمی", "برنج کیلویی"),
+        "مرغ" to listOf("مرغ کامل", "مرغ قطعه", "مرغ زنده", "ران مرغ", "سینه مرغ", "جوجه", "جوجه کباب"),
+        "گوشت" to listOf("گوشت قرمز", "گوشت گوسفند", "گوشت گوساله", "گوشت چرخکرده", "گوشت چرخ کرده", "گوشت کیلویی"),
+        "شیر" to listOf("شیر پرچرب", "شیر کم چرب", "شیر استریلیزه", "شیر پاستوریزه", "شیر کاکائو", "شیر موز"),
+        "ماست" to listOf("ماست چکیده", "ماست موسیر", "ماست ساده", "ماست میوه", "ماست یونانی", "ماست کیسه ای"),
+        "پنیر" to listOf("پنیر سفید", "پنیر پر چرب", "پنیر کم چرب", "پنیر پیتزا", "پنیر موزارلا", "پنیر لیقوان", "پنیر کوزه"),
+        "روغن" to listOf("روغن مایع", "روغن جامد", "روغن زیتون", "روغن کنجد", "روغن کانولا", "روغن نارگیل", "روغن حیوانی"),
+        "نان" to listOf("نان بربری", "نان سنگک", "نان تافتون", "نان لواش", "نان باگت", "نان تست", "نان جو"),
+        "عدس" to listOf("عدس دال", "عدس سبز", "عدس قرمز"),
+        "نخود" to listOf("نخودچی", "نخود آبگوشتی", "نخود فرنگی"),
+        "دوغ" to listOf("دوغ گازدار", "دوغ بدون گاز", "دوغ سنتی"),
+        "پیاز" to listOf("پیاز زرد", "پیاز قرمز", "پیاز سفید", "پیازچه", "پیاز کیلویی"),
+        "خیار" to listOf("خیار شور", "خیار سالادی", "خیار بوته", "خیار چنبر"),
+        "موز" to listOf("موز کیلویی", "موز اکوادوری"),
+        "سیب" to listOf("سیب قرمز", "سیب زرد", "سیب سبز", "سیب کیلویی"),
+        "پرتقال" to listOf("پرتقال کیلویی", "پرتقال توسرخ", "پرتقال والنسیا", "نارنج"),
+        "هویج" to listOf("هویج کیلویی", "هویج فرنگی", "هویج ایرانی"),
+        "کاهو" to listOf("کاهو سالادی", "کاهو پیچ"),
+        "کرفس" to listOf("کرفس ساقه"),
+        "فلفل" to listOf("فلفل دلمه", "فلفل سبز", "فلفل قرمز", "فلفل تند"),
+        "بادمجان" to listOf("بادمجان کیلویی", "بادمجان قلمی"),
+        "کدو" to listOf("کدو سبز", "کدو حلوایی", "کدو تنبل"),
+        "قارچ" to listOf("قارچ کیلویی", "قارچ فله"),
+        "لیمو" to listOf("لیمو ترش", "لیمو شیرین", "لیمو شيرين", "آبلیمو"),
+        "خرما" to listOf("خرما کیلویی", "خرما مضافتی", "خرما پیارم"),
+        "گردو" to listOf("گردو کیلویی", "گردو مغز"),
+        "بادام" to listOf("بادام کیلویی", "بادام درختی", "بادام زمینی")
+    )
+
+    /** A conservative Persian comparison key: spaces, half-spaces and punctuation do not
+     * matter; common Arabic letter variants are unified. It intentionally does not apply
+     * broad fuzzy matching, so one food is never silently priced as another. */
+    fun canonicalKey(value: String): String = value.trim()
+        .lowercase(java.util.Locale.ROOT)
+        .replace('ي', 'ی')
+        .replace('ى', 'ی')
+        .replace('ك', 'ک')
+        .replace('ة', 'ه')
+        .filter { it.isLetterOrDigit() }
+        .toString()
+
+    /** Recognizes a catalog food from an exact item/alias name or a longer expense
+     * description that contains one. The longest matching alias wins (e.g. "گوجه فرنگی"
+     * before "گوجه"). */
+    fun matchName(value: String): FoodItemDef? {
+        val key = canonicalKey(value)
+        if (key.isBlank()) return null
+        val candidates = ITEMS.flatMap { item ->
+            (listOf(item.name) + aliases[item.name].orEmpty()).map { alias -> item to canonicalKey(alias) }
+        }.filter { it.second.isNotBlank() }
+        return candidates.filter { it.second == key }
+            .maxByOrNull { it.second.length }
+            ?.first
+            ?: candidates.filter { key.contains(it.second) }
+                .maxByOrNull { it.second.length }
+                ?.first
+    }
+
     /** Best-effort match: does this expense description mention a known food ingredient?
      *  Returns the matched [FoodItemDef] or null - a plain substring check, deliberately
      *  simple since the person's own free-text descriptions are short and Persian word
      *  forms vary too much for anything fancier to be reliably better. */
     fun findMatch(description: String): FoodItemDef? {
-        val normalized = description.trim()
-        if (normalized.isBlank()) return null
-        return ITEMS.firstOrNull { normalized.contains(it.name) }
+        return matchName(description)
+    }
+
+    /** Category labels the person might reasonably pick for a grocery/food-store
+     *  purchase, distinct from the "خوراک" budget-category name itself (e.g. someone
+     *  categorizing a corner-store run as "سوپر" rather than "خوراک"). */
+    private val FOOD_ADJACENT_CATEGORIES = setOf("سوپر", "فروشگاه", "خواربار", "مواد غذایی")
+
+    /** Generic Persian phrases describing a grocery/food-shopping trip without naming a
+     *  specific catalog ingredient (e.g. "خرید مواد غذایی این هفته" or "خرید خوراکی")، so a
+     *  description-only check can still recognize an everyday grocery run even when it
+     *  doesn't happen to mention rice/oil/etc. by name. */
+    private val GENERIC_FOOD_PHRASES = listOf(
+        "مواد غذایی", "خوراکی", "خواربار", "سوپرمارکت", "سوپر مارکت", "بقالی",
+        "میوه و تره بار", "میوه‌فروشی", "میوه فروشی", "سبزی فروشی", "قصابی", "نانوایی"
+    )
+
+    /**
+     * Best-effort answer to "should this expense count as food/grocery spending?" -
+     * used by both the budget screen (matching expenses against a "خوراک" budget) and
+     * the meal-planning price history. Deliberately requires the expense's own
+     * [category] to be blank/food-adjacent *first*: an expense the person explicitly
+     * filed under a different category (خودرو, حمل‌ونقل, ...) must never be pulled into
+     * food totals just because a food-catalog word or generic grocery phrase happens to
+     * appear in its free-text [description] - e.g. "تعویض روغن موتور" for a car mentions
+     * "روغن" (also a cooking-oil catalog item) but is not a grocery purchase.
+     */
+    fun isLikelyFoodExpense(category: String, description: String): Boolean {
+        val normalizedCategory = category.trim().lowercase(java.util.Locale.ROOT)
+        if (normalizedCategory in FOOD_ADJACENT_CATEGORIES) return true
+        if (normalizedCategory.isNotBlank()) return false
+        return findMatch(description) != null || GENERIC_FOOD_PHRASES.any { description.contains(it) }
     }
 }
+

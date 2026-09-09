@@ -11,7 +11,14 @@ import kotlinx.coroutines.flow.Flow
  *  [isEstimated] = true means this is the static fallback price, not something the person
  *  actually paid - the UI must always label it "تقریبی" per the spec, never show it as a
  *  confirmed price. */
-data class FoodPrice(val amount: Double, val isEstimated: Boolean, val unitLabel: String)
+enum class FoodPriceSource { MANUAL, EXPENSE_HISTORY, MARKET_CHECK, CATALOG_ESTIMATE }
+
+data class FoodPrice(
+    val amount: Double,
+    val isEstimated: Boolean,
+    val unitLabel: String,
+    val source: FoodPriceSource
+)
 
 data class ShoppingListItem(
     val ingredientName: String,
@@ -27,16 +34,21 @@ class MealPlanManager(context: Context) {
 
     private val dao = AppDatabase.getDatabase(context).mealPlanDao()
     private val accountingManager = AccountingManager(context)
+    private val foodPriceManager = FoodPriceManager(context)
+    private val productPricing = MarketAssistantManager(context)
 
     fun getAllPlans(): Flow<List<MealPlan>> = dao.getAllPlans()
     fun getLatestPlan(): Flow<MealPlan?> = dao.getLatestPlan()
     fun getEntries(planId: Long): Flow<List<MealPlanEntry>> = dao.getEntries(planId)
 
     /** All of the person's own Expense rows recognized as food purchases (item #1 of the
-     *  spec) - matched by scanning [Expense.description] against FoodCatalog, since
-     *  category text is free-form and can't be relied on. Newest first. */
+     *  spec) - matched via [FoodCatalog.isLikelyFoodExpense], which requires the
+     *  expense's own category to be blank/food-adjacent before scanning its description
+     *  (so e.g. a "خودرو"-categorized "تعویض روغن موتور" entry is never mistaken for a
+     *  cooking-oil purchase just because "روغن" appears in its text). Newest first. */
     private suspend fun getFoodExpenses(): List<Pair<Expense, String>> {
         return accountingManager.getAllExpensesList()
+            .filter { FoodCatalog.isLikelyFoodExpense(it.category, it.description) }
             .mapNotNull { expense -> FoodCatalog.findMatch(expense.description)?.let { expense to it.name } }
             .sortedByDescending { it.first.date }
     }
@@ -48,15 +60,25 @@ class MealPlanManager(context: Context) {
     suspend fun getPriceFor(ingredientName: String): FoodPrice {
         val catalogItem = FoodCatalog.ITEMS.find { it.name == ingredientName }
         val unitLabel = catalogItem?.unitLabel ?: ""
+        foodPriceManager.find(ingredientName)?.let { manual ->
+            return FoodPrice(
+                amount = manual.pricePerUnit,
+                isEstimated = false,
+                unitLabel = manual.unitLabel.ifBlank { unitLabel },
+                source = FoodPriceSource.MANUAL
+            )
+        }
         val lastUserPrice = getFoodExpenses()
             .filter { it.second == ingredientName }
             .maxByOrNull { it.first.date }
             ?.first?.amount
         return if (lastUserPrice != null) {
-            FoodPrice(lastUserPrice, isEstimated = false, unitLabel = unitLabel)
-        } else {
-            FoodPrice(catalogItem?.fallbackPricePerUnit ?: 0.0, isEstimated = true, unitLabel = unitLabel)
+            FoodPrice(lastUserPrice, isEstimated = false, unitLabel = unitLabel, source = FoodPriceSource.EXPENSE_HISTORY)
         }
+        else productPricing.localPrice(ingredientName)?.let { quote ->
+            FoodPrice(quote.price, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.MARKET_CHECK)
+        }
+        ?: FoodPrice(catalogItem?.fallbackPricePerUnit ?: 0.0, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.CATALOG_ESTIMATE)
     }
 
     private fun recipeCost(recipe: Recipe, prices: Map<String, FoodPrice>): Double =

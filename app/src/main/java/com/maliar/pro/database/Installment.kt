@@ -17,5 +17,10 @@ data class Installment(
     val recipient: String = "",
     val description: String = "",
     val lastPaymentDate: Long? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** Account each installment payment is deducted from when marked "پرداخت شد" (see
+     *  AccountingManager.payInstallment). Null keeps the old behavior of not touching any
+     *  account balance - creating an installment plan itself never moves money, only
+     *  paying one of its installments does. */
+    val accountId: Long? = null
 )

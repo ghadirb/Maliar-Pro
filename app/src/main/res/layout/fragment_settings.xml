@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background">
@@ -24,8 +25,8 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
             app:cardBackgroundColor="#FFF8E1"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -64,8 +65,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -108,8 +109,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -139,8 +140,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -224,8 +225,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -256,6 +257,84 @@
                     android:textSize="12sp"
                     android:textColor="#757575" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="12dp"
+                    android:background="#E0E0E0" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="فعال/غیرفعال کردن هر نوع هشدار به‌صورت جداگانه:"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="#757575" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightPeriodicPaymentSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:checked="true"
+                    android:text="نزدیک‌شدن پرداخت‌های دوره‌ای" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightInstallmentSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="نزدیک‌شدن سررسید اقساط" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightDebtSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="نزدیک‌شدن سررسید بدهی" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightBudgetSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="هشدار بودجه" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightGoalSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="عقب‌ماندن از هدف مالی" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightCategorySwingSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="نوسان هزینه‌های یک دسته نسبت به ماه قبل" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightMarketSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="نوسان نرخ طلا/دلار" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightSavingsSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="پیشنهاد امکان پس‌انداز" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/insightProjectionSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="پیش‌بینی مازاد/کسری پایان ماه" />
+
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
@@ -264,8 +343,96 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="نرخ طلا و ارز"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="این نرخ‌ها به‌صورت خودکار دریافت می‌شوند و دستیار هوشمند از آن‌ها در تحلیل‌ها استفاده می‌کند؛ نیازی به وارد کردن آدرسی نیست. آدرس زیر فقط برای کاربران پیشرفته است که می‌خواهند منبع اختصاصی خودشان را جایگزین کنند."
+                    android:textSize="12sp"
+                    android:textColor="#757575" />
+                <EditText
+                    android:id="@+id/marketRatesEndpointInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="آدرس HTTPS اختصاصی (اختیاری - برای کاربران پیشرفته)"
+                    android:inputType="textUri"
+                    android:singleLine="true" />
+                <EditText
+                    android:id="@+id/marketRatesTokenInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:hint="توکن دسترسی منبع اختصاصی (اختیاری)"
+                    android:inputType="textPassword"
+                    android:singleLine="true" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/fetchMarketRatesButton"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="آزمایش دریافت نرخ" />
+                <TextView
+                    android:id="@+id/marketRatesStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="12sp"
+                    android:textColor="#757575" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="آستانه هشدار نوسان نرخ"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="اگر نرخ طلا یا دلار نسبت به بررسی قبلی حداقل به این میزان تغییر کند، در پیشنهادهای هوشمند روزانه به شما اطلاع داده می‌شود."
+                    android:textSize="12sp"
+                    android:textColor="#757575" />
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/marketSwingThresholdSlider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:valueFrom="2"
+                    android:valueTo="10"
+                    android:stepSize="1" />
+                <TextView
+                    android:id="@+id/marketSwingThresholdLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:textColor="#757575"
+                    tools:text="۳٪" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -318,8 +485,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -371,8 +538,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -431,7 +598,117 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/biometricLockSwitch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="قفل بیومتریک برنامه" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="برای بازکردن مالیار از اثرانگشت یا تشخیص چهره ثبت‌شده گوشی استفاده می‌شود؛ هیچ اثرانگشتی در برنامه ذخیره نمی‌شود."
+                    android:textSize="12sp"
+                    android:textColor="#757575" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/themeModeCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎨 ظاهر برنامه"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="می‌توانید مستقل از تنظیمات گوشی، حالت روشن یا تیره را خودتان انتخاب کنید."
+                    android:textColor="#757575"
+                    android:textSize="12sp" />
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/themeModeToggle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true"
+                    app:selectionRequired="true">
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/themeModeSystemButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="سیستم" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/themeModeLightButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="روشن" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/themeModeDarkButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="تیره" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/supportCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🛟 پشتیبانی مالیار پرو"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="تماس با پشتیبانی در تلگرام/ایتا/روبیکا، گزارش مشکل، پیشنهاد قابلیت و سوالات متداول"
+                    android:textColor="#757575"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 

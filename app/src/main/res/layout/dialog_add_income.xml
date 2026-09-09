@@ -43,4 +43,116 @@
             android:inputType="textMultiLine" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- «فروش کالا»: lets the whole amount above keep landing in the account balance as
+         real cash, while only (amount - بهای تمام‌شده) counts as profit in reports. Defaults
+         to "درآمد خدمات" (radioService) so existing behavior is unchanged unless the user
+         explicitly switches it. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="نوع درآمد"
+        android:layout_marginTop="16dp"
+        android:textSize="14sp" />
+
+    <RadioGroup
+        android:id="@+id/incomeTypeGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="4dp">
+
+        <RadioButton
+            android:id="@+id/radioService"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="درآمد خدمات" />
+
+        <RadioButton
+            android:id="@+id/radioProductSale"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:text="فروش کالا" />
+
+    </RadioGroup>
+
+    <LinearLayout
+        android:id="@+id/productSaleSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="بهای تمام‌شده کالا"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/costOfGoodsInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="نام کالا">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/productNameInput" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="text" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="تعداد">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/productQuantityInput" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="numberDecimal" android:text="1" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="قیمت اولیه (پیش از تخفیف)">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/listPriceInput" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="مبلغ تخفیف">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/discountAmountInput" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:id="@+id/profitPreviewText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:text="سود فروش: 0" />
+
+    </LinearLayout>
+
+    <!-- Account picker - see dialog_add_expense.xml for the matching comment; this
+         income is added to the chosen account's balance instead of subtracted. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="حساب"
+        android:layout_marginTop="16dp"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/accountSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" />
+
 </LinearLayout>

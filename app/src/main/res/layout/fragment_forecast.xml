@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="آینده مالی من"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="این یک برآورد است، نه پیش‌بینی قطعی؛ بر اساس اطلاعات ثبت‌شدهٔ شما در برنامه محاسبه می‌شود."
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+
+        <!-- Period selector: 30 / 60 / 90 days -->
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/forecastPeriodToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/forecast30Button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="۳۰ روز آینده" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/forecast60Button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="۶۰ روز آینده" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/forecast90Button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="۹۰ روز آینده" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <!-- Not-enough-data notice -->
+        <TextView
+            android:id="@+id/forecastInsufficientDataText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="برای پیش‌بینی دقیق‌تر، اطلاعات بیشتری دربارهٔ درآمد یا هزینه‌های دورهٔ خود ثبت کنید."
+            android:textColor="@color/text_secondary"
+            android:visibility="gone" />
+
+        <!-- Breakdown card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/forecastBreakdownCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="@color/card_background"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="موجودی فعلی (برآوردی)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/forecastStartingBalanceText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="۰ تومان"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="درآمدهای احتمالی (+)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/forecastIncomeText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="۰ تومان"
+                        android:textColor="@color/success"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="هزینه‌های پیش‌بینی‌شده (-)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/forecastExpenseText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="۰ تومان"
+                        android:textColor="@color/error"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="اقساط و پرداخت‌های آینده (-)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                    <TextView
+                        android:id="@+id/forecastCommitmentsText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="۰ تومان"
+                        android:textColor="@color/error"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="14dp"
+                    android:background="@color/text_secondary"
+                    android:alpha="0.2" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="موجودی احتمالی"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:id="@+id/forecastProjectedBalanceText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="۰ تومان"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+                <TextView
+                    android:id="@+id/forecastPeriodLabelText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="برآورد ۳۰ روز آینده"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Warning banner -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/forecastAlertCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="@color/warning"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/forecastAlertText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="14dp"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

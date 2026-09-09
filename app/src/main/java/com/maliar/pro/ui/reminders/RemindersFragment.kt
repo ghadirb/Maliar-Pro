@@ -1,4 +1,4 @@
-package com.maliar.pro.ui.reminders
+﻿package com.maliar.pro.ui.reminders
 
 import android.content.Intent
 import android.os.Bundle
@@ -102,6 +102,7 @@ class RemindersFragment : Fragment() {
 
     private fun loadReminders() {
         lifecycleScope.launch {
+            smartReminderManager.reconcileRecurringReminders()
             val reminders = smartReminderManager.getAllRemindersList()
             adapter.submitList(groupByCategory(reminders))
             updateHeader()
@@ -126,7 +127,7 @@ class RemindersFragment : Fragment() {
 
     private fun updateHeader() {
         lifecycleScope.launch {
-            val active = smartReminderManager.getActiveRemindersList()
+            val active = smartReminderManager.reconcileRecurringReminders()
             activeCountText.text = if (active.isEmpty()) {
                 "یادآوری فعالی وجود ندارد"
             } else {
@@ -135,16 +136,6 @@ class RemindersFragment : Fragment() {
 
             val next = active.filter { it.triggerTime > System.currentTimeMillis() }
                 .minByOrNull { it.triggerTime }
-
-            if (next != null) {
-                val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(next.triggerTime)
-                val cal = java.util.Calendar.getInstance().apply { timeInMillis = next.triggerTime }
-                val timeStr = String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
-                nextReminderText.text = "⏭ بعدی: ${next.title} — ${PersianCalendarHelper.formatJalali(y, m, d)} ساعت $timeStr"
-                nextReminderText.visibility = View.VISIBLE
-            } else {
-                nextReminderText.visibility = View.GONE
-            }
 
             val now = System.currentTimeMillis()
             val startOfToday = java.util.Calendar.getInstance().apply {
@@ -156,6 +147,17 @@ class RemindersFragment : Fragment() {
             val overdue = active.count { it.triggerTime < now }
             val today = active.count { it.triggerTime in startOfToday until endOfToday }
             val thisWeek = active.count { it.triggerTime in endOfToday until endOfWeek }
+
+            if (next != null) {
+                val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(next.triggerTime)
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = next.triggerTime }
+                val timeStr = String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
+                val extraText = if (today > 1) " (+${today - 1} مورد امروز)" else if (thisWeek > 0) " (+$thisWeek مورد تا هفته آینده)" else ""
+                nextReminderText.text = "⏭ بعدی: ${next.title} — ${PersianCalendarHelper.formatJalali(y, m, d)} ساعت $timeStr$extraText"
+                nextReminderText.visibility = View.VISIBLE
+            } else {
+                nextReminderText.visibility = View.GONE
+            }
             reminderPeriodSummaryText.text = "🔴 $overdue سررسیدشده   🟠 $today امروز   🔵 $thisWeek این هفته"
         }
     }

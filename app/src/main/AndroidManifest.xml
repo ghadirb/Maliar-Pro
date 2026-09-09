@@ -1,18 +1,32 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Voice command recording; requested only when user taps the mic button -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Full-screen intent for alarm reminders. Android 14+ requires this explicit
+         declaration for USE_FULL_SCREEN_INTENT; the permission is only requested when
+         the user first creates a FULL_SCREEN or SMART reminder. Play Store policy
+         allows this for alarm/reminder apps. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Used only after an explicit opt-in in Settings; never started automatically. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Lets us show the system "ignore battery optimization" dialog so reminders and the
+         home-screen widget keep refreshing on phones (Xiaomi/Samsung/Huawei, etc.) that
+         otherwise freeze background apps and show a stale/blank widget. Only ever opens a
+         system dialog the person can accept or dismiss; nothing is granted automatically. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Filled by the selected store flavor at build time. -->
     <uses-permission android:name="${marketPermission}" />
@@ -31,6 +45,14 @@
         <intent>
             <action android:name="ir.cafebazaar.pardakht.InAppBillingService.BIND" />
         </intent>
+        <!-- Support screen (see com.maliar.pro.support.SupportConfig): needed on
+             Android 11+ so we can actually detect/target these apps directly by
+             package - without this, startActivity(...).setPackage(...) for an
+             installed-but-unqueried app silently fails to resolve and we'd always
+             fall back to the browser even when the app is present. -->
+        <package android:name="org.telegram.messenger" />
+        <package android:name="ir.eitaa.messenger" />
+        <package android:name="ir.resaneh1.iptv" />
     </queries>
 
 
@@ -77,6 +99,32 @@
             android:turnScreenOn="true"
             android:theme="@style/Theme.MaliarPro.Alarm" />
 
+        <!-- Voice command: record and transcribe a short command to create an expense,
+             a reminder, or make a call. Launched from the notification action or the
+             voice FAB in the assistant tab. -->
+        <activity
+            android:name=".ui.assistant.VoiceCommandActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MaliarPro"
+            android:label="دستور صوتی" />
+
+        <!-- Exposes cache-dir files (currently: generated smart-reminder TTS audio) to the
+             system as content:// URIs, e.g. so a heads-up notification (posted while the
+             device is unlocked and the app is backgrounded, where Android intentionally
+             won't auto-launch FullScreenAlarmActivity - see ReminderReceiver) can still
+             play the spoken reminder as its notification sound instead of the plain alarm
+             tone. Nothing here is exported/world-readable; access is only ever granted
+             per-URI via FLAG_GRANT_READ_URI_PERMISSION. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.maliar.pro.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Reminder Receivers -->
         <receiver
             android:name=".receivers.ReminderReceiver"
@@ -93,6 +141,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
 

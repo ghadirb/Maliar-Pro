@@ -23,8 +23,10 @@ import com.maliar.pro.adapters.ReportRowAdapter
 import com.maliar.pro.adapters.ReportRowItem
 import com.maliar.pro.viewmodels.FinancialReportsViewModel
 import com.maliar.pro.viewmodels.FinancialReportsViewModelFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.maliar.pro.utils.PersianCalendarHelper
 
 /** "گزارش‌های مالی حرفه‌ای": period-scoped income/expense totals, biggest individual
  *  expenses/incomes, the category that ate the most money, and an income-vs-expense trend
@@ -67,6 +69,10 @@ class FinancialReportsFragment : Fragment() {
 
         setupChart()
 
+        lifecycleScope.launch {
+            loadMarketRateTrend()
+        }
+
         binding.exportCsvButton.setOnClickListener {
             val period = viewModel.selectedPeriod.value.name.lowercase()
             val offset = viewModel.periodOffset.value
@@ -82,6 +88,7 @@ class FinancialReportsFragment : Fragment() {
 
         binding.periodPrevButton.setOnClickListener { viewModel.goToPreviousPeriod() }
         binding.periodNextButton.setOnClickListener { viewModel.goToNextPeriod() }
+        binding.periodSelectButton.setOnClickListener { showJalaliMonthPicker() }
 
         binding.periodChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
@@ -110,6 +117,36 @@ class FinancialReportsFragment : Fragment() {
         }
     }
 
+    private fun showJalaliMonthPicker() {
+        val container = android.widget.LinearLayout(requireContext()).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            setPadding(24, 8, 24, 0)
+        }
+        val yearInput = android.widget.EditText(requireContext()).apply {
+            hint = "سال شمسی"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        val monthInput = android.widget.EditText(requireContext()).apply {
+            hint = "ماه ۱ تا ۱۲"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        container.addView(yearInput, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+        container.addView(monthInput, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("انتخاب ماه و سال شمسی")
+            .setView(container)
+            .setNegativeButton("انصراف", null)
+            .setPositiveButton("نمایش") { _, _ ->
+                val year = yearInput.text.toString().toIntOrNull()
+                val month = monthInput.text.toString().toIntOrNull()
+                if (year == null || month == null || month !in 1..12) {
+                    android.widget.Toast.makeText(requireContext(), "سال و ماه شمسی معتبر وارد کنید", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    viewModel.selectJalaliMonth(year, month)
+                }
+            }.show()
+    }
+
     private fun setupChart() {
         binding.trendChart.apply {
             description.isEnabled = false
@@ -120,6 +157,81 @@ class FinancialReportsFragment : Fragment() {
             setTouchEnabled(true)
             setPinchZoom(true)
         }
+        binding.marketRateTrendChart.apply {
+            description.isEnabled = false
+            legend.isEnabled = true
+            axisRight.isEnabled = false
+            xAxis.position = XAxis.XAxisPosition.BOTTOM
+            xAxis.granularity = 1f
+            setTouchEnabled(true)
+            setPinchZoom(true)
+        }
+    }
+
+    /** Draws up to the last 30 days of gold/currency history recorded by
+     *  [com.maliar.pro.utils.FinancialInsightWorker] (see
+     *  [com.maliar.pro.database.FinancialStatusManager.getMarketRateHistory]). Gold and
+     *  currency are shown as two lines on the same chart despite their very different
+     *  scale (gold is roughly 100x the dollar rate) since MPAndroidChart auto-scales each
+     *  dataset's Y range independently by default - a normalized "% change" view could be
+     *  added later, but the raw values are simpler and match how the rest of the app shows
+     *  these numbers. Hides the whole section (label + chart) when there's fewer than 2
+     *  days of history to plot, since a single point isn't a "trend". */
+    private suspend fun loadMarketRateTrend() {
+        val history = withContext(Dispatchers.IO) {
+            runCatching {
+                com.maliar.pro.database.FinancialStatusManager(requireContext()).getMarketRateHistory(30)
+            }.getOrNull()
+        } ?: emptyList()
+
+        if (history.size < 2) {
+            binding.marketRateTrendLabel.visibility = View.GONE
+            binding.marketRateTrendChart.visibility = View.GONE
+            return
+        }
+
+        val toToman = { rial: Double -> rial / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN }
+        val goldEntries = history.mapIndexedNotNull { i, h -> h.gold?.let { Entry(i.toFloat(), toToman(it).toFloat()) } }
+        val currencyEntries = history.mapIndexedNotNull { i, h -> h.currency?.let { Entry(i.toFloat(), toToman(it).toFloat()) } }
+        val labels = history.map {
+            val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(it.date)
+            "$d/$m"
+        }
+
+        val dataSets = mutableListOf<com.github.mikephil.charting.interfaces.datasets.ILineDataSet>()
+        if (goldEntries.size >= 2) {
+            dataSets.add(LineDataSet(goldEntries, "طلا (تومان)").apply {
+                color = Color.parseColor("#FFB300")
+                setCircleColor(Color.parseColor("#FFB300"))
+                lineWidth = 2f
+                circleRadius = 2.5f
+                setDrawValues(false)
+                axisDependency = com.github.mikephil.charting.components.YAxis.AxisDependency.LEFT
+            })
+        }
+        if (currencyEntries.size >= 2) {
+            dataSets.add(LineDataSet(currencyEntries, "دلار (تومان)").apply {
+                color = Color.parseColor("#1E88E5")
+                setCircleColor(Color.parseColor("#1E88E5"))
+                lineWidth = 2f
+                circleRadius = 2.5f
+                setDrawValues(false)
+                axisDependency = com.github.mikephil.charting.components.YAxis.AxisDependency.RIGHT
+            })
+        }
+
+        if (dataSets.isEmpty()) {
+            binding.marketRateTrendLabel.visibility = View.GONE
+            binding.marketRateTrendChart.visibility = View.GONE
+            return
+        }
+
+        binding.marketRateTrendChart.axisRight.isEnabled = currencyEntries.size >= 2
+        binding.marketRateTrendChart.xAxis.valueFormatter = IndexAxisValueFormatter(labels)
+        binding.marketRateTrendChart.data = com.github.mikephil.charting.data.LineData(dataSets)
+        binding.marketRateTrendChart.invalidate()
+        binding.marketRateTrendLabel.visibility = View.VISIBLE
+        binding.marketRateTrendChart.visibility = View.VISIBLE
     }
 
     private fun exportReport(uri: android.net.Uri, isPdf: Boolean) {
@@ -185,10 +297,25 @@ class FinancialReportsFragment : Fragment() {
     private fun renderReport(report: FinancialReport) {
         binding.totalIncomeText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.totalIncome, "")
         binding.totalExpenseText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.totalExpense, "")
-        binding.netText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.net, "")
+        binding.netText.text = com.maliar.pro.utils.CurrencyFormatter.format(report.netProfit, "")
         binding.netText.setTextColor(
-            if (report.net >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
+            if (report.netProfit >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
         )
+
+        // «فروش کالا»: کارت تفکیک فقط وقتی این دوره فروش کالا ثبت شده باشد نمایش داده
+        // می‌شود، تا کاربران فقط-خدمات هیچ تغییری در صفحه نبینند.
+        if (report.totalProductSales > 0 || report.totalCostOfGoods > 0) {
+            binding.profitBreakdownCard.visibility = View.VISIBLE
+            binding.productSalesText.text = "فروش کالا: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalProductSales)}"
+            binding.costOfGoodsText.text = "بهای تمام‌شده: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalCostOfGoods)}"
+            binding.serviceIncomeText.text = "درآمد خدمات: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalServiceIncome)}"
+            binding.totalProfitText.text = "سود ناخالص: ${com.maliar.pro.utils.CurrencyFormatter.format(report.totalProfit)} · سود خالص: ${com.maliar.pro.utils.CurrencyFormatter.format(report.netProfit)}"
+            binding.totalProfitText.setTextColor(
+                if (report.totalProfit >= 0) Color.parseColor("#4CAF50") else Color.parseColor("#F44336")
+            )
+        } else {
+            binding.profitBreakdownCard.visibility = View.GONE
+        }
 
         if (report.topExpenseCategory != null) {
             binding.topCategoryLabel.visibility = View.VISIBLE

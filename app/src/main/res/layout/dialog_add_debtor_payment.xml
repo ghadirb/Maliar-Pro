@@ -44,4 +44,19 @@
             android:inputType="text" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- Account this payment moves money into/out of - see AddDebtorPaymentDialog.kt
+         and DebtorManager.addPayment for the direction-aware balance adjustment. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="حساب"
+        android:layout_marginTop="16dp"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/accountSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" />
+
 </LinearLayout>

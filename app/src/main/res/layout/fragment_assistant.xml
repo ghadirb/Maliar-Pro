@@ -9,7 +9,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:paddingBottom="32dp">
 
         <!-- Header -->
         <LinearLayout
@@ -31,8 +32,17 @@
                 android:layout_weight="1"
                 android:layout_marginStart="12dp"
                 android:text="دستیار مالی"
+                style="@style/TextAppearance.MaliarPro.SectionHeader"
                 android:textSize="24sp"
                 android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/voiceCommandButton"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="دستور صوتی"
+                android:text="🎙️ صوتی" />
 
         </LinearLayout>
 
@@ -41,6 +51,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="کارت‌های هوشمند"
+            style="@style/TextAppearance.MaliarPro.SectionHeader"
             android:textSize="16sp"
             android:textStyle="bold"
             android:layout_marginBottom="8dp" />
@@ -60,8 +71,8 @@
                     android:layout_width="200dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp">
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -109,8 +120,8 @@
                     android:layout_width="200dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp">
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -157,8 +168,8 @@
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="200dp"
                     android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp">
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -222,30 +233,35 @@
             <com.google.android.material.chip.Chip
                 android:id="@+id/question1"
                 android:layout_width="wrap_content"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_height="wrap_content"
                 android:text="پولم کجا خرج شد؟" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/question2"
                 android:layout_width="wrap_content"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_height="wrap_content"
                 android:text="تحلیل این ماه" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/question3"
                 android:layout_width="wrap_content"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_height="wrap_content"
                 android:text="پیشنهاد سرمایه‌گذاری" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/question4"
                 android:layout_width="wrap_content"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_height="wrap_content"
                 android:text="آیا می‌توانم این خرید را انجام دهم؟" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/question5"
                 android:layout_width="wrap_content"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_height="wrap_content"
                 android:text="برنامه غذایی" />
 
@@ -263,8 +279,8 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="300dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"

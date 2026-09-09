@@ -11,11 +11,41 @@ class PreferencesManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
+    /** Manual light/dark override for the whole app (design/modern-ui-phase1: previously
+     *  the app only ever followed the system's day/night setting with no in-app control). */
+    enum class ThemeMode(val storageValue: String) {
+        SYSTEM("system"), LIGHT("light"), DARK("dark");
+
+        companion object {
+            fun fromStorageValue(value: String?): ThemeMode = entries.find { it.storageValue == value } ?: SYSTEM
+        }
+    }
+
+    fun getThemeMode(): ThemeMode = ThemeMode.fromStorageValue(prefs.getString(KEY_THEME_MODE, null))
+
+    fun setThemeMode(mode: ThemeMode) {
+        prefs.edit().putString(KEY_THEME_MODE, mode.storageValue).apply()
+        applyThemeMode(mode)
+    }
+
     companion object {
         private const val PREFS_NAME = "maliar_pro_prefs"
+
+        /** Applies [mode] to the whole process via AppCompat's night-mode delegate -
+         *  AppCompat automatically recreates any active Activities for it, so calling
+         *  this from Settings takes effect immediately with no manual restart needed. */
+        fun applyThemeMode(mode: ThemeMode) {
+            val nightMode = when (mode) {
+                ThemeMode.LIGHT -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+                ThemeMode.DARK -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+                ThemeMode.SYSTEM -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            }
+            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(nightMode)
+        }
         private const val KEY_API_KEYS = "api_keys"
         private const val KEY_AUTO_PROVISIONING = "auto_provisioning"
         private const val KEY_NOTIFICATION_MODE = "notification_mode"
+        private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_BACKGROUND_SERVICE_ENABLED = "background_service_enabled"
         private const val KEY_LAST_BACKUP_URI = "last_backup_uri"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
@@ -28,6 +58,22 @@ class PreferencesManager(context: Context) {
         private const val KEY_QUIET_HOURS_END_MINUTES = "quiet_hours_end_minutes"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_LAST_SEEN_ANNOUNCEMENT_ID = "last_seen_announcement_id"
+        private const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_optimization_prompt_dismissed"
+        private const val KEY_FULL_SCREEN_INTENT_PROMPT_DISMISSED = "full_screen_intent_prompt_dismissed"
+        private const val KEY_BIOMETRIC_LOCK_ENABLED = "biometric_lock_enabled"
+        private const val KEY_MARKET_RATES_ENDPOINT = "market_rates_endpoint"
+        private const val KEY_MARKET_RATES_TOKEN = "market_rates_token"
+        private const val KEY_MARKET_RATES_CACHE = "market_rates_cache"
+        private const val KEY_MARKET_SWING_THRESHOLD = "market_swing_threshold_percent"
+        private const val KEY_INSIGHT_PERIODIC_PAYMENT_ENABLED = "insight_periodic_payment_enabled"
+        private const val KEY_INSIGHT_BUDGET_ENABLED = "insight_budget_enabled"
+        private const val KEY_INSIGHT_INSTALLMENT_ENABLED = "insight_installment_enabled"
+        private const val KEY_INSIGHT_DEBT_ENABLED = "insight_debt_enabled"
+        private const val KEY_INSIGHT_GOAL_ENABLED = "insight_goal_enabled"
+        private const val KEY_INSIGHT_SAVINGS_ENABLED = "insight_savings_enabled"
+        private const val KEY_INSIGHT_CATEGORY_SWING_ENABLED = "insight_category_swing_enabled"
+        private const val KEY_INSIGHT_MARKET_ENABLED = "insight_market_enabled"
+        private const val KEY_INSIGHT_PROJECTION_ENABLED = "insight_projection_enabled"
 
         // --- Subscription / entitlement ---
         private const val KEY_DEVICE_ID = "device_id"
@@ -120,6 +166,46 @@ class PreferencesManager(context: Context) {
 
     fun isFinancialInsightsEnabled(): Boolean = prefs.getBoolean(KEY_FINANCIAL_INSIGHTS_ENABLED, true)
 
+    // --- Individual financial-insight toggles (all on by default; only relevant while the
+    //     master switch above is also on). Each corresponds to one candidate insight the
+    //     worker can pick from - see FinancialInsightWorker for the priority order. ---
+
+    fun setInsightPeriodicPaymentEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_PERIODIC_PAYMENT_ENABLED, enabled).apply()
+    fun isInsightPeriodicPaymentEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_PERIODIC_PAYMENT_ENABLED, true)
+
+    fun setInsightInstallmentEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_INSTALLMENT_ENABLED, enabled).apply()
+    fun isInsightInstallmentEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_INSTALLMENT_ENABLED, true)
+
+    fun setInsightDebtEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_DEBT_ENABLED, enabled).apply()
+    fun isInsightDebtEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_DEBT_ENABLED, true)
+
+    fun setInsightBudgetEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_BUDGET_ENABLED, enabled).apply()
+    fun isInsightBudgetEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_BUDGET_ENABLED, true)
+
+    fun setInsightGoalEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_GOAL_ENABLED, enabled).apply()
+    fun isInsightGoalEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_GOAL_ENABLED, true)
+
+    fun setInsightSavingsEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_SAVINGS_ENABLED, enabled).apply()
+    fun isInsightSavingsEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_SAVINGS_ENABLED, true)
+
+    fun setInsightCategorySwingEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_CATEGORY_SWING_ENABLED, enabled).apply()
+    fun isInsightCategorySwingEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_CATEGORY_SWING_ENABLED, true)
+
+    fun setInsightMarketEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_MARKET_ENABLED, enabled).apply()
+    fun isInsightMarketEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_MARKET_ENABLED, true)
+
+    fun setInsightProjectionEnabled(enabled: Boolean) =
+        prefs.edit().putBoolean(KEY_INSIGHT_PROJECTION_ENABLED, enabled).apply()
+    fun isInsightProjectionEnabled(): Boolean = prefs.getBoolean(KEY_INSIGHT_PROJECTION_ENABLED, true)
+
     // --- Automatic due-date reminders (checks/installments/debts/debtors) ---
 
     fun setAutoDueRemindersEnabled(enabled: Boolean) {
@@ -189,6 +275,33 @@ class PreferencesManager(context: Context) {
 
     fun isOnboardingCompleted(): Boolean = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
 
+    fun isBiometricLockEnabled(): Boolean = prefs.getBoolean(KEY_BIOMETRIC_LOCK_ENABLED, false)
+
+    fun setBiometricLockEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK_ENABLED, enabled).apply()
+    }
+
+    fun getMarketRatesEndpoint(): String = prefs.getString(KEY_MARKET_RATES_ENDPOINT, "") ?: ""
+    fun setMarketRatesEndpoint(endpoint: String) {
+        prefs.edit().putString(KEY_MARKET_RATES_ENDPOINT, endpoint.trim()).apply()
+    }
+    fun getMarketRatesToken(): String = prefs.getString(KEY_MARKET_RATES_TOKEN, "") ?: ""
+    fun setMarketRatesToken(token: String) {
+        prefs.edit().putString(KEY_MARKET_RATES_TOKEN, token.trim()).apply()
+    }
+    fun cacheMarketRates(json: String) {
+        prefs.edit().putString(KEY_MARKET_RATES_CACHE, json).apply()
+    }
+    fun getCachedMarketRates(): String? = prefs.getString(KEY_MARKET_RATES_CACHE, null)
+
+    /** Minimum day-over-day gold/currency swing (percent) worth a notification - see
+     *  [com.maliar.pro.utils.FinancialInsightWorker]. User-adjustable in Settings; 3.0 by
+     *  default, same as the value this feature originally shipped hardcoded with. */
+    fun getMarketSwingThresholdPercent(): Float = prefs.getFloat(KEY_MARKET_SWING_THRESHOLD, 3.0f)
+    fun setMarketSwingThresholdPercent(percent: Float) {
+        prefs.edit().putFloat(KEY_MARKET_SWING_THRESHOLD, percent).apply()
+    }
+
     fun setOnboardingCompleted(completed: Boolean) {
         prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
     }
@@ -199,6 +312,32 @@ class PreferencesManager(context: Context) {
 
     fun setLastSeenAnnouncementId(id: String) {
         prefs.edit().putString(KEY_LAST_SEEN_ANNOUNCEMENT_ID, id).apply()
+    }
+
+    // --- Battery optimization prompt (widget/reminder reliability) ---
+
+    /** True once the person has explicitly dismissed the "ignore battery optimization"
+     *  prompt with "بعداً" (later), so we don't nag them again every app open. If they
+     *  actually grant the exemption, [android.os.PowerManager.isIgnoringBatteryOptimizations]
+     *  itself becomes the source of truth and this flag stops mattering. */
+    fun hasBatteryOptimizationPromptBeenDismissed(): Boolean =
+        prefs.getBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, false)
+
+    fun setBatteryOptimizationPromptDismissed(dismissed: Boolean) {
+        prefs.edit().putBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, dismissed).apply()
+    }
+
+    // --- Full-screen intent prompt (Android 14+ reminder reliability) ---
+
+    /** Same "بعداً" dismissal pattern as the battery-optimization prompt above, for the
+     *  "USE_FULL_SCREEN_INTENT" special permission. If the person grants it,
+     *  [android.app.NotificationManager.canUseFullScreenIntent] becomes the source of
+     *  truth and this flag stops mattering. */
+    fun hasFullScreenIntentPromptBeenDismissed(): Boolean =
+        prefs.getBoolean(KEY_FULL_SCREEN_INTENT_PROMPT_DISMISSED, false)
+
+    fun setFullScreenIntentPromptDismissed(dismissed: Boolean) {
+        prefs.edit().putBoolean(KEY_FULL_SCREEN_INTENT_PROMPT_DISMISSED, dismissed).apply()
     }
 
     // --- Subscription / entitlement ---

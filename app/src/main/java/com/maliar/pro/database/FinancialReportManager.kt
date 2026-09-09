@@ -21,9 +21,23 @@ data class FinancialReport(
     val trend: List<ReportPoint>,
     /** Every category's share of this period's total expense, sorted descending - used for
      *  the "مقایسه با میانگین" benchmark card, not just the single top category above. */
-    val categoryBreakdown: List<CategoryTotal> = emptyList()
+    val categoryBreakdown: List<CategoryTotal> = emptyList(),
+    /** «فروش کالا»: [totalIncome] above stays the *cash* figure it always was (every
+     *  toman that actually landed in an account, service income + full product sale price
+     *  alike). These four fields break that down further so reports can show real profit
+     *  alongside real cash flow instead of conflating the two. All default so old call
+     *  sites/tests that only pass the first eight params keep compiling unchanged. */
+    val totalProductSales: Double = 0.0,
+    val totalCostOfGoods: Double = 0.0,
+    val totalServiceIncome: Double = totalIncome,
+    val totalProfit: Double = totalIncome
 ) {
+    /** خالص نقدی (cash-based) - unchanged meaning from before this field existed. */
     val net: Double get() = totalIncome - totalExpense
+
+    /** سود کل واقعی دوره (خدمات + سود فروش کالا) منهای هزینه‌ها. برای کسب‌وکارهایی که
+     *  فقط خدمات دارند، دقیقا برابر net است. */
+    val netProfit: Double get() = totalProfit - totalExpense
 }
 
 /**
@@ -70,7 +84,20 @@ class FinancialReportManager(
             .map { (category, list) -> CategoryTotal(category, list.sumOf { it.amount }) }
             .sortedByDescending { it.total }
 
-        return FinancialReport(period, totalIncome, totalExpense, topExpenses, topIncomes, topCategory, trend, categoryBreakdown)
+        // «فروش کالا»: split this period's incomes into product-sale vs. service, and cash
+        // vs. profit. For anyone who has never used the feature, isProductSale is always
+        // false so totalProductSales/totalCostOfGoods are 0 and totalProfit == totalIncome,
+        // exactly matching pre-feature behavior.
+        val productSaleIncomes = incomesInPeriod.filter { it.isProductSale }
+        val totalProductSales = productSaleIncomes.sumOf { it.amount }
+        val totalCostOfGoods = productSaleIncomes.sumOf { it.costOfGoods }
+        val totalServiceIncome = totalIncome - totalProductSales
+        val totalProfit = incomesInPeriod.sumOf { it.profit }
+
+        return FinancialReport(
+            period, totalIncome, totalExpense, topExpenses, topIncomes, topCategory, trend, categoryBreakdown,
+            totalProductSales, totalCostOfGoods, totalServiceIncome, totalProfit
+        )
     }
 
     /** Human-readable "from - to" label for the given period/offset window, e.g.

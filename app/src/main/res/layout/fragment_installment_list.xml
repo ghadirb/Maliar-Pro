@@ -9,14 +9,17 @@
         android:id="@+id/installmentRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="8dp" />
+        android:clipToPadding="false"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="96dp" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/addInstallmentFab"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
+        android:layout_margin="20dp"
         android:contentDescription="افزودن قسط"
         android:src="@android:drawable/ic_input_add" />
 

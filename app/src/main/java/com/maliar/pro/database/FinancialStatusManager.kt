@@ -5,12 +5,36 @@ import kotlinx.coroutines.flow.Flow
 
 class FinancialStatusManager(context: Context) {
     
+    private val appContext = context.applicationContext
     private val database = AppDatabase.getDatabase(context)
     private val financialDao = database.financialStatusDao()
+    private val marketRateHistoryDao = database.marketRateHistoryDao()
     
     // Assets
     fun getAllAssets(): Flow<List<Asset>> {
         return financialDao.getAllAssets()
+    }
+
+    fun getAssetsByPurpose(purpose: AccountPurpose): Flow<List<Asset>> {
+        return financialDao.getAssetsByPurpose(purpose)
+    }
+
+    suspend fun setAccountPurpose(
+        assetId: Long,
+        purpose: AccountPurpose,
+        assignExistingExpenses: Boolean = false
+    ) {
+        if (purpose == AccountPurpose.DAILY_SPENDING) {
+            financialDao.clearPurpose(AccountPurpose.DAILY_SPENDING)
+            if (assignExistingExpenses) {
+                database.accountingDao().assignUnlinkedExpensesToAccount(assetId)
+            }
+        }
+        financialDao.setPurpose(assetId, purpose)
+    }
+
+    suspend fun setDailyLimit(assetId: Long, dailyLimit: Double?) {
+        financialDao.setDailyLimit(assetId, dailyLimit?.takeIf { it > 0.0 })
     }
     
     suspend fun getAllAssetsList(): List<Asset> {
@@ -29,11 +53,81 @@ class FinancialStatusManager(context: Context) {
         val asset = Asset(type = AssetType.OTHER, title = name, value = amount)
         return financialDao.insertAsset(asset)
     }
+
+    /** Adds a gold asset the user specified by weight (grams) rather than a fixed price;
+     *  its [Asset.value] is computed from the current rate right away and kept fresh
+     *  afterwards by [refreshGoldAssetValues]. If no rate is available yet (offline/first
+     *  run), the value simply starts at 0 and self-corrects the next time the rate is
+     *  reachable - it never guesses a price. */
+    suspend fun addGoldAsset(
+        name: String,
+        grams: Double,
+        purpose: AccountPurpose = AccountPurpose.NORMAL,
+        dailyLimit: Double? = null
+    ): Long {
+        val rate = runCatching { com.maliar.pro.utils.MarketRateClient(appContext).fetch() }.getOrNull()
+        val value = rate?.gold?.let { grams * it / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN } ?: 0.0
+        val id = financialDao.insertAsset(
+            Asset(
+                type = AssetType.GOLD,
+                title = name,
+                value = value,
+                goldGrams = grams,
+                purpose = purpose,
+                dailyLimit = dailyLimit?.takeIf { it > 0.0 }
+            )
+        )
+        if (purpose != AccountPurpose.NORMAL) setAccountPurpose(id, purpose)
+        return id
+    }
+
+    /** Re-prices every gold asset that was entered by weight (see [addGoldAsset]) against
+     *  the latest gold rate, so their [Asset.value] - and therefore "کل دارایی‌ها" wherever
+     *  it's summed - never goes stale. Best-effort: with no reachable rate this silently
+     *  does nothing and leaves the last known values in place, exactly like the rest of the
+     *  market-rate features. Safe to call often; it skips writes when the value hasn't
+     *  meaningfully changed. */
+    suspend fun refreshGoldAssetValues() {
+        val rate = runCatching { com.maliar.pro.utils.MarketRateClient(appContext).fetch() }.getOrNull() ?: return
+        val goldPerGramToman = rate.gold?.let { it / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN } ?: return
+        val goldAssets = getAllAssetsList().filter { it.type == AssetType.GOLD && (it.goldGrams ?: 0.0) > 0.0 }
+        for (asset in goldAssets) {
+            val newValue = asset.goldGrams!! * goldPerGramToman
+            if (kotlin.math.abs(newValue - asset.value) > 1.0) {
+                financialDao.updateAsset(asset.copy(value = newValue, updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
     
     suspend fun updateAsset(asset: Asset) {
         financialDao.updateAsset(asset)
     }
-    
+
+    /**
+     * Adjusts one account's stored balance by [delta] (positive to add, negative to
+     * subtract) - the single mechanism that keeps "حساب‌های من"/"کل دارایی‌ها" showing
+     * the real, current amount as income/expense/installment/debt transactions linked to
+     * an account are added, edited, or deleted, instead of Asset.value only ever being a
+     * number the person typed in by hand. Every caller (AccountingManager for income/
+     * expense, and anywhere else a transaction can be linked to an account) goes through
+     * this one function so the reverse-then-reapply arithmetic an edit needs is never
+     * duplicated or done inconsistently between call sites.
+     *
+     * No-ops silently (never throws) when [accountId] is null (an unlinked transaction -
+     * the pre-existing, still fully-supported behavior) or the account no longer exists
+     * (e.g. deleted after a transaction referenced it) - a missing account must never
+     * block saving the transaction that triggered this call.
+     */
+    suspend fun adjustAssetBalance(accountId: Long?, delta: Double) {
+        if (accountId == null || delta == 0.0) return
+        try {
+            val asset = financialDao.getAssetById(accountId) ?: return
+            financialDao.updateAsset(asset.copy(value = asset.value + delta, updatedAt = System.currentTimeMillis()))
+        } catch (e: Exception) {
+            // Best-effort; a balance-sync failure must never block the transaction itself.
+        }
+    }
+
     suspend fun deleteAsset(asset: Asset) {
         financialDao.deleteAsset(asset)
     }
@@ -62,6 +156,41 @@ class FinancialStatusManager(context: Context) {
     
     suspend fun updateDebt(debt: Debt) {
         financialDao.updateDebt(debt)
+    }
+
+    /** Flips [debt.isPaid] and, when it has a linked account, keeps that account's
+     *  balance honest: marking a debt paid deducts [Debt.amount] from the account (money
+     *  leaving to settle it) and records a matching [Expense] for reporting/history,
+     *  exactly like AccountingManager.payInstallment does for installments. Un-marking a
+     *  debt as paid (undo) reverses the balance adjustment, but deliberately leaves the
+     *  earlier expense record in place - an audit trail of "this was paid, then reopened"
+     *  is more useful than silently deleting history, and mirrors how nothing else in
+     *  this app auto-deletes expense rows when an unrelated flag changes. */
+    suspend fun toggleDebtPaid(debt: Debt) {
+        val updated = debt.copy(isPaid = !debt.isPaid, updatedAt = System.currentTimeMillis())
+        // Only touch a balance when the debt actually has a linked account - an
+        // unlinked debt (the old, still fully-supported case) stays a plain flag flip,
+        // exactly as before. When linked, addExpense() below is the single place that
+        // deducts from the account (same as payInstallment/markPaid do for their own
+        // flows), so it's never double-applied here.
+        if (debt.accountId != null) {
+            if (updated.isPaid) {
+                AccountingManager(appContext).addExpense(
+                    Expense(
+                        category = "بدهی/وام",
+                        amount = debt.amount,
+                        description = "تسویه: ${debt.title}",
+                        date = System.currentTimeMillis(),
+                        accountId = debt.accountId
+                    )
+                )
+            } else {
+                // Undo: give the money back to the account. The earlier expense record
+                // is deliberately left in place as an audit trail rather than deleted.
+                adjustAssetBalance(debt.accountId, debt.amount)
+            }
+        }
+        financialDao.updateDebt(updated)
     }
     
     suspend fun deleteDebt(debt: Debt) {
@@ -139,6 +268,8 @@ class FinancialStatusManager(context: Context) {
     suspend fun getPreferences(): FinancialPreferences? {
         return financialDao.getPreferences()
     }
+
+    fun getPreferencesFlow(): Flow<FinancialPreferences?> = financialDao.getPreferencesFlow()
     
     suspend fun savePreferences(preferences: FinancialPreferences): Long {
         return financialDao.insertPreferences(preferences)
@@ -188,5 +319,40 @@ class FinancialStatusManager(context: Context) {
         if (preferences != null) completed++
         
         return (completed * 100) / total
+    }
+
+    // Market rate history (feature: "روند نرخ طلا و دلار" chart on the reports screen)
+
+    /** Upserts today's rate snapshot (replaces any row already recorded for today - see
+     *  the unique index on [MarketRateHistory.date]) and prunes anything older than a
+     *  year, so the table can't grow unbounded on a long-lived install. */
+    suspend fun recordMarketRateSnapshot(rates: com.maliar.pro.utils.MarketRates) {
+        val todayStart = startOfDayMillis(System.currentTimeMillis())
+        marketRateHistoryDao.insert(
+            MarketRateHistory(
+                date = todayStart,
+                gold = rates.gold,
+                currency = rates.currency,
+                coinEmami = rates.coinEmami,
+                coinHalf = rates.coinHalf,
+                coinQuarter = rates.coinQuarter
+            )
+        )
+        marketRateHistoryDao.deleteOlderThan(todayStart - 365L * 24 * 60 * 60 * 1000)
+    }
+
+    suspend fun getMarketRateHistory(days: Int): List<MarketRateHistory> {
+        val since = startOfDayMillis(System.currentTimeMillis()) - days.toLong() * 24 * 60 * 60 * 1000
+        return marketRateHistoryDao.getSince(since)
+    }
+
+    private fun startOfDayMillis(millis: Long): Long {
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = millis
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
     }
 }

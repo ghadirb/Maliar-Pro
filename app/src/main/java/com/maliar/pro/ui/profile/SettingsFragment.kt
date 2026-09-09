@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +14,11 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.navigation.fragment.findNavController
+import com.maliar.pro.R
 import com.maliar.pro.databinding.FragmentSettingsBinding
 import com.maliar.pro.utils.AutoBackupWorker
 import com.maliar.pro.utils.BackupManager
@@ -38,6 +44,17 @@ class SettingsFragment : Fragment() {
     private val restoreLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) confirmAndRestore(uri)
     }
+
+    /** Result callback for [deviceCredentialLauncher]; see MainActivity's identical field
+     *  for why this legacy KeyguardManager path exists alongside the BiometricManager one. */
+    private var onDeviceCredentialResult: ((Boolean) -> Unit)? = null
+    private val deviceCredentialLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val success = result.resultCode == android.app.Activity.RESULT_OK
+        onDeviceCredentialResult?.invoke(success)
+        onDeviceCredentialResult = null
+    }
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -53,6 +70,178 @@ class SettingsFragment : Fragment() {
         setupNotificationSettings()
         setupBackgroundServiceSetting()
         setupBackupSettings()
+        setupBiometricLock()
+        setupMarketRates()
+
+        binding.supportCard.setOnClickListener {
+            findNavController().navigate(R.id.action_profileFragment_to_supportFragment)
+        }
+
+        setupThemeModeToggle()
+    }
+
+    private fun setupThemeModeToggle() {
+        val currentMode = prefs.getThemeMode()
+        val buttonId = when (currentMode) {
+            PreferencesManager.ThemeMode.SYSTEM -> R.id.themeModeSystemButton
+            PreferencesManager.ThemeMode.LIGHT -> R.id.themeModeLightButton
+            PreferencesManager.ThemeMode.DARK -> R.id.themeModeDarkButton
+        }
+        binding.themeModeToggle.check(buttonId)
+        binding.themeModeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                R.id.themeModeLightButton -> PreferencesManager.ThemeMode.LIGHT
+                R.id.themeModeDarkButton -> PreferencesManager.ThemeMode.DARK
+                else -> PreferencesManager.ThemeMode.SYSTEM
+            }
+            prefs.setThemeMode(mode)
+        }
+    }
+
+    private fun setupMarketRates() {
+        binding.marketRatesEndpointInput.setText(prefs.getMarketRatesEndpoint())
+        binding.marketRatesTokenInput.setText(prefs.getMarketRatesToken())
+
+        fun runFetch(persistCustomEndpoint: Boolean) {
+            if (persistCustomEndpoint) {
+                val endpoint = binding.marketRatesEndpointInput.text.toString().trim()
+                if (endpoint.isNotEmpty() && !endpoint.startsWith("https://")) {
+                    binding.marketRatesStatusText.text = "فقط آدرس HTTPS معتبر وارد کنید."
+                    return
+                }
+                prefs.setMarketRatesEndpoint(endpoint)
+                prefs.setMarketRatesToken(binding.marketRatesTokenInput.text.toString())
+            }
+            binding.fetchMarketRatesButton.isEnabled = false
+            binding.marketRatesStatusText.text = "در حال دریافت نرخ..."
+            viewLifecycleOwner.lifecycleScope.launch {
+                val rates = withContext(Dispatchers.IO) {
+                    com.maliar.pro.utils.MarketRateClient(requireContext()).fetch()
+                }
+                if (!isAdded) return@launch
+                binding.fetchMarketRatesButton.isEnabled = true
+                binding.marketRatesStatusText.text = if (rates == null) {
+                    "دریافت نرخ ممکن نشد؛ کش قبلی هم در دسترس نیست."
+                } else {
+                    "طلا: ${rates.gold ?: "-"} | دلار: ${rates.currency ?: "-"} | سکه امامی: ${rates.coinEmami ?: "-"}"
+                }
+            }
+        }
+
+        binding.fetchMarketRatesButton.setOnClickListener { runFetch(persistCustomEndpoint = true) }
+        // Show the automatically-fetched (or cached) rate as soon as the screen opens, so
+        // the user can see it's already working with no address entered.
+        runFetch(persistCustomEndpoint = false)
+
+        val currentThreshold = prefs.getMarketSwingThresholdPercent()
+        binding.marketSwingThresholdSlider.value = currentThreshold.coerceIn(2f, 10f)
+        binding.marketSwingThresholdLabel.text = "${currentThreshold.toInt()}٪"
+        binding.marketSwingThresholdSlider.addOnChangeListener { _, value, _ ->
+            prefs.setMarketSwingThresholdPercent(value)
+            binding.marketSwingThresholdLabel.text = "${value.toInt()}٪"
+        }
+    }
+
+    private fun setupBiometricLock() {
+        binding.biometricLockSwitch.isChecked = prefs.isBiometricLockEnabled()
+        binding.biometricLockSwitch.setOnCheckedChangeListener { _, enabled ->
+            if (!enabled) {
+                prefs.setBiometricLockEnabled(false)
+                return@setOnCheckedChangeListener
+            }
+            // Try fingerprint first, then fall back to the phone's own PIN/pattern/password
+            // if that fails for any reason - see MainActivity.authenticateAppIfNeeded() for
+            // why (a broken vendor fingerprint HAL/binder reporting "available" but then
+            // failing is a known issue on cheap/unofficial devices, e.g. a G-Plus P10
+            // running Android 10).
+            tryBiometricAuth(
+                authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK,
+                subtitle = "برای تأیید، اثر انگشت خود را وارد کنید",
+                onSuccess = { prefs.setBiometricLockEnabled(true) },
+                onUnavailable = { fallBackToDeviceCredential() }
+            )
+        }
+    }
+
+    /** Second-line fallback: the phone's own lock-screen confirmation, launched directly
+     *  via [android.app.KeyguardManager] rather than through BiometricManager/
+     *  BiometricPrompt. Needed because on at least one reported device (a G-Plus P10 on
+     *  Android 10), *both* BIOMETRIC_WEAK and a BiometricPrompt-based DEVICE_CREDENTIAL
+     *  check reported unavailable even with a working fingerprint and an active pattern
+     *  lock - pointing at a broken/incomplete BiometricManager implementation on that
+     *  firmware rather than the device actually lacking a secure lock screen.
+     *  KeyguardManager.createConfirmDeviceCredentialIntent() is a much older (API 21+)
+     *  OS-level API that hands off straight to the system's own lock-screen confirmation
+     *  UI, bypassing BiometricManager entirely. */
+    private fun fallBackToDeviceCredential() {
+        val keyguardManager = requireContext().getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+        val intent = try {
+            if (keyguardManager?.isDeviceSecure == true) {
+                keyguardManager.createConfirmDeviceCredentialIntent("فعال‌سازی قفل مالیار", "قفل صفحه گوشی را تأیید کنید")
+            } else null
+        } catch (e: RuntimeException) {
+            null
+        }
+        if (intent == null) {
+            binding.biometricLockSwitch.isChecked = false
+            Toast.makeText(
+                requireContext(),
+                "نه اثر انگشت و نه قفل صفحه‌ای روی این دستگاه در دسترس نیست، پس قفل مالیار را نمی‌توان فعال کرد.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        onDeviceCredentialResult = { success ->
+            if (success) {
+                prefs.setBiometricLockEnabled(true)
+            } else {
+                binding.biometricLockSwitch.isChecked = false
+            }
+        }
+        try {
+            deviceCredentialLauncher.launch(intent)
+        } catch (e: RuntimeException) {
+            onDeviceCredentialResult = null
+            binding.biometricLockSwitch.isChecked = false
+            Toast.makeText(requireContext(), "قفل صفحه‌ای این دستگاه در دسترس نیست.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** One authenticate attempt with one [authenticators] value (see the equivalent helper
+     *  in MainActivity for why authenticators are never combined here). Falls through to
+     *  [onUnavailable] - not a crash - for a broken/absent authenticator so the caller can
+     *  chain to the next one. */
+    private fun tryBiometricAuth(
+        authenticators: Int,
+        subtitle: String,
+        onSuccess: () -> Unit,
+        onUnavailable: () -> Unit
+    ) {
+        try {
+            val availability = BiometricManager.from(requireContext()).canAuthenticate(authenticators)
+            if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+                onUnavailable()
+                return
+            }
+            val executor = ContextCompat.getMainExecutor(requireContext())
+            BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    onSuccess()
+                }
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    binding.biometricLockSwitch.isChecked = false
+                }
+            }).authenticate(
+                BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("فعال‌سازی قفل مالیار")
+                    .setSubtitle(subtitle)
+                    .setAllowedAuthenticators(authenticators)
+                    .build()
+            )
+        } catch (_: RuntimeException) {
+            onUnavailable()
+        }
     }
 
     override fun onResume() {
@@ -170,16 +359,67 @@ class SettingsFragment : Fragment() {
         binding.financialInsightsSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefs.setFinancialInsightsEnabled(isChecked)
             if (isChecked) {
-                FinancialInsightWorker.schedule(requireContext())
+                FinancialInsightWorker.schedule(requireContext(), runImmediately = true)
                 Toast.makeText(requireContext(), "پیشنهادهای هوشمند مالی فعال شد", Toast.LENGTH_SHORT).show()
             } else {
                 FinancialInsightWorker.cancel(requireContext())
             }
         }
+        setupInsightSubToggles()
 
         setupAutoDueReminders()
         setupFinancialPeriodStartDay()
         setupQuietHours()
+    }
+
+    /** Wires the eight independent insight-type switches to their own preference flags -
+     *  each is a plain on/off with no extra logic, since [FinancialInsightWorker] already
+     *  re-checks every flag on its own each run. */
+    private fun setupInsightSubToggles() {
+        binding.insightPeriodicPaymentSwitch.isChecked = prefs.isInsightPeriodicPaymentEnabled()
+        binding.insightPeriodicPaymentSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightPeriodicPaymentEnabled(isChecked)
+        }
+
+        binding.insightInstallmentSwitch.isChecked = prefs.isInsightInstallmentEnabled()
+        binding.insightInstallmentSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightInstallmentEnabled(isChecked)
+        }
+
+        binding.insightDebtSwitch.isChecked = prefs.isInsightDebtEnabled()
+        binding.insightDebtSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightDebtEnabled(isChecked)
+        }
+
+        binding.insightBudgetSwitch.isChecked = prefs.isInsightBudgetEnabled()
+        binding.insightBudgetSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightBudgetEnabled(isChecked)
+        }
+
+        binding.insightGoalSwitch.isChecked = prefs.isInsightGoalEnabled()
+        binding.insightGoalSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightGoalEnabled(isChecked)
+        }
+
+        binding.insightCategorySwingSwitch.isChecked = prefs.isInsightCategorySwingEnabled()
+        binding.insightCategorySwingSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightCategorySwingEnabled(isChecked)
+        }
+
+        binding.insightMarketSwitch.isChecked = prefs.isInsightMarketEnabled()
+        binding.insightMarketSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightMarketEnabled(isChecked)
+        }
+
+        binding.insightSavingsSwitch.isChecked = prefs.isInsightSavingsEnabled()
+        binding.insightSavingsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightSavingsEnabled(isChecked)
+        }
+
+        binding.insightProjectionSwitch.isChecked = prefs.isInsightProjectionEnabled()
+        binding.insightProjectionSwitch.setOnCheckedChangeListener { _, isChecked ->
+            prefs.setInsightProjectionEnabled(isChecked)
+        }
     }
 
     private fun setupAutoDueReminders() {

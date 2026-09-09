@@ -12,8 +12,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                Asset::class, Debt::class, FinancialGoal::class, FixedIncome::class, FinancialPreferences::class,
                ReminderEntity::class, Debtor::class, DebtorPayment::class,
                Car::class, CarOdometerLog::class, CarServiceItem::class, CarServiceLog::class,
-               MealPlan::class, MealPlanEntry::class],
-    version = 12,
+               MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class,
+               MonthlyBudget::class, PeriodicPayment::class, MarketProduct::class,
+               MarketPriceQuote::class, ProductPurchase::class, MarketSource::class,
+               BusinessTransaction::class, ProductInventory::class, GoldTransaction::class, GoldPriceAlert::class],
+    version = 25,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -26,6 +29,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun debtorDao(): DebtorDao
     abstract fun carDao(): CarDao
     abstract fun mealPlanDao(): MealPlanDao
+    abstract fun foodPriceDao(): FoodPriceDao
+    abstract fun marketRateHistoryDao(): MarketRateHistoryDao
+    abstract fun budgetDao(): BudgetDao
+    abstract fun periodicPaymentDao(): PeriodicPaymentDao
+    abstract fun marketAssistantDao(): MarketAssistantDao
+    abstract fun businessDao(): BusinessDao
+    abstract fun goldPortfolioDao(): GoldPortfolioDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -151,6 +161,174 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE advanced_reminders ADD COLUMN repeatIntervalMinutes INTEGER NOT NULL DEFAULT 0")
             }
         }
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `user_food_prices` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `normalizedName` TEXT NOT NULL,
+                        `pricePerUnit` REAL NOT NULL,
+                        `unitLabel` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_user_food_prices_normalizedName` " +
+                        "ON `user_food_prices` (`normalizedName`)"
+                )
+            }
+        }
+        /** Two independent, all-additive changes for the gold/currency-rate features:
+         *  a nullable `goldGrams` column on `assets` (existing rows get NULL, so they keep
+         *  behaving exactly as before - a fixed manually-entered value) and a new
+         *  `market_rate_history` table (one row/day) for the reports trend chart. */
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE assets ADD COLUMN goldGrams REAL")
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `market_rate_history` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `date` INTEGER NOT NULL,
+                        `gold` REAL,
+                        `currency` REAL,
+                        `coinEmami` REAL,
+                        `coinHalf` REAL,
+                        `coinQuarter` REAL,
+                        `recordedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_market_rate_history_date` " +
+                        "ON `market_rate_history` (`date`)"
+                )
+            }
+        }
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE assets ADD COLUMN purpose TEXT NOT NULL DEFAULT 'NORMAL'")
+                database.execSQL("ALTER TABLE expenses ADD COLUMN accountId INTEGER")
+            }
+        }
+        private val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE assets ADD COLUMN dailyLimit REAL")
+            }
+        }
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `monthly_budgets` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `year` INTEGER NOT NULL,
+                        `month` INTEGER NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `softThreshold` INTEGER NOT NULL DEFAULT 70,
+                        `hardThreshold` INTEGER NOT NULL DEFAULT 85,
+                        `isEnabled` INTEGER NOT NULL DEFAULT 1,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_monthly_budgets_year_month_category` " +
+                        "ON `monthly_budgets` (`year`, `month`, `category`)"
+                )
+            }
+        }
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `periodic_payments` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `accountId` INTEGER,
+                        `periodDays` INTEGER NOT NULL DEFAULT 30,
+                        `nextPaymentAt` INTEGER NOT NULL,
+                        `category` TEXT NOT NULL DEFAULT 'عمومی',
+                        `isActive` INTEGER NOT NULL DEFAULT 1,
+                        `notes` TEXT NOT NULL DEFAULT '',
+                        `reminderDaysBefore` INTEGER NOT NULL DEFAULT 1,
+                        `lastPaidOccurrenceAt` INTEGER,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE periodic_payments ADD COLUMN reminderId INTEGER")
+            }
+        }
+        /** بازاریار: four isolated tables, deliberately not coupled to accounting data. */
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS `market_products` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `category` TEXT NOT NULL DEFAULT '', `brand` TEXT NOT NULL DEFAULT '', `model` TEXT NOT NULL DEFAULT '', `barcode` TEXT NOT NULL DEFAULT '', `createdAt` INTEGER NOT NULL)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `market_price_quotes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `productId` INTEGER NOT NULL, `source` TEXT NOT NULL, `priceType` TEXT NOT NULL, `price` REAL NOT NULL, `minPrice` REAL, `maxPrice` REAL, `checkedAt` INTEGER NOT NULL, `confidence` REAL NOT NULL DEFAULT 0.5, `sourceUrl` TEXT NOT NULL DEFAULT '')")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_market_price_quotes_productId_checkedAt` ON `market_price_quotes` (`productId`, `checkedAt`)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `product_purchases` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `productId` INTEGER NOT NULL, `purchasePrice` REAL NOT NULL, `quantity` REAL NOT NULL DEFAULT 1, `purchasedAt` INTEGER NOT NULL, `supplier` TEXT NOT NULL DEFAULT '')")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_product_purchases_productId_purchasedAt` ON `product_purchases` (`productId`, `purchasedAt`)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS `market_sources` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `url` TEXT NOT NULL, `priceType` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL DEFAULT 1, `createdAt` INTEGER NOT NULL)")
+            }
+        }
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Lets an income be linked to the account it was deposited into, mirroring
+                // Expense.accountId (which already existed) - the missing half needed for
+                // account balances to actually track real money in/out automatically.
+                database.execSQL("ALTER TABLE incomes ADD COLUMN accountId INTEGER")
+            }
+        }
+        /** Extends the same account-linked-balance mechanism (see
+         *  FinancialStatusManager.adjustAssetBalance) to installments, debts, and
+         *  debtor payments, so every place money actually moves - not just plain
+         *  income/expense - can keep an account's balance correct automatically. */
+        private val MIGRATION_21_22 = object : Migration(21, 22) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE installments ADD COLUMN accountId INTEGER")
+                database.execSQL("ALTER TABLE debts ADD COLUMN accountId INTEGER")
+                database.execSQL("ALTER TABLE debtor_payments ADD COLUMN accountId INTEGER")
+            }
+        }
+        /** «فروش کالا»: two new, nullable-with-default columns on `incomes` only - existing
+         *  rows get isProductSale=0/costOfGoods=0, so every pre-existing income keeps being
+         *  treated as plain service income (profit == amount) exactly as before. Nothing
+         *  else (accounts, expenses, balances) is touched. See Income.kt for the fields'
+         *  meaning and AccountingDao/AccountingManager for the new profit-vs-cash queries
+         *  that read them. */
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE incomes ADD COLUMN isProductSale INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE incomes ADD COLUMN costOfGoods REAL NOT NULL DEFAULT 0")
+            }
+        }
+        /** Business accounting is additive: existing incomes remain valid service/product
+         * sales, while stock and non-profit cash movements get their own audit tables. */
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE incomes ADD COLUMN productName TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE incomes ADD COLUMN productQuantity REAL NOT NULL DEFAULT 1")
+                database.execSQL("ALTER TABLE incomes ADD COLUMN listPrice REAL NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE incomes ADD COLUMN discountAmount REAL NOT NULL DEFAULT 0")
+                database.execSQL("CREATE TABLE IF NOT EXISTS business_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, fromAccountId INTEGER, toAccountId INTEGER, date INTEGER NOT NULL, description TEXT NOT NULL DEFAULT '', supplier TEXT NOT NULL DEFAULT '', productName TEXT NOT NULL DEFAULT '', quantity REAL NOT NULL DEFAULT 0, unitCost REAL NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS product_inventory (name TEXT NOT NULL PRIMARY KEY, quantity REAL NOT NULL DEFAULT 0, averageUnitCost REAL NOT NULL DEFAULT 0, updatedAt INTEGER NOT NULL)")
+            }
+        }
+        private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS gold_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, kind TEXT NOT NULL, type TEXT NOT NULL, quantity REAL NOT NULL, unitPrice REAL NOT NULL, fee REAL NOT NULL DEFAULT 0, date INTEGER NOT NULL, notes TEXT NOT NULL DEFAULT '', accountId INTEGER)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS gold_price_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, kind TEXT NOT NULL, targetPrice REAL NOT NULL, direction TEXT NOT NULL, isActive INTEGER NOT NULL DEFAULT 1, createdAt INTEGER NOT NULL)")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -165,7 +343,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

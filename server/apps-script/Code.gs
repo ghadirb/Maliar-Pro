@@ -1,4 +1,4 @@
-// Google Apps Script version of the Maliar Pro billing backend - a free, no-hosting-
+﻿// Google Apps Script version of the Maliar Pro billing backend - a free, no-hosting-
 // needed alternative to the Node.js server in /server. Uses PropertiesService as a tiny
 // key-value store (no Google Sheet needed) and UrlFetchApp to call the gateway's API.
 //
@@ -38,9 +38,10 @@
 //      -- optional AI proxy --
 //      AI_PROVIDER          = gapgpt (or liara)
 //      GAPGPT_API_KEY       = provider key (Script Property only)
-//      LIARA_API_KEY        = provider key (Script Property only)
 //      AI_MODEL             = gpt-4o-mini
-//      AI_DAILY_LIMIT       = 10
+//      AI_MARKET_MODEL      = grok-4  (optional live-web fallback for product prices)
+//      AI_STT_MODEL         = whisper-1  (یا gapgpt/whisper-1 برای GapGPT)
+//      AI_TTS_MODEL         = gpt-4o-mini-tts  (یا tts-1)
 // 4. Deploy -> New deployment -> type: "Web app".
 //      Execute as: Me
 //      Who has access: Anyone
@@ -180,8 +181,195 @@ function routeRequest_(e) {
   if (path === 'aiChat') return handleAiChat_(params);
   if (path === 'aiStt') return handleAiStt_(params);
   if (path === 'aiTts') return handleAiTts_(params);
+  if (path === 'marketSearch') return handleMarketSearch_(params);
+  if (path === 'marketAiSearch') return handleMarketAiSearch_(params);
+  if (path === 'marketParseMessage') return handleMarketParseMessage_(params);
 
   return jsonOutput_({ error: 'unknown_path' });
+}
+
+// --- Market Assistant ---------------------------------------------------------------
+// The APK never calls shops/channels directly. Providers live here so credentials,
+// caching, terms of use, and rate limits stay server-side.
+//  - Torob/Digikala: unofficial public JSON endpoints their own web/app clients use.
+//    No API key. Google's outbound IPs are occasionally rate-limited by their anti-bot
+//    layer (seen as an "ok":false / empty response) - this is a known, external
+//    limitation, not a bug in this script. Failures are swallowed per-provider so one
+//    blocked source never breaks the others.
+//  - Telegram: only the *user's own* saved sources (from "منابع عمده و خرده") are
+//    queried, via the public https://t.me/s/<channel> preview page (no bot token, no
+//    login - this is the same page a browser sees for any public channel).
+function handleMarketSearch_(params) {
+  const query = String(params.query || '').trim();
+  const priceType = String(params.priceType || 'retail').toLowerCase();
+  if (!query || query.length > 160) return jsonOutput_({ error: 'query is required' });
+  if (priceType !== 'retail' && priceType !== 'wholesale') return jsonOutput_({ error: 'invalid_price_type' });
+  const sources = parseUserSources_(params.sources);
+  const cacheKey = 'market_cache_' + Utilities.base64EncodeWebSafe(query + ':' + priceType + ':' + sources.map(function(s) { return s.url; }).join(',')).replace(/[+/=]/g, '').slice(0, 180);
+  const cached = CacheService.getScriptCache().get(cacheKey);
+  if (cached) return jsonOutput_(JSON.parse(cached));
+  const results = marketProviders_(priceType, sources).reduce(function(all, provider) {
+    try { return all.concat(provider(query, priceType) || []); } catch (err) { return all; }
+  }, []);
+  const response = { query: query, priceType: priceType, checkedAt: Date.now(), results: results };
+  CacheService.getScriptCache().put(cacheKey, JSON.stringify(response), 900);
+  return jsonOutput_(response);
+}
+
+/** Last-resort live web search. This is called only after the deterministic shop/channel
+ * search returned no price and only after an explicit tap in the app. Grok 4 was verified
+ * on GapGPT's OpenAI-like endpoint to execute web_search; gpt-4o-mini rejected the tool. */
+function handleMarketAiSearch_(params) {
+  const query = String(params.query || '').trim();
+  if (!query || query.length > 160) return jsonOutput_({ error: 'query is required' });
+  const denied = requireAiFields_(params);
+  if (denied) return denied;
+  const cfg = aiConfig_();
+  if (cfg.provider !== 'gapgpt') return jsonOutput_({ error: 'market_web_search_requires_gapgpt' });
+  try {
+    const response = aiFetch_(cfg.baseUrl + '/chat/completions', {
+      apiKey: cfg.key,
+      body: {
+        model: getSetting_('AI_MARKET_MODEL', 'grok-4'), tools: [{ type: 'web_search' }], temperature: 0.1, max_tokens: 350,
+        messages: [
+          { role: 'system', content: 'Use web search for Iranian prices. Return ONLY valid JSON: {"price":number,"minPrice":number,"maxPrice":number,"source":"","sourceUrl":""}. Prices must be TOMAN. With insufficient evidence return price 0. Never invent a price or URL.' },
+          { role: 'user', content: 'Find an approximate current retail market price in Iran for: ' + query }
+        ]
+      }
+    });
+    if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) return jsonOutput_({ error: 'ai_unavailable' });
+    const data = JSON.parse(response.getContentText());
+    const text = String(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '');
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return jsonOutput_({ results: [], checkedAt: Date.now() });
+    const result = JSON.parse(match[0]); const price = Number(result.price || 0);
+    if (!(price > 0) || !isFinite(price)) return jsonOutput_({ results: [], checkedAt: Date.now() });
+    return jsonOutput_({ checkedAt: Date.now(), results: [{ source: String(result.source || 'جست‌وجوی وب Grok').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] });
+  } catch (err) { return jsonOutput_({ error: 'ai_unavailable' }); }
+}
+
+// Only accepts {name, url} pairs the user already saved on-device via "افزودن منبع"
+// (MarketSource). Capped and length-limited before any network call is made from them.
+function parseUserSources_(raw) {
+  if (!raw) return [];
+  let list = raw;
+  if (typeof raw === 'string') { try { list = JSON.parse(raw); } catch (err) { return []; } }
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, 8).map(function(s) {
+    return { name: String((s && s.name) || '').trim().slice(0, 80), url: String((s && s.url) || '').trim().slice(0, 300) };
+  }).filter(function(s) { return s.url; });
+}
+
+function marketProviders_(priceType, sources) {
+  // Each provider is a (query, priceType) -> [{name, price, minPrice, maxPrice, url,
+  // source, confidence}] function. Torob/Digikala only make sense for retail; wholesale
+  // pricing in Iran mostly lives in Telegram supplier channels, which is why those are
+  // driven entirely by the user's own saved sources for both price types.
+  const providers = [];
+  if (priceType === 'retail') { providers.push(torobSearch_); providers.push(digikalaSearch_); }
+  (sources || []).forEach(function(src) {
+    const channel = telegramChannelUsername_(src.url);
+    if (channel) providers.push(function(query, type) { return telegramChannelSearch_(channel, src.name || channel, query, type); });
+  });
+  return providers;
+}
+
+function telegramChannelUsername_(url) {
+  const m = String(url || '').match(/t(?:elegram)?\.me\/(?:s\/)?@?([A-Za-z0-9_]{4,})/i);
+  return m ? m[1] : null;
+}
+
+function torobSearch_(query) {
+  const url = 'https://api.torob.com/v4/base-product/search/?page=0&sort=popularity&size=8&source=next_desktop&query=' + encodeURIComponent(query) + '&q=' + encodeURIComponent(query);
+  const res = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true, followRedirects: true,
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json', 'Referer': 'https://torob.com/search/?query=' + encodeURIComponent(query) }
+  });
+  if (res.getResponseCode() !== 200) return [];
+  const data = JSON.parse(res.getContentText());
+  const list = (data && data.results) || [];
+  return list.slice(0, 6).map(function(item) {
+    const price = Number(item.price1 || item.price || 0);
+    if (!(price > 0)) return null;
+    return {
+      source: 'ترب' + (item.shop_text ? ' · ' + item.shop_text : ''), priceType: 'retail', price: price,
+      minPrice: price, maxPrice: Number(item.price2 || price) || price, confidence: 0.7,
+      name: item.name1 || item.name || '', url: item.web_client_absolute_url ? ('https://torob.com' + item.web_client_absolute_url) : ''
+    };
+  }).filter(function(r) { return r; });
+}
+
+function digikalaSearch_(query) {
+  const url = 'https://api.digikala.com/v1/search/?q=' + encodeURIComponent(query) + '&page=1';
+  const res = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true, followRedirects: true,
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json', 'Referer': 'https://www.digikala.com/search/?q=' + encodeURIComponent(query) }
+  });
+  if (res.getResponseCode() !== 200) return [];
+  const data = JSON.parse(res.getContentText());
+  const list = (data && data.data && (data.data.products || data.data.sellable_products)) || [];
+  return list.slice(0, 6).map(function(item) {
+    const variant = item.default_variant || (item.variants && item.variants[0]) || {};
+    const rial = Number((variant.price && (variant.price.selling_price || variant.price.rrp_price)) || item.price || 0);
+    const price = Math.round(rial / 10); // Digikala prices are in Rial; app uses Toman.
+    if (!(price > 0)) return null;
+    return {
+      source: 'دیجی‌کالا', priceType: 'retail', price: price, confidence: 0.7,
+      name: item.title_fa || item.title || '', url: item.url && item.url.uri ? ('https://www.digikala.com' + item.url.uri) : ''
+    };
+  }).filter(function(r) { return r; });
+}
+
+// Reads the public "instant view" preview of a Telegram channel (what a browser sees
+// with no login) and reuses the same price-extraction pass as pasted-message parsing.
+// Only channels the user explicitly saved as a source are ever fetched.
+function telegramChannelSearch_(channel, label, query) {
+  const res = UrlFetchApp.fetch('https://t.me/s/' + encodeURIComponent(channel), {
+    muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+  });
+  if (res.getResponseCode() !== 200) return [];
+  const html = res.getContentText();
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(function(t) { return t.length > 1; });
+  const blocks = html.split('tgme_widget_message ').slice(1).slice(-25); // most recent ~25 posts
+  const results = [];
+  blocks.forEach(function(block) {
+    const text = block.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+    const lower = text.toLowerCase();
+    if (terms.length && !terms.some(function(t) { return lower.indexOf(t) !== -1; })) return;
+    const parsed = extractPriceInfo_(text);
+    if (!parsed.prices.length) return;
+    results.push({
+      source: label, priceType: parsed.priceType, price: parsed.prices[0], minPrice: parsed.minPrice,
+      maxPrice: parsed.maxPrice, confidence: 0.5, name: parsed.nameHint, url: 'https://t.me/' + channel
+    });
+  });
+  return results.slice(0, 5);
+}
+
+// Shared plain-text -> price extraction used by both pasted-message parsing
+// (handleMarketParseMessage_) and the Telegram channel adapter above.
+function extractPriceInfo_(text) {
+  const faDigits = '۰۱۲۳۴۵۶۷۸۹';
+  const prices = [];
+  const re = /(^|[^0-9۰-۹])([0-9۰-۹][0-9۰-۹,٫]*)(?:\s*(?:تومان|ت))?/g;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const value = Number(String(match[2]).replace(/[۰-۹]/g, function(d) { return String(faDigits.indexOf(d)); }).replace(/[٫,]/g, ''));
+    if (value >= 1000) prices.push(value);
+  }
+  return {
+    nameHint: text.split('\n')[0].trim().slice(0, 120),
+    priceType: /عمده|تعداد|کارتن|همکار/.test(text) ? 'wholesale' : 'retail',
+    prices: prices, minPrice: prices.length ? Math.min.apply(null, prices) : null,
+    maxPrice: prices.length ? Math.max.apply(null, prices) : null, confidence: prices.length ? 0.45 : 0
+  };
+}
+
+function handleMarketParseMessage_(params) {
+  const text = String(params.text || '').trim();
+  if (!text || text.length > 8000) return jsonOutput_({ error: 'text is required' });
+  return jsonOutput_(extractPriceInfo_(text));
 }
 
 function parseJsonBody_(e) {
@@ -297,7 +485,7 @@ function handleAiStt_(params) {
       muteHttpExceptions: true,
       headers: { Authorization: 'Bearer ' + cfg.key },
       payload: {
-        model: 'whisper-1',
+        model: getSetting_('AI_STT_MODEL', 'whisper-1'),
         file: Utilities.newBlob(Utilities.base64Decode(encoded), 'audio/mp4', 'audio.m4a')
       }
     });
@@ -319,12 +507,12 @@ function handleAiTts_(params) {
   try {
     let response = aiFetch_(cfg.baseUrl + '/audio/speech', {
       apiKey: cfg.key,
-      body: { model: 'gpt-4o-mini-tts', voice: 'alloy', input: text }
+      body: { model: getSetting_('AI_TTS_MODEL', 'gpt-4o-mini-tts'), voice: 'alloy', input: text }
     });
     if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
       response = aiFetch_(cfg.baseUrl + '/audio/speech', {
         apiKey: cfg.key,
-        body: { model: 'tts-1', voice: 'alloy', input: text }
+        body: { model: getSetting_('AI_TTS_MODEL_FALLBACK', 'tts-1'), voice: 'alloy', input: text }
       });
     }
     if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
@@ -706,3 +894,4 @@ function handleCallbackNextpay_(params) {
 
   return htmlOutput_('<h2>❌ پرداخت ناموفق</h2><p>تایید پرداخت توسط نکست‌پی ناموفق بود.</p>');
 }
+

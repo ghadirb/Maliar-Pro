@@ -17,17 +17,22 @@ import com.maliar.pro.dialogs.AddIncomeDialog
 import com.maliar.pro.dialogs.AddExpenseDialog
 import com.maliar.pro.dialogs.AddCheckDialog
 import com.maliar.pro.dialogs.AddInstallmentDialog
+import com.maliar.pro.dialogs.BusinessTransactionDialog
 import com.maliar.pro.viewmodels.AccountingViewModel
 import com.maliar.pro.viewmodels.AccountingViewModelFactory
 import com.maliar.pro.viewmodels.DueSoonViewModel
 import com.maliar.pro.viewmodels.DueSoonViewModelFactory
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class AccountingFragment : Fragment() {
 
     private lateinit var binding: FragmentAccountingBinding
     private val viewModel: AccountingViewModel by viewModels {
-        AccountingViewModelFactory(AccountingManager(requireContext()))
+        AccountingViewModelFactory(
+            AccountingManager(requireContext()),
+            com.maliar.pro.database.FinancialStatusManager(requireContext())
+        )
     }
     private val dueSoonViewModel: DueSoonViewModel by viewModels {
         DueSoonViewModelFactory(
@@ -49,6 +54,12 @@ class AccountingFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupUI()
         observeViewModel()
+        com.maliar.pro.utils.MarketRateBarBinder.bind(
+            binding.marketRateBar.marketRateBarCard,
+            binding.marketRateBar.marketRateBarText,
+            viewLifecycleOwner.lifecycleScope,
+            requireContext()
+        )
     }
 
     private fun setupUI() {
@@ -67,6 +78,9 @@ class AccountingFragment : Fragment() {
         binding.installmentsCard.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_installmentListFragment)
         }
+        binding.periodicPaymentsCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_periodicPaymentFragment)
+        }
 
         binding.addIncomeButton.setOnClickListener {
             showAddIncomeDialog()
@@ -74,6 +88,9 @@ class AccountingFragment : Fragment() {
 
         binding.addExpenseButton.setOnClickListener {
             showAddExpenseDialog()
+        }
+        binding.businessTransactionButton.setOnClickListener {
+            BusinessTransactionDialog(requireContext()).show()
         }
 
         binding.addCheckButton.setOnClickListener {
@@ -98,6 +115,14 @@ class AccountingFragment : Fragment() {
 
         binding.financialReportsCard.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_financialReportsFragment)
+        }
+
+        binding.budgetCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_budgetFragment)
+        }
+
+        binding.forecastCard.setOnClickListener {
+            findNavController().navigate(R.id.action_accountingFragment_to_forecastFragment)
         }
 
         binding.carsCard.setOnClickListener {
@@ -158,7 +183,7 @@ class AccountingFragment : Fragment() {
             }
         }
         lifecycleScope.launch {
-            // "تراز همین دوره" answers exactly the question people keep asking: the big
+            // "سود خالص همین دوره" answers exactly the question people keep asking: the big
             // "تراز کل" number above is the all-time total (by design - it never changes
             // just because you change the period), so this row shows the period-scoped
             // net (period income − period expense) right next to it, colored red when
@@ -193,6 +218,196 @@ class AccountingFragment : Fragment() {
             viewModel.activeInstallmentsMonthlyTotal.collect { total ->
                 val count = viewModel.activeInstallmentsCount.value
                 binding.monthlyInstallmentsSummary.text = "$count قسط · ${formatCurrency(total)}"
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.todayExpense.collect { binding.todayExpenseAmount.text = formatCurrency(it) }
+        }
+        lifecycleScope.launch {
+            viewModel.weekExpense.collect { binding.weekExpenseAmount.text = formatCurrency(it) }
+        }
+        lifecycleScope.launch {
+            viewModel.currentPeriodSavings.collect { binding.todaySavingsAmount.text = formatCurrency(it) }
+        }
+        lifecycleScope.launch {
+            viewModel.financialHealthScore.collect { score ->
+                binding.financialHealthText.text = if (score == 0) {
+                    "سلامت مالی تقریبی: داده کافی نیست"
+                } else {
+                    "سلامت مالی تقریبی: $score از ۱۰۰ · فقط یک شاخص راهنما"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.suggestedMonthlyBudget.collect { amount ->
+                binding.budgetSuggestionText.text = if (amount <= 0.0) {
+                    "بودجه پیشنهادی ماهانه: داده کافی نیست"
+                } else {
+                    "بودجه پیشنهادی ماهانه: ${formatCurrency(amount)} · قابل ویرایش"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            kotlinx.coroutines.flow.combine(
+                viewModel.suggestedSpendableAmount,
+                viewModel.dailySpendingSummary
+            ) { suggested, daily -> suggested to daily }.collect { (suggested, daily) ->
+                binding.spendableSuggestionText.text = if (daily.isConfigured) {
+                    "حساب خرج روزانه «${daily.accountTitle}»: موجودی ${formatCurrency(daily.remainingBalance)} · پیشنهاد امروز ${formatCurrency(daily.dailySuggestion)}"
+                } else if (suggested == null) {
+                    "قابل خرج پیشنهادی: داده کافی نیست"
+                } else {
+                    "قابل خرج پیشنهادی تا پایان دوره: ${formatCurrency(suggested)}"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.activeGoalsSummary.collect { goals ->
+                binding.goalsSummaryText.text = if (goals.isEmpty()) {
+                    "اهداف فعال: داده‌ای ثبت نشده"
+                } else {
+                    val progress = goals.map { goal ->
+                        if (goal.targetAmount <= 0.0) 0.0
+                        else (goal.currentProgress / goal.targetAmount * 100.0).coerceIn(0.0, 100.0)
+                    }.average().toInt()
+                    "اهداف فعال: ${goals.size} · میانگین پیشرفت $progress٪"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.nearestGoalSavingsSuggestion.collect { suggestion ->
+                binding.goalSavingsSuggestionText.text = if (suggestion == null) {
+                    "پیشنهاد پس‌انداز هدف: داده کافی نیست"
+                } else {
+                    "برای «${suggestion.first}» ماهانه حدود ${formatCurrency(suggestion.second)} پس‌انداز پیشنهادی است"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.emergencyFundSummary.collect { summary ->
+                binding.emergencyFundText.text = if (summary == null) {
+                    "صندوق اضطراری: هدفی تنظیم نشده"
+                } else {
+                    "صندوق اضطراری: ${formatCurrency(summary.current)} از ${formatCurrency(summary.target)} · ${summary.percent}٪"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.sevenDayForecast.collect { amount ->
+                binding.sevenDayForecastText.text = if (amount == null) {
+                    "برآورد ۷ روز آینده: داده کافی نیست"
+                } else {
+                    "برآورد موجودی/تراز ۷ روز آینده: ${formatCurrency(amount)} · تخمینی"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.unpaidDebtSummary.collect { summary ->
+                binding.unpaidDebtText.text = if (summary.second == 0) {
+                    "بدهی پرداخت‌نشده: داده‌ای ثبت نشده"
+                } else {
+                    "بدهی پرداخت‌نشده: ${summary.second} مورد · ${formatCurrency(summary.first)}"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.thirtyDayForecast.collect { amount ->
+                binding.thirtyDayForecastText.text = if (amount == null) {
+                    "برآورد ۳۰ روز آینده: داده کافی نیست"
+                } else {
+                    "برآورد تراز ۳۰ روز آینده: ${formatCurrency(amount)} · تخمینی"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.sixtyDayForecast.collect { amount ->
+                binding.sixtyDayForecastText.text = if (amount == null) {
+                    "برآورد ۶۰ روز آینده: داده کافی نیست"
+                } else {
+                    "برآورد تراز ۶۰ روز آینده: ${formatCurrency(amount)} · تخمینی"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.ninetyDayForecast.collect { amount ->
+                binding.ninetyDayForecastText.text = if (amount == null) {
+                    "برآورد ۹۰ روز آینده: داده کافی نیست"
+                } else {
+                    "برآورد تراز ۹۰ روز آینده: ${formatCurrency(amount)} · تخمینی"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.next30DayCommitments.collect { amount ->
+                binding.periodicCommitmentsText.text = if (amount <= 0.0) {
+                    "پرداخت‌های دوره‌ای ۳۰ روز آینده: داده‌ای ثبت نشده"
+                } else {
+                    "پرداخت‌های دوره‌ای ۳۰ روز آینده: ${formatCurrency(amount)} · واردشده توسط کاربر"
+                }
+                binding.periodicPaymentsCardSummary.text = if (amount <= 0.0) {
+                    "اشتراک‌ها و تعهدات آینده: موردی ثبت نشده"
+                } else {
+                    "تعهدات ۳۰ روز آینده: ${formatCurrency(amount)}"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.expenseAnalysis.collect { analysis ->
+                if (analysis == null) {
+                    binding.expenseAnalysisText.text = "تحلیل هزینه: داده کافی نیست"
+                    binding.expenseAnalysisChangeText.visibility = View.GONE
+                    binding.expenseAnalysisTopDayText.visibility = View.GONE
+                    return@collect
+                }
+
+                binding.expenseAnalysisText.text = "بیشترین دسته: ${analysis.topCategory} " +
+                    "(${formatCurrency(analysis.topCategoryAmount)}) · میانگین روزانه: " +
+                    "${formatCurrency(analysis.dailyAverage)} · تعداد تراکنش: ${analysis.transactionCount}"
+
+                val increase = analysis.biggestIncreaseCategory
+                val decrease = analysis.biggestDecreaseCategory
+                if (increase == null && decrease == null) {
+                    binding.expenseAnalysisChangeText.visibility = View.GONE
+                } else {
+                    val parts = mutableListOf<String>()
+                    if (increase != null) {
+                        parts.add("بیشترین افزایش: ${increase.category} (+${increase.changePercent.roundToInt()}٪)")
+                    }
+                    if (decrease != null) {
+                        parts.add("بیشترین کاهش: ${decrease.category} (${decrease.changePercent.roundToInt()}٪)")
+                    }
+                    binding.expenseAnalysisChangeText.text = parts.joinToString(" · ") +
+                        " نسبت به دوره قبل"
+                    binding.expenseAnalysisChangeText.visibility = View.VISIBLE
+                }
+
+                if (analysis.topSpendingDayLabel == null || analysis.topSpendingDayAmount <= 0.0) {
+                    binding.expenseAnalysisTopDayText.visibility = View.GONE
+                } else {
+                    binding.expenseAnalysisTopDayText.text = "پرهزینه‌ترین روز: ${analysis.topSpendingDayLabel} " +
+                        "(${formatCurrency(analysis.topSpendingDayAmount)})"
+                    binding.expenseAnalysisTopDayText.visibility = View.VISIBLE
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.budgetStatus.collect { status ->
+                binding.budgetStatusText.text = status
+                binding.budgetStatusText.setTextColor(
+                    if (status.contains("هشدار")) android.graphics.Color.parseColor("#C62828")
+                    else resources.getColor(com.maliar.pro.R.color.text_secondary, null)
+                )
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.expenseTrend.collect { change ->
+                binding.expenseTrendText.text = if (change == null) {
+                    "روند هزینه: داده کافی نیست"
+                } else {
+                    val direction = if (change >= 0.0) "افزایش" else "کاهش"
+                    "روند هزینه نسبت به دوره قبل: $direction ${kotlin.math.abs(change).toInt()}٪"
+                }
             }
         }
 

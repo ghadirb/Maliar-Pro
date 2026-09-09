@@ -34,4 +34,19 @@
 
     <color name="alarm_background">#FF1A1A2E</color>
     <color name="widget_background">#FF2D146B</color>
+
+    <!-- Modern dashboard hero card (design/modern-ui-phase1) - a touch lighter than
+         the light-mode version so it still reads as a distinct, lifted surface against
+         the dark page background instead of disappearing into it. -->
+    <color name="hero_card_background">#26243A</color>
+    <color name="hero_card_text_secondary">#B3FFFFFF</color>
+    <color name="hero_positive_accent">#7FE0B0</color>
+    <color name="hero_negative_accent">#F0A1A1</color>
+
+    <color name="ds_surface_variant">#2B2838</color>
+    <color name="ds_outline">#484354</color>
+    <color name="ds_income_container">#183F2A</color>
+    <color name="ds_expense_container">#4A2827</color>
+    <color name="ds_warning_container">#49391D</color>
+    <color name="ds_info_container">#1D3658</color>
 </resources>

@@ -58,6 +58,13 @@ class FinancialReportsViewModel(
         refresh()
     }
 
+    fun selectJalaliMonth(year: Int, month: Int) {
+        val (currentYear, currentMonth, _) = com.maliar.pro.utils.PersianCalendarHelper.getCurrentJalaliDate()
+        _selectedPeriod.value = ReportPeriod.MONTHLY
+        _periodOffset.value = ((currentYear - year) * 12 + (currentMonth - month)).coerceAtLeast(0)
+        refresh()
+    }
+
     private fun refresh() {
         val period = _selectedPeriod.value
         val offset = _periodOffset.value

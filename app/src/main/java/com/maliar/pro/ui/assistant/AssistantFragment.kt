@@ -1,10 +1,12 @@
 package com.maliar.pro.ui.assistant
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -48,15 +50,35 @@ class AssistantFragment : Fragment() {
 
         val input: TextInputEditText = view.findViewById(R.id.messageInput)
         val sendBtn: MaterialButton = view.findViewById(R.id.sendButton)
+        val voiceCommandBtn: MaterialButton = view.findViewById(R.id.voiceCommandButton)
         bindSmartCards(view)
+
+        voiceCommandBtn.setOnClickListener {
+            startActivity(Intent(requireContext(), VoiceCommandActivity::class.java))
+        }
 
         sendBtn.setOnClickListener {
             val message = input.text.toString().trim()
             if (message.isNotEmpty()) {
-                lifecycleScope.launch {
-                    viewModel.sendMessage(message) // Connected to accounting, reminders
+                val preview = viewModel.previewQuickTransaction(message)
+                if (preview != null) {
+                    val kind = if (preview.isIncome) "درآمد" else "هزینه"
+                    val amount = com.maliar.pro.utils.CurrencyFormatter.format(preview.amount, "")
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("تأیید ثبت $kind")
+                        .setMessage("مبلغ: $amount تومان\nتوضیح: ${preview.description}\n\nآیا این تراکنش در حسابداری ثبت شود؟")
+                        .setPositiveButton("ثبت") { _, _ ->
+                            viewModel.confirmQuickTransaction(preview)
+                            input.text = null
+                        }
+                        .setNegativeButton("لغو", null)
+                        .show()
+                } else {
+                    lifecycleScope.launch {
+                        viewModel.sendMessage(message) // Connected to accounting, reminders
+                        input.text = null
+                    }
                 }
-                input.text = null
             }
         }
 
@@ -67,6 +89,14 @@ class AssistantFragment : Fragment() {
                     chatAdapter.submitList(messages)
                 }
             }
+        }
+
+        // If we were opened from the market-rate-swing notification (see
+        // PendingAssistantQuestion / MainActivity.handleAssistantDeepLink), send that
+        // question automatically so the user lands straight on the analysis they tapped
+        // for, instead of an empty chat.
+        com.maliar.pro.utils.PendingAssistantQuestion.consume()?.let { question ->
+            viewModel.sendMessage(question)
         }
 
         return view

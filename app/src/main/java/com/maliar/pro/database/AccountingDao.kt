@@ -21,8 +21,27 @@ interface AccountingDao {
     @Query("SELECT SUM(amount) FROM incomes")
     suspend fun getTotalIncome(): Double?
 
+    @Query("SELECT * FROM incomes WHERE id = :id LIMIT 1")
+    suspend fun getIncomeById(id: Long): Income?
+
     @Query("SELECT SUM(amount) FROM incomes WHERE date >= :startDate")
     suspend fun getMonthlyIncome(startDate: Long): Double?
+
+    // «فروش کالا»: amount always stays the real cash figure (used above, unchanged); these
+    // three queries separate out the profit side. (amount - costOfGoods) works for both
+    // product sales and plain service income, since costOfGoods defaults to 0 for the
+    // latter - so SUM(amount - costOfGoods) over *all* incomes already equals total profit.
+    @Query("SELECT SUM(amount - costOfGoods) FROM incomes WHERE date >= :startDate")
+    suspend fun getMonthlyProfit(startDate: Long): Double?
+
+    @Query("SELECT SUM(amount - costOfGoods) FROM incomes")
+    suspend fun getTotalProfit(): Double?
+
+    @Query("SELECT SUM(costOfGoods) FROM incomes WHERE date >= :startDate AND isProductSale = 1")
+    suspend fun getMonthlyCostOfGoods(startDate: Long): Double?
+
+    @Query("SELECT SUM(amount) FROM incomes WHERE date >= :startDate AND isProductSale = 1")
+    suspend fun getMonthlyProductSales(startDate: Long): Double?
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertIncome(income: Income): Long
@@ -46,8 +65,17 @@ interface AccountingDao {
     @Query("SELECT SUM(amount) FROM expenses")
     suspend fun getTotalExpense(): Double?
 
+    @Query("SELECT * FROM expenses WHERE id = :id LIMIT 1")
+    suspend fun getExpenseById(id: Long): Expense?
+
     @Query("SELECT SUM(amount) FROM expenses WHERE date >= :startDate")
     suspend fun getMonthlyExpense(startDate: Long): Double?
+
+    @Query("SELECT SUM(amount) FROM expenses WHERE accountId = :accountId")
+    suspend fun getExpenseTotalForAccount(accountId: Long): Double?
+
+    @Query("UPDATE expenses SET accountId = :accountId WHERE accountId IS NULL")
+    suspend fun assignUnlinkedExpensesToAccount(accountId: Long)
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExpense(expense: Expense): Long

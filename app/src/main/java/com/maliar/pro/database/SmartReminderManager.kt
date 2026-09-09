@@ -29,27 +29,42 @@ class SmartReminderManager(private val context: Context) {
     fun getActiveReminders(): Flow<List<ReminderEntity>> = dao.getActiveReminders()
     
     suspend fun getActiveRemindersList(): List<ReminderEntity> = dao.getActiveRemindersList()
+
+    /** Repairs stale recurring rows after midnight, reboot, or a missed alarm. */
+    suspend fun reconcileRecurringReminders(): List<ReminderEntity> {
+        val now = System.currentTimeMillis()
+        val active = dao.getActiveRemindersList()
+        active.filter { it.repeatPattern != RepeatPattern.ONCE.name && it.triggerTime <= now }
+            .forEach { stale ->
+                val fixed = ensureFutureTriggerTime(stale)
+                cancelAlarm(fixed.id)
+                scheduleAlarm(fixed)
+            }
+        return dao.getActiveRemindersList()
+    }
     
     suspend fun getReminderById(id: Long): ReminderEntity? = dao.getReminderById(id)
 
     suspend fun addReminder(reminder: ReminderEntity): Long {
         val id = dao.insertReminder(reminder)
-        if (reminder.triggerTime > 0) {
-            scheduleAlarm(reminder.copy(id = id))
+        val saved = ensureFutureTriggerTime(reminder.copy(id = id))
+        if (saved.triggerTime > 0) {
+            scheduleAlarm(saved)
         }
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
         return id
     }
 
     suspend fun updateReminder(reminder: ReminderEntity) {
-        dao.updateReminder(reminder)
-        cancelAlarm(reminder.id)
+        val saved = ensureFutureTriggerTime(reminder)
+        dao.updateReminder(saved)
+        cancelAlarm(saved.id)
         // No manual notification-channel cleanup needed here: ReminderReceiver.channelIdFor()
         // now folds the sound value into the channel ID itself, so a changed sound
         // automatically gets its own fresh channel (and prunes this reminder's old
         // channel(s)) the next time it actually fires - see that function for why.
-        if (reminder.triggerTime > 0) {
-            scheduleAlarm(reminder)
+        if (saved.triggerTime > 0) {
+            scheduleAlarm(saved)
         }
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context.applicationContext)
     }
@@ -154,13 +169,45 @@ class SmartReminderManager(private val context: Context) {
     }
 
     // Alarm Scheduling
+
+    /**
+     * A repeating reminder (DAILY/WEEKLY/...) whose triggerTime has already passed - e.g.
+     * it's created after today's time-of-day already went by, or its alarm never actually
+     * fired (device off, OS killed the app in the background, etc.) - has to be advanced
+     * to its next real future occurrence *and that has to be written back to the database*,
+     * not just used locally when arming AlarmManager. Previously this catch-up only
+     * happened inside scheduleAlarm() as a local variable that was handed to AlarmManager
+     * and then thrown away: the actual AlarmManager alarm ended up correctly scheduled for
+     * tomorrow, but the database (and therefore the reminders list, which reads
+     * triggerTime straight from the database) kept showing the original stale/past time
+     * forever - a DAILY reminder would sit permanently under "سررسید گذشته" and never
+     * appear under "امروز"/"فردا" again, even though it was still silently ringing on
+     * schedule underneath. Called before every scheduleAlarm() so the two can never drift
+     * apart.
+     */
+    private suspend fun ensureFutureTriggerTime(reminder: ReminderEntity): ReminderEntity {
+        if (reminder.repeatPattern == RepeatPattern.ONCE.name) return reminder
+        if (reminder.triggerTime >= System.currentTimeMillis()) return reminder
+
+        val corrected = reminder.copy(
+            triggerTime = calculateNextTriggerTime(
+                reminder.triggerTime,
+                RepeatPattern.valueOf(reminder.repeatPattern),
+                parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays, reminder.repeatIntervalMinutes
+            )
+        )
+        dao.updateReminder(corrected)
+        return corrected
+    }
+
     private fun scheduleAlarm(reminder: ReminderEntity) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (!alarmManager.canScheduleExactAlarms()) {
-                Log.w(TAG, "Cannot schedule exact alarms - permission needed")
-                return
-            }
-        }
+        // Android 12+ can deny the special "Alarms & reminders" permission on a
+        // fresh install. Never treat that as "do not schedule": the previous early
+        // return made a saved reminder completely silent forever. Use an inexact
+        // allow-while-idle alarm as a delivery fallback; once the permission is granted,
+        // the permission-change receiver reschedules every active row exactly.
+        val canScheduleExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            alarmManager.canScheduleExactAlarms()
 
         // FULL_SCREEN and SMART reminders both need to fire at the exact instant they're
         // due (an alarm-clock style alarm survives Doze better than a plain exact alarm),
@@ -195,17 +242,16 @@ class SmartReminderManager(private val context: Context) {
             var triggerTime = reminder.triggerTime
             val now = System.currentTimeMillis()
 
-            if (triggerTime < now && reminder.repeatPattern != RepeatPattern.ONCE.name) {
-                triggerTime = calculateNextTriggerTime(
-                    triggerTime,
-                    RepeatPattern.valueOf(reminder.repeatPattern),
-                    parseCustomDays(reminder.customRepeatDays), reminder.repeatIntervalDays, reminder.repeatIntervalMinutes
-                )
-            } else if (triggerTime < now) {
+            // Repeating reminders arrive here already advanced to a future time by
+            // ensureFutureTriggerTime() (called from every caller of this function), so
+            // the only case left to defend against is a ONCE reminder whose time somehow
+            // ended up in the past (e.g. device clock changed) - fire it almost
+            // immediately rather than silently never arming an alarm for it.
+            if (triggerTime < now) {
                 triggerTime = now + 1000
             }
 
-            if (useAlarm) {
+            if (useAlarm && canScheduleExact) {
                 val showIntent = Intent(context, FullScreenAlarmActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra("reminder_id", reminder.id)
@@ -231,10 +277,17 @@ class SmartReminderManager(private val context: Context) {
                         AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
                     )
                 }
-            } else {
+            } else if (canScheduleExact) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
                 )
+            } else {
+                // This API remains available without SCHEDULE_EXACT_ALARM. It can be
+                // deferred by Android, but it preserves the reminder instead of losing it.
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
+                )
+                Log.w(TAG, "Exact-alarm permission unavailable; scheduled inexact fallback for ${reminder.id}")
             }
             Log.d(TAG, "✅ Alarm scheduled for: ${reminder.title} at $triggerTime")
         } catch (e: SecurityException) {
@@ -254,7 +307,7 @@ class SmartReminderManager(private val context: Context) {
             val reminders = dao.getActiveRemindersList()
             reminders.forEach { reminder ->
                 cancelAlarm(reminder.id)
-                scheduleAlarm(reminder)
+                scheduleAlarm(ensureFutureTriggerTime(reminder))
             }
             Log.d(TAG, "✅ Rescheduled ${reminders.size} reminders")
         }

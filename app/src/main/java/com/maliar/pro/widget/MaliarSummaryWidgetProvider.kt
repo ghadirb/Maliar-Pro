@@ -1,4 +1,4 @@
-package com.maliar.pro.widget
+﻿package com.maliar.pro.widget
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -16,11 +16,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * A simple home-screen widget: current balance + the next upcoming reminder. Read-only and
- * refreshed periodically (every 30 min, the Android-enforced minimum-adjacent interval) plus
- * on-demand via [requestUpdate] whenever accounting/reminder data actually changes, so it
- * doesn't rely only on the slow periodic refresh. Tapping it opens the app - no other
- * interaction, no background service, no new permissions.
+ * A simple home-screen widget: total balance ("تراز کل") + this period's balance
+ * ("تراز دوره") + the next upcoming reminder. Read-only and refreshed periodically
+ * (every 30 min, the Android-enforced minimum-adjacent interval) plus on-demand via
+ * [requestUpdate] whenever accounting/reminder data actually changes, so it doesn't rely
+ * only on the slow periodic refresh. Tapping it opens the app - no other interaction, no
+ * background service, no new permissions.
  */
 class MaliarSummaryWidgetProvider : AppWidgetProvider() {
 
@@ -42,6 +43,7 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widgetRoot, pendingIntent)
             views.setOnClickPendingIntent(R.id.widgetBalanceText, pendingIntent)
+            views.setOnClickPendingIntent(R.id.widgetPeriodBalanceText, pendingIntent)
             views.setOnClickPendingIntent(R.id.widgetNextReminderText, pendingIntent)
 
             // Show something immediately (avoids a blank widget while the async load below
@@ -50,17 +52,39 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val balance = AccountingManager(context).getBalance()
-                    val nextReminder = SmartReminderManager(context).getActiveRemindersList()
+                    val accountingManager = AccountingManager(context)
+                    val balance = accountingManager.getBalance()
+                    val periodBalance = accountingManager.getPeriodBalance()
+                    val allActiveReminders = SmartReminderManager(context).reconcileRecurringReminders()
                         .filter { !it.isCompleted }
-                        .minByOrNull { it.triggerTime }
+                        .sortedBy { it.triggerTime }
+                    val nextReminder = allActiveReminders.firstOrNull()
+                    val upcomingCount = allActiveReminders.count {
+                        it.triggerTime > System.currentTimeMillis() && it.triggerTime < System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000L
+                    }
+                    val rates = runCatching { com.maliar.pro.utils.MarketRateClient(context).fetch() }.getOrNull()
 
                     views.setTextViewText(R.id.widgetBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(balance))
+                    views.setTextViewText(R.id.widgetPeriodBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(periodBalance))
+                    views.setTextColor(
+                        R.id.widgetPeriodBalanceText,
+                        if (periodBalance < 0) android.graphics.Color.parseColor("#FFCDD2") else android.graphics.Color.WHITE
+                    )
+                    if (rates != null && (rates.gold != null || rates.currency != null)) {
+                        val toToman = { rial: Double -> rial / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN }
+                        val goldText = rates.gold?.let { com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "") } ?: "-"
+                        val currencyText = rates.currency?.let { com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "") } ?: "-"
+                        views.setTextViewText(R.id.widgetMarketRateText, "طلا: $goldText | دلار: $currencyText")
+                        views.setViewVisibility(R.id.widgetMarketRateText, android.view.View.VISIBLE)
+                    } else {
+                        views.setViewVisibility(R.id.widgetMarketRateText, android.view.View.GONE)
+                    }
                     views.setTextViewText(
                         R.id.widgetNextReminderText,
                         if (nextReminder != null) {
                             val (y, m, d) = PersianCalendarHelper.gregorianMillisToJalali(nextReminder.triggerTime)
-                            "⏰ ${nextReminder.title} - ${PersianCalendarHelper.formatJalali(y, m, d)}"
+                            val suffix = if (upcomingCount > 1) " (+$upcomingCount تا هفته آینده)" else ""
+                            "⏰ ${nextReminder.title} - ${PersianCalendarHelper.formatJalali(y, m, d)}$suffix"
                         } else {
                             "یادآوری فعالی وجود ندارد"
                         }
@@ -102,3 +126,4 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
         }
     }
 }
+

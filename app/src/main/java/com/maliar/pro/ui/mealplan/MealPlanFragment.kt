@@ -4,8 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.text.InputType
+import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -13,6 +18,7 @@ import com.google.android.material.card.MaterialCardView
 import com.maliar.pro.R
 import com.maliar.pro.database.MealPlanEntry
 import com.maliar.pro.database.MealPlanManager
+import com.maliar.pro.database.FoodPriceManager
 import com.maliar.pro.database.ShoppingList
 import com.maliar.pro.databinding.FragmentMealPlanBinding
 import com.maliar.pro.utils.AIHelper
@@ -44,6 +50,7 @@ class MealPlanFragment : Fragment() {
             viewModel.generatePlan(weekStartMillis(), budget)
             binding.shoppingListCard.visibility = View.GONE
         }
+        binding.managePricesButton.setOnClickListener { showPriceManager() }
 
         binding.shoppingListButton.setOnClickListener {
             val planId = viewModel.latestPlan.value?.id ?: return@setOnClickListener
@@ -119,6 +126,107 @@ class MealPlanFragment : Fragment() {
         }
     }
 
+    private fun showPriceManager() {
+        val manager = FoodPriceManager(requireContext())
+        val root = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 8, 32, 8)
+            textDirection = View.TEXT_DIRECTION_RTL
+        }
+        val nameInput = EditText(requireContext()).apply {
+            hint = "عنوان کالا یا ماده غذایی"
+            setSingleLine(true)
+        }
+        val priceInput = EditText(requireContext()).apply {
+            hint = "قیمت هر واحد (تومان)"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setSingleLine(true)
+        }
+        val unitInput = EditText(requireContext()).apply {
+            hint = "واحد (مثلاً کیلو یا بسته)"
+            setSingleLine(true)
+        }
+        val saveButton = Button(requireContext()).apply { text = "افزودن قیمت" }
+        val entriesContainer = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        root.addView(nameInput)
+        root.addView(priceInput)
+        root.addView(unitInput)
+        root.addView(saveButton)
+        root.addView(entriesContainer)
+
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("مدیریت قیمت‌ها")
+            .setView(ScrollView(requireContext()).apply { addView(root) })
+            .setNegativeButton("بستن", null)
+            .create()
+        var editingId = 0L
+        saveButton.setOnClickListener {
+            val price = priceInput.text.toString().toDoubleOrNull()
+            lifecycleScope.launch {
+                if (manager.upsert(nameInput.text.toString(), price ?: -1.0, unitInput.text.toString(), editingId)) {
+                    nameInput.text.clear()
+                    priceInput.text.clear()
+                    unitInput.text.clear()
+                    editingId = 0L
+                    saveButton.text = "افزودن قیمت"
+                } else {
+                    nameInput.error = "عنوان و قیمت معتبر وارد کنید"
+                }
+            }
+        }
+        val listJob = lifecycleScope.launch {
+            manager.getAll().collect { items ->
+                entriesContainer.removeAllViews()
+                if (items.isEmpty()) {
+                    entriesContainer.addView(TextView(requireContext()).apply {
+                        text = "هنوز قیمتی ثبت نشده است."
+                        setPadding(0, 24, 0, 16)
+                        gravity = android.view.Gravity.CENTER_HORIZONTAL
+                    })
+                }
+                items.forEach { item ->
+                    val row = LinearLayout(requireContext()).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(0, 16, 0, 16)
+                    }
+                    val label = TextView(requireContext()).apply {
+                        text = "${item.name} — ${item.pricePerUnit.toLong()} تومان" +
+                            if (item.unitLabel.isBlank()) "" else " / ${item.unitLabel}"
+                        textSize = 14f
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        )
+                    }
+                    val edit = Button(requireContext()).apply { text = "ویرایش" }
+                    val delete = Button(requireContext()).apply { text = "حذف" }
+                    edit.setOnClickListener {
+                        editingId = item.id
+                        nameInput.setText(item.name)
+                        priceInput.setText(item.pricePerUnit.toString())
+                        unitInput.setText(item.unitLabel)
+                        saveButton.text = "ذخیره تغییرات"
+                    }
+                    delete.setOnClickListener {
+                        lifecycleScope.launch { manager.delete(item) }
+                    }
+                    val actions = LinearLayout(requireContext()).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                    }
+                    actions.addView(edit)
+                    actions.addView(delete)
+                    row.addView(label)
+                    row.addView(actions)
+                    entriesContainer.addView(row)
+                }
+            }
+        }
+        dialog.setOnDismissListener { listJob.cancel() }
+        dialog.show()
+    }
+
     private fun renderShoppingList(list: ShoppingList?) {
         if (list == null) {
             binding.shoppingListCard.visibility = View.GONE
@@ -134,8 +242,12 @@ class MealPlanFragment : Fragment() {
                 .inflate(R.layout.item_shopping_list_row, binding.shoppingListContainer, false)
             row.findViewById<TextView>(R.id.itemNameText).text =
                 "${item.ingredientName} · ${formatUnits(item.approxUnits)} ${item.unitLabel}"
-            row.findViewById<TextView>(R.id.itemPriceNoteText).text =
-                if (item.unitPrice.isEstimated) "قیمت تقریبی (بدون سابقهٔ خرید)" else "بر اساس آخرین خرید شما"
+            row.findViewById<TextView>(R.id.itemPriceNoteText).text = when (item.unitPrice.source) {
+                com.maliar.pro.database.FoodPriceSource.MANUAL -> "قیمت ثبت‌شده توسط شما"
+                com.maliar.pro.database.FoodPriceSource.EXPENSE_HISTORY -> "بر اساس آخرین خرید شما"
+                com.maliar.pro.database.FoodPriceSource.MARKET_CHECK -> "قیمت تقریبی از آخرین بررسی بازار"
+                com.maliar.pro.database.FoodPriceSource.CATALOG_ESTIMATE -> "قیمت تقریبی؛ برای دقت بیشتر قیمت را وارد یا بازار را بررسی کنید"
+            }
             row.findViewById<TextView>(R.id.itemCostText).text = formatCurrency(item.totalCost)
             binding.shoppingListContainer.addView(row)
         }

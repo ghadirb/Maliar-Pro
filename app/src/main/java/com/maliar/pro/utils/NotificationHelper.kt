@@ -24,6 +24,10 @@ object NotificationHelper {
     private const val INSIGHT_CHANNEL_ID = "financial_insights_channel"
     private const val NOTIFICATION_ID_FINANCIAL_INSIGHT = 5010
 
+    /** Intent extra [com.maliar.pro.MainActivity] checks to route a cold/warm start to the
+     *  assistant tab with a pre-sent question (see [PendingAssistantQuestion]). */
+    const val EXTRA_OPEN_ASSISTANT_MARKET_QUESTION = "open_assistant_market_question"
+
     private fun ensureInsightChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(NotificationManager::class.java)
@@ -39,18 +43,24 @@ object NotificationHelper {
     }
 
     /** Opens the app itself (accounting tab) rather than SubscriptionActivity, since this
-     *  is an analytical nudge, not a billing prompt. */
-    private fun openMainActivityIntent(context: Context): PendingIntent {
+     *  is an analytical nudge, not a billing prompt. When [marketInsightDeepLink] is true,
+     *  routes to the دستیار هوشمند tab with a ready-made question instead (see
+     *  [PendingAssistantQuestion] / [com.maliar.pro.MainActivity]), since a gold/currency
+     *  swing notification is naturally a "go ask the assistant about this" moment. */
+    private fun openMainActivityIntent(context: Context, marketInsightDeepLink: Boolean = false): PendingIntent {
         val intent = Intent(context, com.maliar.pro.MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            if (marketInsightDeepLink) putExtra(EXTRA_OPEN_ASSISTANT_MARKET_QUESTION, true)
         }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        return PendingIntent.getActivity(context, 1, intent, flags)
+        return PendingIntent.getActivity(context, if (marketInsightDeepLink) 2 else 1, intent, flags)
     }
 
     /** One AI/rule-generated insight per day, e.g. "هزینه حمل‌ونقل شما در مرداد نسبت به
-     *  تیر ۲۳٪ افزایش داشته است" or a projected month-end surplus/deficit. */
-    fun notifyFinancialInsight(context: Context, message: String) {
+     *  تیر ۲۳٪ افزایش داشته است" or a projected month-end surplus/deficit. When
+     *  [isMarketInsight] is true (a gold/currency swing), tapping the notification opens
+     *  the assistant tab with a matching question pre-sent instead of just the app. */
+    fun notifyFinancialInsight(context: Context, message: String, isMarketInsight: Boolean = false) {
         ensureInsightChannel(context)
         val notification = NotificationCompat.Builder(context, INSIGHT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -58,7 +68,7 @@ object NotificationHelper {
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setAutoCancel(true)
-            .setContentIntent(openMainActivityIntent(context))
+            .setContentIntent(openMainActivityIntent(context, marketInsightDeepLink = isMarketInsight))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
         try {

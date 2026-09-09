@@ -3,12 +3,14 @@ package com.maliar.pro.database
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
 
-class AccountingManager(context: Context) {
+class AccountingManager(val context: Context) {
 
     private val appContext = context.applicationContext
     private val database = AppDatabase.getDatabase(context)
     private val accountingDao = database.accountingDao()
-    
+    private val financialStatusManager = FinancialStatusManager(context)
+    private val businessManager = BusinessManager(context)
+
     // Income
     fun getAllIncomes(): Flow<List<Income>> {
         return accountingDao.getAllIncomes()
@@ -21,20 +23,63 @@ class AccountingManager(context: Context) {
     suspend fun getTotalIncome(): Double {
         return accountingDao.getTotalIncome() ?: 0.0
     }
-    
+
+    /** سود کل (تمام دوره) - amount minus costOfGoods across every income; equals
+     *  getTotalIncome() for anyone who has never used «فروش کالا», since costOfGoods is 0
+     *  for plain service income. */
+    suspend fun getTotalProfit(): Double {
+        return accountingDao.getTotalProfit() ?: 0.0
+    }
+
+    /** سود دوره جاری - see getPeriodBalance()/getMonthlyIncome() for the matching cash
+     *  figures; this is the profit-based counterpart used by reports. */
+    suspend fun getMonthlyProfit(): Double {
+        val start = getFinancialPeriodStartMillis()
+        return accountingDao.getMonthlyProfit(start) ?: 0.0
+    }
+
+    /** بهای تمام‌شده کالاهای فروخته‌شده در دوره جاری. */
+    suspend fun getMonthlyCostOfGoods(): Double {
+        val start = getFinancialPeriodStartMillis()
+        return accountingDao.getMonthlyCostOfGoods(start) ?: 0.0
+    }
+
+    /** مجموع مبلغ فروش کالا (نه سود آن) در دوره جاری - بخشی از getMonthlyIncome(). */
+    suspend fun getMonthlyProductSales(): Double {
+        val start = getFinancialPeriodStartMillis()
+        return accountingDao.getMonthlyProductSales(start) ?: 0.0
+    }
+
     suspend fun addIncome(income: Income): Long {
-        val id = accountingDao.insertIncome(income)
+        val toSave = resolveSaleCost(income)
+        val id = accountingDao.insertIncome(toSave)
+        financialStatusManager.adjustAssetBalance(toSave.accountId, toSave.amount)
+        businessManager.adjustStockForSale(toSave.copy(id = id), 1.0)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
         return id
     }
     
     suspend fun updateIncome(income: Income) {
-        accountingDao.updateIncome(income)
+        val previous = accountingDao.getIncomeById(income.id)
+        if (previous != null) {
+            // Reverse the old transaction's effect on its (possibly different) account,
+            // then apply the new one - this is what makes editing an income's amount or
+            // switching which account it's linked to keep every affected balance correct,
+            // instead of just re-applying the new amount on top of the old one.
+            financialStatusManager.adjustAssetBalance(previous.accountId, -previous.amount)
+            businessManager.adjustStockForSale(previous, -1.0)
+        }
+        val toSave = resolveSaleCost(income)
+        accountingDao.updateIncome(toSave)
+        financialStatusManager.adjustAssetBalance(toSave.accountId, toSave.amount)
+        businessManager.adjustStockForSale(toSave, 1.0)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     suspend fun deleteIncome(income: Income) {
         accountingDao.deleteIncome(income)
+        financialStatusManager.adjustAssetBalance(income.accountId, -income.amount)
+        businessManager.adjustStockForSale(income, -1.0)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
@@ -50,20 +95,80 @@ class AccountingManager(context: Context) {
     suspend fun getTotalExpense(): Double {
         return accountingDao.getTotalExpense() ?: 0.0
     }
+
+    suspend fun getExpenseTotalForAccount(accountId: Long): Double {
+        return accountingDao.getExpenseTotalForAccount(accountId) ?: 0.0
+    }
+
+    suspend fun assignUnlinkedExpensesToAccount(accountId: Long) {
+        accountingDao.assignUnlinkedExpensesToAccount(accountId)
+    }
     
     suspend fun addExpense(expense: Expense): Long {
-        val id = accountingDao.insertExpense(expense)
+        val linkedAccountId = expense.accountId ?: database.financialStatusDao()
+            .getAssetsByPurposeList(AccountPurpose.DAILY_SPENDING)
+            .firstOrNull()
+            ?.id
+        val toSave = expense.copy(accountId = linkedAccountId)
+        val id = accountingDao.insertExpense(toSave)
+        financialStatusManager.adjustAssetBalance(linkedAccountId, -toSave.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
+        checkForUnusualExpense(expense, id)
         return id
+    }
+
+    /** Best-effort, local-only anomaly check: fires a single notification the moment a
+     *  newly-added expense is far above what's typical for its own category this
+     *  financial period, so the user finds out immediately instead of only if they
+     *  happen to ask the assistant "هزینه غیرعادی؟" (see AssistantViewModel for that
+     *  on-demand version, which this reuses the same >2x-average rule as). Needs at
+     *  least [MIN_SAMPLES_FOR_ANOMALY] *other* same-category expenses this period before
+     *  it will flag anything - too little history makes "average" meaningless and would
+     *  otherwise nag on literally the first purchase in any new category. Never throws:
+     *  this must never block or fail the actual expense save above it. */
+    private suspend fun checkForUnusualExpense(expense: Expense, insertedId: Long) {
+        if (expense.category.isBlank() || expense.amount <= 0.0) return
+        try {
+            val prefs = com.maliar.pro.utils.PreferencesManager(appContext)
+            if (!prefs.isFinancialInsightsEnabled()) return
+            val start = getFinancialPeriodStartMillis()
+            val sameCategoryBefore = accountingDao.getAllExpensesList()
+                .filter { it.category == expense.category && it.date >= start && it.id != insertedId }
+            if (sameCategoryBefore.size < MIN_SAMPLES_FOR_ANOMALY) return
+            val average = sameCategoryBefore.map { it.amount }.average()
+            if (average <= 0.0 || expense.amount < average * ANOMALY_MULTIPLIER) return
+            val amountText = com.maliar.pro.utils.CurrencyFormatter.format(expense.amount)
+            val label = expense.description.ifBlank { expense.category }
+            com.maliar.pro.utils.NotificationHelper.notifyFinancialInsight(
+                appContext,
+                "هزینه «$label» به مبلغ $amountText بیش از دو برابر میانگین هزینه‌های «${expense.category}» در این دوره است و می‌تواند غیرعادی باشد."
+            )
+        } catch (e: Exception) {
+            // Best-effort feature; never let a notification failure affect the save above.
+        }
+    }
+
+    companion object {
+        private const val MIN_SAMPLES_FOR_ANOMALY = 3
+        private const val ANOMALY_MULTIPLIER = 2.0
     }
     
     suspend fun updateExpense(expense: Expense) {
+        val previous = accountingDao.getExpenseById(expense.id)
+        if (previous != null) {
+            // Same reverse-then-reapply pattern as updateIncome: undo the old amount's
+            // effect on its old account first, then apply the new amount to the (possibly
+            // different) new account.
+            financialStatusManager.adjustAssetBalance(previous.accountId, previous.amount)
+        }
         accountingDao.updateExpense(expense)
+        financialStatusManager.adjustAssetBalance(expense.accountId, -expense.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
     suspend fun deleteExpense(expense: Expense) {
         accountingDao.deleteExpense(expense)
+        financialStatusManager.adjustAssetBalance(expense.accountId, expense.amount)
         com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(appContext)
     }
     
@@ -120,6 +225,31 @@ class AccountingManager(context: Context) {
     suspend fun deleteInstallment(installment: Installment) {
         accountingDao.deleteInstallment(installment)
     }
+
+    /** Marks one more occurrence of [installment] as paid: records a real [Expense]
+     *  (so it shows up in reports/history exactly like any other spending, and - via
+     *  [addExpense] - automatically deducts it from [installment.accountId] when one is
+     *  set) and advances [Installment.paidInstallments]. No-ops and returns null if the
+     *  installment is already fully paid, mirroring PeriodicPaymentManager.markPaid's
+     *  duplicate-guard. */
+    suspend fun payInstallment(installment: Installment): Installment? {
+        if (installment.paidInstallments >= installment.totalInstallments) return null
+        addExpense(
+            Expense(
+                category = "اقساط",
+                amount = installment.installmentAmount,
+                description = "قسط: ${installment.title}",
+                date = System.currentTimeMillis(),
+                accountId = installment.accountId
+            )
+        )
+        val updated = installment.copy(
+            paidInstallments = installment.paidInstallments + 1,
+            lastPaymentDate = System.currentTimeMillis()
+        )
+        accountingDao.updateInstallment(updated)
+        return updated
+    }
     
     // Balance
     /** "تراز کل" - scoped to the current Jalali year (1 Farvardin onward), per the person's
@@ -143,6 +273,22 @@ class AccountingManager(context: Context) {
     suspend fun getMonthlyExpense(): Double {
         val start = getFinancialPeriodStartMillis()
         return accountingDao.getMonthlyExpense(start) ?: 0.0
+    }
+
+    /** "تراز دوره" - period income minus period expense, using the same
+     *  getFinancialPeriodStartMillis() boundary (the person's custom period-start-day
+     *  from Profile) as AccountingViewModel.monthlyBalance on the accounting dashboard,
+     *  so this and that screen always agree. Deliberately separate from getBalance()
+     *  above ("تراز کل"), which is scoped to the whole Jalali year on purpose and
+     *  shouldn't change just because the person picks a different period-start-day. */
+    suspend fun getPeriodBalance(): Double = getMonthlyIncome() - getMonthlyExpense()
+
+    /** A blank/zero cost on a named product means "use recorded stock cost"; a typed
+     * value remains authoritative for old inventory or special cases. */
+    private suspend fun resolveSaleCost(income: Income): Income {
+        if (!income.isProductSale || income.productName.isBlank() || income.costOfGoods > 0) return income
+        val stockCost = businessManager.inventoryCost(income.productName, income.productQuantity)
+        return if (stockCost > 0) income.copy(costOfGoods = stockCost) else income
     }
 
     /** Epoch millis for the start of the *current* financial period, based on the

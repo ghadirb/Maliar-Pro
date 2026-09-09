@@ -15,7 +15,11 @@ data class Debt(
     val description: String = "",
     val isPaid: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    /** Account this debt is settled from when marked paid (see
+     *  FinancialStatusManager.toggleDebtPaid). Null keeps the old behavior: toggling
+     *  isPaid is a plain flag flip with no effect on any account balance. */
+    val accountId: Long? = null
 )
 
 enum class DebtType {

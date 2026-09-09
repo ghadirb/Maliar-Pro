@@ -1,15 +1,21 @@
 package com.maliar.pro
 
 import android.app.AlarmManager
+import android.content.Context
+import android.app.NotificationManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
@@ -24,6 +30,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var navController: androidx.navigation.NavController
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -32,6 +39,28 @@ class MainActivity : AppCompatActivity() {
             }
             requestAssistantActionPermissions()
         }
+
+    /** Result callback for [deviceCredentialLauncher]; set right before each launch() and
+     *  cleared right after, so exactly one pending attempt is tracked at a time. */
+    private var onDeviceCredentialResult: ((Boolean) -> Unit)? = null
+
+    /** Legacy (pre-BiometricPrompt) device-credential confirmation, launched by
+     *  [tryDeviceCredentialLegacy]. Deliberately independent of androidx.biometric's own
+     *  DEVICE_CREDENTIAL support in BiometricManager/BiometricPrompt - on at least one
+     *  reported device (a G-Plus P10 on Android 10) *both* BIOMETRIC_WEAK and a
+     *  BiometricPrompt-based DEVICE_CREDENTIAL check reported unavailable even with a
+     *  working fingerprint and an active pattern lock, which points at a broken/incomplete
+     *  BiometricManager implementation on that firmware rather than the device actually
+     *  lacking a secure lock screen. KeyguardManager.createConfirmDeviceCredentialIntent()
+     *  is a much older (API 21+) OS-level API that hands off straight to the system's own
+     *  lock-screen confirmation UI, bypassing BiometricManager entirely. */
+    private val deviceCredentialLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val success = result.resultCode == android.app.Activity.RESULT_OK
+        onDeviceCredentialResult?.invoke(success)
+        onDeviceCredentialResult = null
+    }
 
     /**
      * Fixed store-review bug: this used to request android.permission.READ_CONTACTS at
@@ -76,6 +105,221 @@ class MainActivity : AppCompatActivity() {
 
         setupNavigation()
         ensureNotificationPermissions()
+        // Deferred to after this frame is laid out (rather than called synchronously here)
+        // since starting a BiometricPrompt fragment transaction before the Activity has
+        // reached onStart/onResume is a known source of flaky IllegalStateExceptions on
+        // some OEM ROMs - see authenticateAppIfNeeded().
+        binding.root.post { authenticateAppIfNeeded() }
+        handleAssistantDeepLink(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAssistantDeepLink(intent)
+    }
+
+    /**
+     * Self-heals reminders (and, below, the optional background service) every time the
+     * app is opened or resumed from the background - not just when the person happens to
+     * visit the یادآوری‌ها tab (the only place
+     * [SmartReminderManager.reconcileRecurringReminders] used to run from). Some OEM ROMs
+     * (MIUI etc. - see checkBatteryOptimization's own comment) silently kill the
+     * underlying AlarmManager alarm without the app ever finding out, so a reminder can
+     * sit stale - past its trigger time, never fired - until something re-arms it.
+     * [SmartReminderManager.rescheduleAllActiveReminders] below (called on every resume,
+     * not just after an app update or the exact-alarm settings page) covers this - a full
+     * re-arm is strictly more thorough than reconciling only the stale recurring ones, so
+     * there's no separate narrower pass here.
+     */
+    override fun onResume() {
+        super.onResume()
+        // A launch after an APK update must restore every persisted alarm on Android 10
+        // too. On Android 12+ this is also a second path after returning from the
+        // "Alarms & reminders" special-access page. Also doubles as the general
+        // "reopening the app should self-heal any reminder an OEM silently killed"
+        // safety net (see the doc comment above).
+        lifecycleScope.launch(Dispatchers.IO) {
+            com.maliar.pro.database.SmartReminderManager(applicationContext)
+                .rescheduleAllActiveReminders()
+        }
+        restartBackgroundServiceIfEnabled()
+        reapplySystemThemeIfNeeded()
+    }
+
+    /**
+     * "حالت سیستم" (ThemeMode.SYSTEM) sets AppCompat to MODE_NIGHT_FOLLOW_SYSTEM once, in
+     * [MaliarProApplication.onCreate]. Normally that alone is enough - AppCompat is
+     * supposed to recreate the current Activity by itself whenever the OS delivers a
+     * uiMode configuration change. The problem: on several common OEM ROMs (MIUI,
+     * some Samsung/Huawei builds - the same family of vendors already worked around for
+     * alarms/battery elsewhere in this file), that broadcast is not reliably delivered to
+     * an app sitting in the background, so if the person switches the *phone's* dark mode
+     * while Maliar Pro isn't in the foreground, AppCompat's cached notion of "current
+     * system night state" goes stale and the app keeps showing whatever it last rendered
+     * until something forces a re-check.
+     * Re-issuing [AppCompatDelegate.setDefaultNightMode] with the same value is the
+     * documented way to force that re-check: AppCompat always re-evaluates and recreates
+     * the Activity if the computed mode actually differs, even when the passed-in value
+     * itself didn't change - so this is a safe, cheap no-op the rest of the time. Only
+     * runs when the person actually chose "سیستم" (a manual لایت/دارک choice never needs
+     * this - it doesn't depend on the OS setting at all).
+     */
+    private fun reapplySystemThemeIfNeeded() {
+        if (PreferencesManager(this).getThemeMode() == PreferencesManager.ThemeMode.SYSTEM) {
+            PreferencesManager.applyThemeMode(PreferencesManager.ThemeMode.SYSTEM)
+        }
+    }
+
+    /**
+     * MaliarBackgroundService (the optional "پایداری یادآوری" foreground service some
+     * people enable from Settings) uses START_NOT_STICKY on purpose - it must never
+     * restart itself in the background without the person's say-so. But that also means
+     * that when Android kills it under memory pressure (e.g. several other apps open at
+     * once on a low-RAM device), it simply stays dead: the person reopens Maliar Pro and
+     * the "پایداری یادآوری فعال است" notification never comes back, even though the
+     * Settings switch still shows it as on - previously the only fix was toggling that
+     * switch off and back on by hand. Re-issuing start() here every time the app is
+     * resumed is safe and cheap when the service is already alive (it just rebuilds the
+     * same foreground notification, no duplicate instance is created), so this makes
+     * simply reopening the app repair it automatically, matching what the switch already
+     * implies is supposed to be running.
+     */
+    private fun restartBackgroundServiceIfEnabled() {
+        if (PreferencesManager(this).isBackgroundServiceEnabled()) {
+            com.maliar.pro.services.MaliarBackgroundService.start(applicationContext)
+        }
+    }
+
+    /** Routes the "نرخ طلا/ارز نوسان داشت" notification tap to the دستیار هوشمند tab with
+     *  a ready-made question, instead of just opening whatever tab the app last had open -
+     *  see [com.maliar.pro.utils.NotificationHelper.notifyFinancialInsight] and
+     *  [com.maliar.pro.utils.PendingAssistantQuestion]. A no-op for every other intent. */
+    private fun handleAssistantDeepLink(intent: Intent) {
+        if (!intent.getBooleanExtra(com.maliar.pro.utils.NotificationHelper.EXTRA_OPEN_ASSISTANT_MARKET_QUESTION, false)) return
+        intent.removeExtra(com.maliar.pro.utils.NotificationHelper.EXTRA_OPEN_ASSISTANT_MARKET_QUESTION)
+        com.maliar.pro.utils.PendingAssistantQuestion.pendingQuestion =
+            "با توجه به نرخ لحظه‌ای طلا و ارز و بودجه/موجودی فعلی من، چه تحلیلی داری؟"
+        runCatching {
+            navController.navigate(R.id.assistantFragment)
+        }
+    }
+
+    private fun authenticateAppIfNeeded() {
+        if (!PreferencesManager(this).isBiometricLockEnabled()) return
+        // Try fingerprint/biometric first, then fall back to the phone's own PIN/pattern/
+        // password screen if that fails for any reason (canAuthenticate() reporting
+        // available but authenticate() then throwing is a known issue on cheap/unofficial
+        // devices - e.g. reported on a G-Plus P10 running Android 10 - where the vendor's
+        // fingerprint HAL/binder is broken even though it announces itself as present).
+        tryAuthenticate(
+            authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK,
+            title = "بازکردن مالیار",
+            subtitle = "برای مشاهده اطلاعات مالی، اثر انگشت خود را تأیید کنید",
+            onSuccess = { /* app already open; nothing else to do */ },
+            onUnavailable = { fallBackToDeviceCredential() },
+            onFailed = { Toast.makeText(this, "اثر انگشت شناسایی نشد.", Toast.LENGTH_SHORT).show() },
+            onCancelledOrError = { finish() }
+        )
+    }
+
+    /** Second-line fallback: the phone's own lock-screen confirmation, launched directly
+     *  via [android.app.KeyguardManager] rather than through BiometricManager/
+     *  BiometricPrompt - see [deviceCredentialLauncher]'s doc comment for why. Only gives
+     *  up (and turns the broken toggle off) if the device genuinely has no secure lock
+     *  screen configured at all. */
+    private fun fallBackToDeviceCredential() {
+        tryDeviceCredentialLegacy(
+            onResult = { success ->
+                if (!success) {
+                    // User backed out or failed the confirmation - keep the app closed
+                    // rather than let them in, same as a cancelled biometric prompt would.
+                    finish()
+                }
+                // else: app already open; nothing else to do
+            },
+            onUnavailable = {
+                Toast.makeText(
+                    this,
+                    "قفل بیومتریک این دستگاه پاسخ نمی‌دهد و قفل صفحه‌ای هم تنظیم نشده. قفل مالیار خاموش شد؛ می‌توانید دوباره از تنظیمات آن را روشن کنید.",
+                    Toast.LENGTH_LONG
+                ).show()
+                PreferencesManager(this).setBiometricLockEnabled(false)
+            }
+        )
+    }
+
+    /** One authenticate attempt with one [authenticators] value (never a combination on
+     *  API < 30 - see the comment above). [onUnavailable] fires when the check/attempt
+     *  can't even start (no hardware, nothing enrolled, or - the case this exists for - a
+     *  broken vendor implementation throwing where it shouldn't); [onCancelledOrError]
+     *  fires for a real prompt-level error (user backed out, too many attempts, etc). */
+    private fun tryAuthenticate(
+        authenticators: Int,
+        title: String,
+        subtitle: String,
+        onSuccess: () -> Unit,
+        onUnavailable: () -> Unit,
+        onFailed: () -> Unit,
+        onCancelledOrError: () -> Unit
+    ) {
+        try {
+            val can = BiometricManager.from(this).canAuthenticate(authenticators)
+            if (can != BiometricManager.BIOMETRIC_SUCCESS) {
+                onUnavailable()
+                return
+            }
+            val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        onSuccess()
+                    }
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        onCancelledOrError()
+                    }
+                    override fun onAuthenticationFailed() {
+                        onFailed()
+                    }
+                })
+            val info = BiometricPrompt.PromptInfo.Builder()
+                .setTitle(title)
+                .setSubtitle(subtitle)
+                .setAllowedAuthenticators(authenticators)
+                .build()
+            prompt.authenticate(info)
+        } catch (e: RuntimeException) {
+            // SecurityException / IllegalStateException / IllegalArgumentException all
+            // mean this particular authenticator can't be used right now - try the next
+            // one in the chain rather than crashing or giving up outright.
+            onUnavailable()
+        }
+    }
+
+    /** Launches the OS's own "confirm your PIN/pattern/password" screen directly via
+     *  [android.app.KeyguardManager], independent of BiometricManager/BiometricPrompt.
+     *  [onResult] fires with whether the user confirmed successfully; [onUnavailable]
+     *  fires if the device has no secure lock screen set (or the OS refuses to hand back
+     *  a confirmation intent at all) rather than a real yes/no attempt happening. */
+    private fun tryDeviceCredentialLegacy(onResult: (Boolean) -> Unit, onUnavailable: () -> Unit) {
+        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+        val intent = try {
+            if (keyguardManager?.isDeviceSecure == true) {
+                keyguardManager.createConfirmDeviceCredentialIntent("بازکردن مالیار", "قفل صفحه گوشی را تأیید کنید")
+            } else null
+        } catch (e: RuntimeException) {
+            null
+        }
+        if (intent == null) {
+            onUnavailable()
+            return
+        }
+        onDeviceCredentialResult = onResult
+        try {
+            deviceCredentialLauncher.launch(intent)
+        } catch (e: RuntimeException) {
+            onDeviceCredentialResult = null
+            onUnavailable()
+        }
     }
 
     /**
@@ -119,7 +363,115 @@ class MainActivity : AppCompatActivity() {
                 return
             }
         }
-        showRemoteAnnouncementIfAny()
+        checkBatteryOptimization()
+    }
+
+    /**
+     * Many Iranian-market phone brands (Xiaomi/MIUI, Samsung, Huawei, etc.) aggressively
+     * freeze/force-stop apps that aren't exempted from battery optimization. When that
+     * happens to Maliar Pro, reminders stop firing and the home-screen widget gets stuck
+     * showing the system's own "tap to open the app so the widget can refresh" placeholder
+     * instead of real data - it looks broken even though nothing crashed. Asking for this
+     * exemption (a single system dialog, not silently granted) is the standard fix. Only
+     * asked once per "بعداً" dismissal; if the user already granted it, or already declined
+     * once, we don't ask again on every launch.
+     */
+    private fun checkBatteryOptimization() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val alreadyExempt = powerManager?.isIgnoringBatteryOptimizations(packageName) ?: true
+        val prefs = PreferencesManager(this)
+
+        if (alreadyExempt || prefs.hasBatteryOptimizationPromptBeenDismissed()) {
+            checkFullScreenIntentPermission()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("پایداری یادآوری‌ها و ویجت")
+            .setMessage(
+                "بعضی گوشی‌ها برای صرفه‌جویی باتری، برنامه‌های استفاده‌نشده را در پس‌زمینه " +
+                    "می‌بندند؛ در این حالت ممکن است یادآوری‌ها دیر برسند یا ویجت صفحه اصلی " +
+                    "به‌روزرسانی نشود. برای جلوگیری از این مشکل، مالیار پرو را از بهینه‌سازی " +
+                    "باتری معاف کنید."
+            )
+            .setPositiveButton("رفتن به تنظیمات") { _, _ ->
+                requestIgnoreBatteryOptimizations()
+                checkFullScreenIntentPermission()
+            }
+            .setNegativeButton("بعداً") { _, _ ->
+                prefs.setBatteryOptimizationPromptDismissed(true)
+                checkFullScreenIntentPermission()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    /**
+     * Android 14 (API 34) stopped auto-granting the "USE_FULL_SCREEN_INTENT" special
+     * permission to apps that aren't pre-classified as alarm/call apps, even though the
+     * manifest declares it. Without this permission actually being granted, a "تمام صفحه"
+     * (FULL_SCREEN) or "هوشمند" (SMART) reminder can never truly wake/unlock the screen
+     * when the app is backgrounded - Android silently demotes it to a normal heads-up
+     * notification instead, which is easy to miss while the phone is asleep. This asks
+     * the person, once, to grant it from Settings (same "بعداً" dismissal pattern as the
+     * battery-optimization prompt above) - devices below API 34 keep the permission
+     * auto-granted from the manifest and never see this dialog.
+     */
+    private fun checkFullScreenIntentPermission() {
+        val prefs = PreferencesManager(this)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            showRemoteAnnouncementIfAny()
+            return
+        }
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val alreadyGranted = notificationManager?.canUseFullScreenIntent() ?: true
+        if (alreadyGranted || prefs.hasFullScreenIntentPromptBeenDismissed()) {
+            showRemoteAnnouncementIfAny()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("مجوز هشدار تمام‌صفحه")
+            .setMessage(
+                "برای اینکه یادآوری‌های «تمام صفحه» و «هوشمند» حتی وقتی گوشی قفل یا در " +
+                    "حالت خواب است شما را بیدار کنند، لازم است مجوز نمایش تمام‌صفحه را به " +
+                    "مالیار پرو بدهید؛ در غیر این صورت این یادآوری‌ها فقط به‌صورت یک اعلان " +
+                    "ساده نمایش داده می‌شوند."
+            )
+            .setPositiveButton("رفتن به تنظیمات") { _, _ ->
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    // Device doesn't support the direct intent; ignore.
+                }
+                showRemoteAnnouncementIfAny()
+            }
+            .setNegativeButton("بعداً") { _, _ ->
+                prefs.setFullScreenIntentPromptDismissed(true)
+                showRemoteAnnouncementIfAny()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun requestIgnoreBatteryOptimizations() {
+        try {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Some ROMs reject the direct per-app request intent; fall back to the general
+            // battery-optimization list so the person can still find and allow it manually.
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (ignored: Exception) {
+                // Device exposes neither screen; nothing more we can do here.
+            }
+        }
     }
 
     /**
@@ -153,7 +505,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigation() {
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        val navController = navHostFragment.navController
+        navController = navHostFragment.navController
 
         binding.bottomNavigation.setupWithNavController(navController)
     }

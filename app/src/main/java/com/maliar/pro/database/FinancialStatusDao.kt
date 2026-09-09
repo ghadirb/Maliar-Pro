@@ -17,7 +17,10 @@ interface FinancialStatusDao {
     
     @Query("SELECT * FROM assets ORDER BY value DESC")
     suspend fun getAllAssetsList(): List<Asset>
-    
+
+    @Query("SELECT * FROM assets WHERE id = :id LIMIT 1")
+    suspend fun getAssetById(id: Long): Asset?
+
     @Query("SELECT SUM(value) FROM assets")
     suspend fun getTotalAssets(): Double?
     
@@ -29,6 +32,21 @@ interface FinancialStatusDao {
     
     @Delete
     suspend fun deleteAsset(asset: Asset)
+
+    @Query("UPDATE assets SET purpose = 'NORMAL' WHERE purpose = :purpose")
+    suspend fun clearPurpose(purpose: AccountPurpose)
+
+    @Query("UPDATE assets SET purpose = :purpose WHERE id = :assetId")
+    suspend fun setPurpose(assetId: Long, purpose: AccountPurpose)
+
+    @Query("SELECT * FROM assets WHERE purpose = :purpose ORDER BY value DESC")
+    fun getAssetsByPurpose(purpose: AccountPurpose): Flow<List<Asset>>
+
+    @Query("SELECT * FROM assets WHERE purpose = :purpose ORDER BY value DESC")
+    suspend fun getAssetsByPurposeList(purpose: AccountPurpose): List<Asset>
+
+    @Query("UPDATE assets SET dailyLimit = :dailyLimit WHERE id = :assetId")
+    suspend fun setDailyLimit(assetId: Long, dailyLimit: Double?)
     
     // Debts
     @Query("SELECT * FROM debts ORDER BY amount DESC")
@@ -90,6 +108,9 @@ interface FinancialStatusDao {
     // Financial Preferences
     @Query("SELECT * FROM financial_preferences LIMIT 1")
     suspend fun getPreferences(): FinancialPreferences?
+
+    @Query("SELECT * FROM financial_preferences LIMIT 1")
+    fun getPreferencesFlow(): Flow<FinancialPreferences?>
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPreferences(preferences: FinancialPreferences): Long

@@ -5,24 +5,36 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.maliar.pro.database.AccountingManager
+import com.maliar.pro.database.BudgetManager
+import com.maliar.pro.database.Debt
 import com.maliar.pro.database.Expense
+import com.maliar.pro.database.FinancialGoal
+import com.maliar.pro.database.FinancialStatusManager
+import com.maliar.pro.database.Installment
+import com.maliar.pro.database.PeriodicPayment
+import com.maliar.pro.database.PeriodicPaymentManager
 import com.maliar.pro.utils.PersianCalendarHelper.PERSIAN_MONTH_NAMES
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
 /**
  * Runs once a day (while "پیشنهادهای هوشمند مالی" is on) and posts at most one notification
- * with the single most useful insight it can find for that day: either a category spending
- * swing vs. the previous Jalali month (e.g. "هزینه حمل‌ونقل شما در مرداد نسبت به تیر ۲۳٪
- * افزایش داشته است"), or, if nothing swung enough to be worth mentioning, a projected
- * end-of-month surplus/deficit based on the average daily net so far this month. The
- * deterministic numbers are always computed locally first (so the feature works even with
- * no AI credentials/connectivity); [AIHelper.generateText] is used only to phrase the
- * final sentence more naturally when it's available, with the local sentence as a
- * guaranteed fallback either way.
+ * with the single most useful insight it can find for that day, in priority order: a
+ * category spending swing vs. the previous Jalali month (e.g. "هزینه حمل‌ونقل شما در مرداد
+ * نسبت به تیر ۲۳٪ افزایش داشته است"); a meaningful day-over-day swing in the gold/currency
+ * rate from [MarketRateClient] (e.g. "نرخ طلا نسبت به آخرین بررسی حدود ۴٪ افزایش داشته
+ * است") - reported only as a percentage, since that needs no assumption about the rate's
+ * exact unit or quotation basis, unlike a derived "you can afford N grams" figure would;
+ * or, if nothing swung enough to be worth mentioning, a projected end-of-month
+ * surplus/deficit based on the average daily net so far this month. The deterministic
+ * numbers are always computed locally first (so the feature works even with no AI
+ * credentials/connectivity); [AIHelper.generateText] is used only to phrase the final
+ * sentence more naturally when it's available, with the local sentence as a guaranteed
+ * fallback either way.
  */
 class FinancialInsightWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -32,18 +44,197 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
 
         return try {
             val accountingManager = AccountingManager(applicationContext)
+            val financialManager = FinancialStatusManager(applicationContext)
             val expenses = accountingManager.getAllExpensesList()
             val incomes = accountingManager.getAllIncomesList()
 
-            val message = buildCategorySwingInsight(expenses) ?: buildProjectionInsight(incomes, expenses)
+            // One shared rate fetch feeds three things below: the swing insight (compared
+            // against what was cached *before* this call), today's history snapshot for the
+            // reports trend chart, and re-pricing any weight-based gold assets - instead of
+            // each doing its own redundant network round-trip.
+            val previousRates = prefs.getCachedMarketRates()
+                ?.let { runCatching { com.google.gson.Gson().fromJson(it, MarketRates::class.java) }.getOrNull() }
+            val currentRates = runCatching { MarketRateClient(applicationContext).fetch() }.getOrNull()
+            if (currentRates != null) {
+                runCatching { financialManager.recordMarketRateSnapshot(currentRates) }
+                runCatching { financialManager.refreshGoldAssetValues() }
+            }
+
+            val marketInsight = if (prefs.isInsightMarketEnabled()) {
+                buildMarketRateInsight(prefs, previousRates, currentRates)
+            } else null
+            val periodicPaymentInsight = if (prefs.isInsightPeriodicPaymentEnabled()) {
+                buildPeriodicPaymentInsight(PeriodicPaymentManager(applicationContext).getAllList())
+            } else null
+            val installmentInsight = if (prefs.isInsightInstallmentEnabled()) {
+                buildInstallmentInsight(accountingManager.getActiveInstallments())
+            } else null
+            val debtInsight = if (prefs.isInsightDebtEnabled()) {
+                buildDebtInsight(financialManager.getAllDebtsList())
+            } else null
+            val budgetInsight = if (prefs.isInsightBudgetEnabled()) {
+                buildBudgetInsight(applicationContext, expenses)
+            } else null
+            val goalInsight = if (prefs.isInsightGoalEnabled()) {
+                buildGoalInsight(financialManager.getActiveGoals())
+            } else null
+            val categorySwingInsight = if (prefs.isInsightCategorySwingEnabled()) {
+                buildCategorySwingInsight(expenses)
+            } else null
+            val savingsInsight = if (prefs.isInsightSavingsEnabled()) {
+                buildSavingsInsight(incomes, expenses)
+            } else null
+            val projectionInsight = if (prefs.isInsightProjectionEnabled()) {
+                buildProjectionInsight(incomes, expenses)
+            } else null
+            val message = periodicPaymentInsight ?: installmentInsight ?: debtInsight ?: budgetInsight
+                ?: goalInsight ?: categorySwingInsight ?: marketInsight ?: savingsInsight ?: projectionInsight
             if (message != null) {
                 val finalMessage = tryRephraseWithAi(message) ?: message
-                NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage)
+                NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage, isMarketInsight = message == marketInsight)
             }
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to compute financial insight", e)
             Result.success() // best-effort feature; never worth retrying/crashing over
+        }
+    }
+
+    private fun buildPeriodicPaymentInsight(payments: List<PeriodicPayment>): String? {
+        val now = System.currentTimeMillis()
+        val due = payments
+            .filter { it.isActive && it.nextPaymentAt <= now + it.reminderDaysBefore.coerceIn(0, 30) * DAY_MILLIS }
+            .minByOrNull { it.nextPaymentAt }
+            ?: return null
+        val remainingDays = ((due.nextPaymentAt - now) / DAY_MILLIS).toInt()
+        val amount = String.format("%,.0f", due.amount)
+        return when {
+            remainingDays < 0 -> "پرداخت دوره‌ای «${due.title}» به مبلغ $amount تومان سررسید شده است."
+            remainingDays == 0 -> "امروز موعد پرداخت دوره‌ای «${due.title}» به مبلغ $amount تومان است."
+            else -> "$remainingDays روز دیگر پرداخت دوره‌ای «${due.title}» به مبلغ $amount تومان سررسید می‌شود."
+        }
+    }
+
+    /** Nearest active installment due within [FinanceCalendarUtils.nextInstallmentDueDate],
+     *  reported the same way as periodic payments - only when it falls inside the next
+     *  [INSTALLMENT_DEBT_WARNING_DAYS] days, so this doesn't fire for every installment
+     *  every single day. */
+    private fun buildInstallmentInsight(installments: List<Installment>): String? {
+        val now = System.currentTimeMillis()
+        val windowEnd = now + INSTALLMENT_DEBT_WARNING_DAYS * DAY_MILLIS
+        val next = installments
+            .mapNotNull { installment ->
+                val due = FinanceCalendarUtils.nextInstallmentDueDate(installment) ?: return@mapNotNull null
+                if (due > windowEnd) return@mapNotNull null
+                installment to due
+            }
+            .minByOrNull { it.second } ?: return null
+        val (installment, due) = next
+        val remainingDays = ((due - now) / DAY_MILLIS).toInt()
+        val amount = String.format("%,.0f", installment.installmentAmount)
+        return when {
+            remainingDays <= 0 -> "امروز موعد پرداخت قسط «${installment.title}» به مبلغ $amount تومان است."
+            else -> "$remainingDays روز دیگر قسط «${installment.title}» به مبلغ $amount تومان سررسید می‌شود."
+        }
+    }
+
+    /** Nearest unpaid debt with a set end date, within the same warning window as
+     *  installments above. Debts with no [Debt.endDate] are open-ended and never surface
+     *  here - there is nothing time-sensitive to warn about. */
+    private fun buildDebtInsight(debts: List<Debt>): String? {
+        val now = System.currentTimeMillis()
+        val windowEnd = now + INSTALLMENT_DEBT_WARNING_DAYS * DAY_MILLIS
+        val due = debts
+            .filter { !it.isPaid && it.endDate != null && it.endDate <= windowEnd }
+            .minByOrNull { it.endDate!! } ?: return null
+        val remainingDays = ((due.endDate!! - now) / DAY_MILLIS).toInt()
+        val amount = String.format("%,.0f", due.amount)
+        return when {
+            remainingDays < 0 -> "بدهی «${due.title}» به مبلغ $amount تومان سررسید شده است."
+            remainingDays == 0 -> "امروز موعد سررسید بدهی «${due.title}» به مبلغ $amount تومان است."
+            else -> "$remainingDays روز دیگر بدهی «${due.title}» به مبلغ $amount تومان سررسید می‌شود."
+        }
+    }
+
+    /** Compares each active goal's actual progress against the linear progress it *should*
+     *  have by now (elapsed time / total time to [FinancialGoal.targetDate]) and reports the
+     *  goal falling behind by the widest margin, if any is behind by at least
+     *  [MIN_GOAL_BEHIND_PERCENT] percentage points. Goals whose deadline has already passed
+     *  or that started in the future are skipped, since "expected progress" isn't meaningful
+     *  for them. */
+    private fun buildGoalInsight(goals: List<FinancialGoal>): String? {
+        val now = System.currentTimeMillis()
+        var worst: FinancialGoal? = null
+        var worstGapPercent = 0.0
+        for (goal in goals) {
+            if (goal.targetAmount <= 0.0 || goal.targetDate <= goal.createdAt || goal.targetDate <= now) continue
+            val totalSpan = (goal.targetDate - goal.createdAt).toDouble()
+            val elapsed = (now - goal.createdAt).toDouble().coerceIn(0.0, totalSpan)
+            val expectedProgressPercent = (elapsed / totalSpan) * 100.0
+            val actualProgressPercent = (goal.currentProgress / goal.targetAmount * 100.0).coerceIn(0.0, 100.0)
+            val gap = expectedProgressPercent - actualProgressPercent
+            if (gap > worstGapPercent) {
+                worstGapPercent = gap
+                worst = goal
+            }
+        }
+        if (worst == null || worstGapPercent < MIN_GOAL_BEHIND_PERCENT) return null
+        val remaining = (worst.targetAmount - worst.currentProgress).coerceAtLeast(0.0)
+        val amount = String.format("%,.0f", remaining)
+        return "هدف مالی «${worst.title}» از برنامه عقب است؛ برای رسیدن به موعد، حدود $amount تومان دیگر باقی مانده."
+    }
+
+    /** A gentle nudge to save part of this month's positive net so far, only when there is
+     *  a comfortable surplus (net income clearly above expenses) and no more urgent insight
+     *  took priority - this is deliberately the lowest-priority candidate. */
+    private fun buildSavingsInsight(incomes: List<com.maliar.pro.database.Income>, expenses: List<Expense>): String? {
+        val (year, month, day) = PersianCalendarHelper.getCurrentJalaliDate()
+        if (day < 5) return null
+        val monthStart = PersianCalendarHelper.jalaliToGregorianMillis(year, month, 1)
+        val incomeSoFar = incomes.filter { it.date >= monthStart }.sumOf { it.amount }
+        val expenseSoFar = expenses.filter { it.date >= monthStart }.sumOf { it.amount }
+        if (incomeSoFar <= 0.0) return null
+        val netSoFar = incomeSoFar - expenseSoFar
+        val surplusRatio = netSoFar / incomeSoFar
+        if (surplusRatio < MIN_SAVINGS_SURPLUS_RATIO) return null
+        val suggested = (netSoFar * SAVINGS_SUGGESTION_RATIO).coerceAtLeast(0.0)
+        if (suggested < MIN_PROJECTION_AMOUNT) return null
+        val amount = String.format("%,.0f", suggested)
+        return "این ماه تاکنون مازاد خوبی داشته‌اید؛ شاید بد نباشد حدود $amount تومان از آن را پس‌انداز کنید."
+    }
+
+    /** Local budget alert. It is evaluated before online/AI insights and never sends
+     * a notification when no explicit budget exists. */
+    private suspend fun buildBudgetInsight(context: Context, expenses: List<Expense>): String? {
+        val (year, month, _) = PersianCalendarHelper.getCurrentJalaliDate()
+        val budgets = BudgetManager(context).getForMonthList(year, month).filter { it.isEnabled && it.amount > 0.0 }
+        if (budgets.isEmpty()) return null
+        val monthStart = PersianCalendarHelper.jalaliToGregorianMillis(year, month, 1)
+        val spentByCategory = expenses
+            .filter { it.date >= monthStart }
+            .groupBy { it.category.trim().ifBlank { "عمومی" }.lowercase() }
+            .mapValues { (_, rows) -> rows.sumOf { it.amount } }
+        val candidate = budgets.mapNotNull { budget ->
+            val spent = spentByCategory[budget.category.trim().ifBlank { "عمومی" }.lowercase()] ?: 0.0
+            val ratio = spent / budget.amount
+            if (ratio >= budget.hardThreshold / 100.0) Triple(budget, spent, ratio) else null
+        }.maxByOrNull { it.third }
+        if (candidate != null) {
+            val (budget, spent, ratio) = candidate
+            val percent = (ratio * 100).toInt()
+            return if (spent > budget.amount) {
+                "هشدار بودجه: هزینهٔ «${budget.category}» به ${percent}٪ بودجهٔ این ماه رسیده و از سقف عبور کرده است."
+            } else {
+                "هشدار بودجه: حدود ${percent}٪ بودجهٔ «${budget.category}» مصرف شده است."
+            }
+        }
+        val nearing = budgets.mapNotNull { budget ->
+            val spent = spentByCategory[budget.category.trim().ifBlank { "عمومی" }.lowercase()] ?: 0.0
+            val ratio = spent / budget.amount
+            if (ratio >= budget.softThreshold / 100.0) Triple(budget, spent, ratio) else null
+        }.maxByOrNull { it.third }
+        return nearing?.let { (budget, _, ratio) ->
+            "بودجهٔ «${budget.category}» تقریباً به سقف نزدیک شده است (${(ratio * 100).toInt()}٪ مصرف)."
         }
     }
 
@@ -85,6 +276,30 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         val direction = if (bestIncreased) "افزایش" else "کاهش"
 
         return "هزینه \"$bestCategory\" شما در $thisMonthName نسبت به $lastMonthName حدود $percentText٪ $direction داشته است."
+    }
+
+    /** Compares [currentRates] (this run's shared fetch) against [previousRates] (what was
+     *  cached *before* that fetch, i.e. genuinely an earlier point in time) and reports
+     *  whichever of gold or currency swung more, if at least [PreferencesManager.getMarketSwingThresholdPercent].
+     *  Best-effort: a missing previous/current value just means no insight this run. */
+    private fun buildMarketRateInsight(
+        prefs: PreferencesManager,
+        previousRates: MarketRates?,
+        currentRates: MarketRates?
+    ): String? {
+        if (previousRates == null || currentRates == null) return null
+        val thresholdPercent = prefs.getMarketSwingThresholdPercent().toDouble()
+        return marketSwingSentence("طلا", previousRates.gold, currentRates.gold, thresholdPercent)
+            ?: marketSwingSentence("دلار", previousRates.currency, currentRates.currency, thresholdPercent)
+    }
+
+    private fun marketSwingSentence(label: String, previousValue: Double?, currentValue: Double?, thresholdPercent: Double): String? {
+        if (previousValue == null || currentValue == null || previousValue <= 0) return null
+        val swingPercent = ((currentValue - previousValue) / previousValue) * 100
+        if (kotlin.math.abs(swingPercent) < thresholdPercent) return null
+        val direction = if (swingPercent > 0) "افزایش" else "کاهش"
+        val percentText = kotlin.math.abs(swingPercent).roundToInt()
+        return "نرخ $label نسبت به آخرین بررسی حدود $percentText٪ $direction داشته است."
     }
 
     /** Projects the month-end balance from the average daily net (income - expense) recorded
@@ -138,18 +353,35 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
         private const val UNIQUE_WORK_NAME = "maliar_pro_financial_insights"
         private const val MIN_SWING_PERCENT = 15.0
         private const val MIN_PROJECTION_AMOUNT = 50_000.0
+        private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+        private const val INSTALLMENT_DEBT_WARNING_DAYS = 3L
+        private const val MIN_GOAL_BEHIND_PERCENT = 15.0
+        private const val MIN_SAVINGS_SURPLUS_RATIO = 0.3
+        private const val SAVINGS_SUGGESTION_RATIO = 0.3
 
-        fun schedule(context: Context) {
+        fun schedule(context: Context, runImmediately: Boolean = false) {
             val request = PeriodicWorkRequestBuilder<FinancialInsightWorker>(1, TimeUnit.DAYS).build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_WORK_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
+            if (runImmediately) {
+                // Periodic work may legally wait up to the first interval before its
+                // initial run. Run one best-effort analysis immediately only when the
+                // user explicitly enables the feature, never on every app startup.
+                val immediate = OneTimeWorkRequestBuilder<FinancialInsightWorker>().build()
+                WorkManager.getInstance(context).enqueueUniqueWork(
+                    "${UNIQUE_WORK_NAME}_immediate",
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    immediate
+                )
+            }
         }
 
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
+            WorkManager.getInstance(context).cancelUniqueWork("${UNIQUE_WORK_NAME}_immediate")
         }
     }
 }

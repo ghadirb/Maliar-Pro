@@ -10,7 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:paddingBottom="32dp">
 
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/periodChipGroup"
@@ -20,7 +21,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipDaily"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
@@ -28,7 +29,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipWeekly"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
@@ -36,7 +37,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipMonthly"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
@@ -45,7 +46,7 @@
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipYearly"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.MaliarPro.FilterChip"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checkable="true"
@@ -88,6 +89,12 @@
                 android:layout_height="wrap_content"
                 android:text="بعدی ›" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/periodSelectButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="انتخاب ماه" />
         </LinearLayout>
 
         <LinearLayout
@@ -119,8 +126,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -161,11 +168,52 @@
                     android:orientation="vertical"
                     android:gravity="center">
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:text="خالص" android:textColor="@color/text_secondary" android:textSize="12sp" />
+                        android:text="سود خالص" android:textColor="@color/text_secondary" android:textSize="12sp" />
                     <TextView android:id="@+id/netText" android:layout_width="wrap_content"
                         android:layout_height="wrap_content" android:textStyle="bold" android:textSize="15sp"
                         android:text="0" />
                 </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- «فروش کالا»: تفکیک سود واقعی از گردش نقدی. فقط وقتی در این دوره فروش کالا ثبت
+             شده باشد نمایش داده می‌شود (کاربرانی که فقط خدمات دارند این کارت را نمی‌بینند). -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/profitBreakdownCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="تفکیک فروش کالا"
+                    android:textStyle="bold"
+                    android:textSize="14sp" />
+
+                <TextView android:id="@+id/productSalesText" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textSize="13sp"
+                    android:text="فروش کالا: 0" />
+                <TextView android:id="@+id/costOfGoodsText" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="13sp"
+                    android:text="بهای تمام‌شده: 0" />
+                <TextView android:id="@+id/serviceIncomeText" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="13sp"
+                    android:text="درآمد خدمات: 0" />
+                <TextView android:id="@+id/totalProfitText" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textSize="14sp"
+                    android:textStyle="bold" android:text="سود کل: 0" />
 
             </LinearLayout>
 
@@ -184,6 +232,23 @@
             android:layout_width="match_parent"
             android:layout_height="220dp"
             android:layout_marginTop="8dp" />
+
+        <TextView
+            android:id="@+id/marketRateTrendLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="🪙 روند نرخ طلا و دلار (۳۰ روز اخیر)"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/marketRateTrendChart"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:layout_marginTop="8dp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/topCategoryLabel"

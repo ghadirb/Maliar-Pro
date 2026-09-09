@@ -3,11 +3,14 @@ package com.maliar.pro.dialogs
 import android.app.AlertDialog
 import android.content.Context
 import android.widget.Button
+import android.widget.Spinner
 import com.google.android.material.textfield.TextInputEditText
 import com.maliar.pro.R
+import com.maliar.pro.database.Asset
 import com.maliar.pro.database.DebtorManager
 import com.maliar.pro.database.DebtorPayment
 import com.maliar.pro.ui.common.PersianDatePickerDialog
+import com.maliar.pro.utils.AccountSpinnerHelper
 import com.maliar.pro.utils.PersianCalendarHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +23,7 @@ class AddDebtorPaymentDialog(
     private val onSaved: () -> Unit = {}
 ) {
     private var selectedDate: Long = System.currentTimeMillis()
+    private var loadedAccounts: List<Asset> = emptyList()
 
     fun show() {
         val builder = AlertDialog.Builder(context)
@@ -29,6 +33,8 @@ class AddDebtorPaymentDialog(
         val amountInput = view.findViewById<TextInputEditText>(R.id.paymentAmountInput)
         val noteInput = view.findViewById<TextInputEditText>(R.id.paymentNoteInput)
         val dateButton = view.findViewById<Button>(R.id.paymentDateButton)
+        val accountSpinner = view.findViewById<Spinner>(R.id.accountSpinner)
+        AccountSpinnerHelper.populate(context, accountSpinner) { loadedAccounts = it }
 
         val today = PersianCalendarHelper.getCurrentJalaliDate()
         dateButton.text = PersianCalendarHelper.formatJalali(today.first, today.second, today.third)
@@ -53,7 +59,8 @@ class AddDebtorPaymentDialog(
                     debtorId = debtorId,
                     amount = amount,
                     date = selectedDate,
-                    note = noteInput.text.toString().trim()
+                    note = noteInput.text.toString().trim(),
+                    accountId = AccountSpinnerHelper.selectedAccountId(accountSpinner, loadedAccounts)
                 )
                 CoroutineScope(Dispatchers.IO).launch {
                     debtorManager.addPayment(payment)

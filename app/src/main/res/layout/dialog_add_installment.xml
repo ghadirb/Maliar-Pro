@@ -83,4 +83,20 @@
         android:layout_marginTop="8dp"
         android:text="انتخاب تاریخ شروع" />
 
+    <!-- Account each future installment payment will be deducted from when marked
+         "پرداخت شد" - see AccountingManager.payInstallment. Creating the plan itself
+         never touches this account; only paying an installment does. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="حساب پرداخت اقساط"
+        android:layout_marginTop="16dp"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/accountSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" />
+
 </LinearLayout>

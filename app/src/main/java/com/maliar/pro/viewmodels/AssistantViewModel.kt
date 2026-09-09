@@ -41,8 +41,46 @@ class AssistantViewModel(
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
     data class ChatMessage(val id: String, val text: String, val isUser: Boolean)
+    data class QuickTransactionPreview(
+        val isIncome: Boolean,
+        val amount: Double,
+        val description: String
+    )
 
     private val smartReminderManager by lazy { com.maliar.pro.database.SmartReminderManager(appContext) }
+
+    fun previewQuickTransaction(message: String): QuickTransactionPreview? {
+        val incomeKeywords = listOf("درآمد", "حقوق", "دریافت کردم", "دریافتی", "واریز شد", "واریز کردم", "فروش")
+        val expenseKeywords = listOf("هزینه", "خرج کردم", "خرج شد", "پرداخت کردم", "خریدم", "خرید کردم", "پرداختی")
+        val isIncome = incomeKeywords.any { message.contains(it) }
+        val isExpense = expenseKeywords.any { message.contains(it) }
+        if (isIncome == isExpense || message.contains("ویرایش") || message.contains("تغییر")) return null
+        val amount = parsePersianAmount(message) ?: return null
+        if (amount <= 0.0) return null
+        return QuickTransactionPreview(isIncome, amount, message.trim())
+    }
+
+    fun confirmQuickTransaction(preview: QuickTransactionPreview) {
+        viewModelScope.launch {
+            val formatted = com.maliar.pro.utils.CurrencyFormatter.format(preview.amount, "")
+            if (preview.isIncome) {
+                accountingManager.addIncome(
+                    Income(amount = preview.amount, description = preview.description, date = Date().time)
+                )
+            } else {
+                accountingManager.addExpense(
+                    Expense(amount = preview.amount, description = preview.description, date = Date().time)
+                )
+            }
+            val kind = if (preview.isIncome) "درآمد" else "هزینه"
+            val balance = com.maliar.pro.utils.CurrencyFormatter.format(accountingManager.getBalance(), "")
+            _chatMessages.value = _chatMessages.value + ChatMessage(
+                (System.currentTimeMillis() + 1).toString(),
+                "✅ $kind به مبلغ $formatted تومان ثبت شد.\n💰 موجودی جدید: $balance تومان",
+                false
+            )
+        }
+    }
 
     fun sendMessage(message: String) {
         viewModelScope.launch {
@@ -56,7 +94,8 @@ class AssistantViewModel(
             // online chat model has no way to call app functions - it was only ever
             // describing data already in the system prompt, never writing anything.
             val localActionResult = try {
-                tryExecuteAccountingCommand(message)
+                tryExecuteLocalFinancialQuery(message)
+                    ?: tryExecuteAccountingCommand(message)
                     ?: tryExecuteReminderCommand(message)
                     ?: tryExecuteFinancialStatusCommand(message)
             } catch (e: Exception) {
@@ -111,6 +150,348 @@ class AssistantViewModel(
 
             _chatMessages.value = _chatMessages.value + ChatMessage((System.currentTimeMillis() + 1).toString(), response, false)
             _isProcessing.value = false
+        }
+    }
+
+    private suspend fun tryExecuteLocalFinancialQuery(message: String): String? {
+        val text = message.trim()
+        val asksAnomaly = text.contains("\u063a\u06cc\u0631\u0639\u0627\u062f\u06cc") ||
+            text.contains("\u063a\u06cc\u0631 \u0639\u0627\u062f\u06cc") || text.contains("\u0646\u0627\u0647\u0646\u062c\u0627\u0631")
+        if (asksAnomaly) {
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val expenses = accountingManager.getAllExpensesList().filter { it.date >= start }
+            if (expenses.size < 3) return "برای شناسایی هزینه غیرعادی، حداقل سه هزینه در دوره جاری لازم است."
+            val average = expenses.map { it.amount }.average()
+            val unusual = expenses.maxByOrNull { it.amount }
+            return if (unusual != null && unusual.amount > average * 2.0) {
+                "هزینه «${unusual.description.ifBlank { unusual.category.ifBlank { "بدون توضیح" } }}» با مبلغ " +
+                    "${com.maliar.pro.utils.CurrencyFormatter.format(unusual.amount)} بیش از دو برابر میانگین است و می‌تواند غیرعادی باشد."
+            } else "در داده‌های دوره جاری هزینه‌ای بیش از دو برابر میانگین پیدا نشد."
+        }
+        val asksDebtScenario = (text.contains("\u0627\u06af\u0631") || text.contains("\u0628\u06cc\u0634\u062a\u0631 \u0628\u067e\u0631\u062f\u0627\u0632\u0645")) &&
+            (text.contains("\u0628\u062f\u0647\u06cc") || text.contains("\u0642\u0633\u0637"))
+        if (asksDebtScenario) {
+            val extra = parsePersianAmount(text)
+            val debts = financialManager.getAllDebtsList().filter { !it.isPaid }
+            val total = debts.sumOf { it.amount }
+            if (debts.isEmpty() || total <= 0.0) return "بدهی پرداخت‌نشده‌ای برای تحلیل ثبت نشده است."
+            if (extra == null || extra <= 0.0) return "مبلغ پرداخت اضافه را هم وارد کنید؛ مثلاً «اگر ماهانه یک میلیون بیشتر بپردازم چه می‌شود؟»."
+            val monthly = debts.mapNotNull { it.installmentAmount }.sum().coerceAtLeast(0.0)
+            val baselineMonths = if (monthly > 0.0) kotlin.math.ceil(total / monthly) else null
+            val acceleratedMonths = if (monthly + extra > 0.0) kotlin.math.ceil(total / (monthly + extra)) else null
+            return if (baselineMonths == null) {
+                "مبلغ قسط فعلی برای بدهی‌ها ثبت نشده است؛ امکان محاسبه سناریوی تسویه وجود ندارد."
+            } else {
+                "بدهی پرداخت‌نشده: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}\n" +
+                    "پرداخت ماهانه فعلی: ${com.maliar.pro.utils.CurrencyFormatter.format(monthly)}\n" +
+                    "با پرداخت اضافه ${com.maliar.pro.utils.CurrencyFormatter.format(extra)}، " +
+                    "زمان تخمینی از حدود $baselineMonths ماه به حدود ${acceleratedMonths ?: baselineMonths} ماه می‌رسد.\n" +
+                    "این سناریو پیشنهادی است و هیچ پرداختی ثبت نمی‌کند."
+            }
+        }
+        val asksSavingsDuration = (text.contains("\u0686\u0647 \u0645\u062f\u062a") ||
+            text.contains("\u0632\u0645\u0627\u0646 \u0631\u0633\u06cc\u062f\u0646")) &&
+            (text.contains("\u067e\u0633\u200c\u0627\u0646\u062f\u0627\u0632") || text.contains("\u0647\u062f\u0641"))
+        if (asksSavingsDuration) {
+            val goal = financialManager.getActiveGoals().minByOrNull { it.targetDate }
+                ?: return "برای برنامه‌ریزی پس‌انداز، ابتدا یک هدف مالی فعال ثبت کنید."
+            val remaining = (goal.targetAmount - goal.currentProgress).coerceAtLeast(0.0)
+            val monthly = accountingManager.getMonthlyIncome() - accountingManager.getMonthlyExpense()
+            if (remaining <= 0.0) return "هدف «${goal.title}» تکمیل شده است."
+            if (monthly <= 0.0) return "با تراز فعلی، مبلغ پس‌انداز ماهانه مثبت نیست؛ ابتدا درآمد و هزینه‌ها را بررسی کنید."
+            val months = kotlin.math.ceil(remaining / monthly).toInt().coerceAtLeast(1)
+            return "با پس‌انداز ماهانه فعلی حدود ${com.maliar.pro.utils.CurrencyFormatter.format(monthly)}، " +
+                "رسیدن به هدف «${goal.title}» تقریباً $months ماه زمان می‌برد. این برآورد تخمینی است."
+        }
+        val asksWeeklyBudget = text.contains("\u0647\u0641\u062a\u0647") && text.contains("\u0628\u0648\u062f\u062c\u0647")
+        if (asksWeeklyBudget) {
+            val expenses = accountingManager.getAllExpensesList()
+            val now = java.util.Calendar.getInstance()
+            val weekStart = (now.clone() as java.util.Calendar).apply {
+                set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.SATURDAY)
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val historyStart = weekStart - 12L * 7 * 24 * 60 * 60 * 1000
+            val history = expenses.filter { it.date >= historyStart && it.date < weekStart }
+            if (history.isEmpty()) return "برای پیشنهاد بودجه هفتگی، سابقه هزینه کافی ثبت نشده است."
+            val suggested = history.sumOf { it.amount } / 12.0
+            val current = expenses.filter { it.date >= weekStart }.sumOf { it.amount }
+            return "بودجه پیشنهادی هفتگی: ${com.maliar.pro.utils.CurrencyFormatter.format(suggested)}\n" +
+                "هزینه ثبت‌شده این هفته: ${com.maliar.pro.utils.CurrencyFormatter.format(current)}\n" +
+                "این مبلغ پیشنهادی و قابل ویرایش است."
+        }
+        val asksCategoryBudget = text.contains("\u0628\u0648\u062f\u062c\u0647") && text.contains("\u062f\u0633\u062a\u0647")
+        if (asksCategoryBudget) {
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val top = accountingManager.getAllExpensesList()
+                .filter { it.date >= start }
+                .groupBy { it.category.trim().ifBlank { "عمومی" } }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+                .maxByOrNull { it.value }
+            return if (top == null) "برای پیشنهاد بودجه دسته‌ای، داده کافی وجود ندارد."
+            else "بودجه پیشنهادی دسته «${top.key}»: " +
+                "${com.maliar.pro.utils.CurrencyFormatter.format(top.value * 1.10)}. این مقدار تخمینی است."
+        }
+        val asksToday = text.contains("امروز")
+        val asksMonth = text.contains("این ماه") || text.contains("ماه جاری")
+        val asksExpense = text.contains("خرج") || text.contains("هزینه")
+        val asksIncome = text.contains("درآمد") || text.contains("دریافت")
+        val asksDebt = text.contains("بدهی") || text.contains("قسط")
+        val asksBalance = text.contains("موجودی") || text.contains("مانده") || text.contains("تراز")
+        val asksTop = text.contains("بیشترین") && asksExpense
+        val asksQuery = text.contains("چقدر") || text.contains("کجا") || text.contains("جمع") || asksTop
+        if (asksDebt && asksQuery) {
+            val debts = financialManager.getAllDebtsList().filter { !it.isPaid }
+            val unpaid = debts.sumOf { it.amount }
+            val installments = accountingManager.getActiveInstallments()
+            val nearest = debts.mapNotNull { debt ->
+                debt.endDate?.let { it to debt }
+            }.minByOrNull { it.first }
+            val nearestText = nearest?.let {
+                val days = ((it.first - System.currentTimeMillis()) / (24L * 60 * 60 * 1000)).toInt()
+                val timing = if (days < 0) "عقب‌افتاده" else "حدود $days روز دیگر"
+                "نزدیک‌ترین سررسید: «${it.second.title}»، $timing."
+            } ?: "برای بدهی‌های ثبت‌شده سررسید مشخصی وجود ندارد."
+            return "مجموع بدهی‌های پرداخت‌نشده: ${com.maliar.pro.utils.CurrencyFormatter.format(unpaid)}\n" +
+                "تعداد بدهی‌های پرداخت‌نشده: ${debts.size}\n" +
+                "تعداد اقساط فعال: ${installments.size}\n" +
+                nearestText + "\nاین گزارش فقط بر اساس اطلاعات ثبت‌شده در برنامه است."
+        }
+        val asksHabit = (text.contains("\u0686\u0647 \u0631\u0648\u0632") ||
+            text.contains("\u0631\u0648\u0632\u0647\u0627\u06cc") ||
+            text.contains("\u0627\u0644\u0606\u0648\u06cc \u0647\u0641\u062a\u0647")) &&
+            (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647"))
+        if (asksHabit) {
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val dayNames = mapOf(
+                java.util.Calendar.SATURDAY to "شنبه",
+                java.util.Calendar.SUNDAY to "یکشنبه",
+                java.util.Calendar.MONDAY to "دوشنبه",
+                java.util.Calendar.TUESDAY to "سه‌شنبه",
+                java.util.Calendar.WEDNESDAY to "چهارشنبه",
+                java.util.Calendar.THURSDAY to "پنجشنبه",
+                java.util.Calendar.FRIDAY to "جمعه"
+            )
+            val byDay = accountingManager.getAllExpensesList()
+                .asSequence()
+                .filter { it.date >= start }
+                .groupBy { expense ->
+                    java.util.Calendar.getInstance().apply { timeInMillis = expense.date }
+                        .get(java.util.Calendar.DAY_OF_WEEK)
+                }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+            val top = byDay.maxByOrNull { it.value }
+            return if (top == null) {
+                "در دوره جاری هنوز هزینه‌ای برای تحلیل روزهای هفته ثبت نشده است."
+            } else {
+                "بیشترین هزینه ثبت‌شده در دوره جاری مربوط به روز ${dayNames[top.key] ?: "نامشخص"} است: " +
+                    "${com.maliar.pro.utils.CurrencyFormatter.format(top.value)}. این تحلیل بر اساس داده‌های ثبت‌شده است."
+            }
+        }
+        val asksSavingAdvice = (text.contains("\u0635\u0631\u0641\u0647\u200c\u062c\u0648\u06cc\u06cc") ||
+            text.contains("\u0635\u0631\u0641\u0647 \u062c\u0648\u06cc\u06cc") ||
+            text.contains("\u06a9\u0645\u062a\u0631 \u062e\u0631\u062c")) &&
+            (text.contains("\u0686\u0637\u0648\u0631") || text.contains("\u067e\u06cc\u0634\u0646\u0647\u0627\u062f") ||
+                text.contains("\u06a9\u0645\u062a\u0631"))
+        if (asksSavingAdvice) {
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val top = accountingManager.getAllExpensesList()
+                .asSequence()
+                .filter { it.date >= start }
+                .groupBy { it.category.trim().ifBlank { "عمومی" } }
+                .mapValues { (_, items) -> items.sumOf { it.amount } }
+                .maxByOrNull { it.value }
+            return if (top == null || top.value <= 0.0) {
+                "برای پیشنهاد صرفه‌جویی، ابتدا چند هزینه در دوره جاری ثبت کنید."
+            } else {
+                val saving = top.value * 0.20
+                "بیشترین ظرفیت کاهش هزینه فعلی مربوط به دسته «${top.key}» است. " +
+                    "اگر هزینه این دسته را حدود ۲۰٪ کاهش دهید، صرفه‌جویی پیشنهادی حدود " +
+                    "${com.maliar.pro.utils.CurrencyFormatter.format(saving)} خواهد بود. این فقط یک پیشنهاد تخمینی است."
+            }
+        }
+        val asksCompare = (text.contains("\u0686\u0631\u0627") || text.contains("\u0645\u0642\u0627\u06cc\u0633\u0647")) &&
+            (text.contains("\u0645\u0627\u0647 \u0642\u0628\u0644") || text.contains("\u062f\u0648\u0631\u0647 \u0642\u0628\u0644")) &&
+            (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647"))
+        if (asksCompare) {
+            val now = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val currentStart = accountingManager.getFinancialPeriodStartMillis()
+            val periodLength = (now - currentStart).coerceAtLeast(24L * 60 * 60 * 1000)
+            val previousStart = currentStart - periodLength
+            val expenses = accountingManager.getAllExpensesList()
+            val current = expenses.filter { it.date >= currentStart }.sumOf { it.amount }
+            val previous = expenses.filter { it.date >= previousStart && it.date < currentStart }.sumOf { it.amount }
+            if (previous <= 0.0) {
+                return "برای مقایسه با دوره قبل، هزینه‌ی کافی در دوره‌ی قبلی ثبت نشده است."
+            }
+            val change = (current - previous) / previous * 100.0
+            val direction = if (change >= 0.0) "افزایش" else "کاهش"
+            return "هزینه‌های دوره جاری نسبت به دوره قبل حدود ${kotlin.math.abs(change).toInt()}٪ $direction داشته است.\n" +
+                "دوره جاری: ${com.maliar.pro.utils.CurrencyFormatter.format(current)}؛ " +
+                "دوره قبل: ${com.maliar.pro.utils.CurrencyFormatter.format(previous)}."
+        }
+        val asksForecast = text.contains("\u067e\u06cc\u0634\u200c\u0628\u06cc\u0646\u06cc") ||
+            text.contains("\u067e\u06cc\u0634 \u0628\u06cc\u0646\u06cc") ||
+            text.contains("\u0648\u0636\u0639\u06cc\u062a \u0622\u06cc\u0646\u062f\u0647")
+        if (asksForecast) {
+            val income = accountingManager.getMonthlyIncome()
+            val expense = accountingManager.getMonthlyExpense()
+            if (income <= 0.0 && expense <= 0.0) {
+                return "برای پیش‌بینی، اطلاعات مالی کافی در دوره جاری ثبت نشده است."
+            }
+            val start = accountingManager.getFinancialPeriodStartMillis()
+            val elapsedDays = ((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000))
+                .toInt().coerceAtLeast(0) + 1
+            val dailyNet = (income - expense) / elapsedDays
+            val targetDays = when {
+                text.contains("\u067e\u0627\u06cc\u0627\u0646 \u0645\u0627\u0647") -> 30
+                text.contains("\u06f1\u06f5") || text.contains("15") -> 15
+                else -> 7
+            }
+            val forecast = (income - expense) + dailyNet * targetDays
+            return "پیش‌بینی تخمینی تراز برای $targetDays روز آینده: " +
+                "${com.maliar.pro.utils.CurrencyFormatter.format(forecast)}. این عدد تضمینی نیست."
+        }
+        val asksSpendable = (text.contains("\u0645\u06cc\u200c\u062a\u0648\u0627\u0646\u0645") ||
+            text.contains("\u0645\u06cc\u062a\u0648\u0646\u0645") ||
+            text.contains("\u0642\u0627\u0628\u0644 \u062e\u0631\u062c")) &&
+            (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647"))
+        if (asksSpendable) {
+            val balance = accountingManager.getBalance()
+            return if (balance <= 0.0) {
+                "بر اساس اطلاعات فعلی، مبلغ قابل‌خرج پیشنهادی صفر است؛ این نتیجه تخمینی است."
+            } else {
+                "مبلغ پیشنهادی قابل‌خرج بر اساس تراز فعلی: " +
+                    "${com.maliar.pro.utils.CurrencyFormatter.format(balance)}. این عدد تخمینی است و تضمین مالی نیست."
+            }
+        }
+        val asksSavingsPlan = (text.contains("\u067e\u0633\u200c\u0627\u0646\u062f\u0627\u0632") ||
+            text.contains("\u067e\u0633\u0627\u0646\u062f\u0627\u0632")) &&
+            (text.contains("\u0645\u0627\u0647\u0627\u0646\u0647") || text.contains("\u0686\u0642\u062f\u0631") ||
+                text.contains("\u0647\u062f\u0641"))
+        if (asksSavingsPlan) {
+            val goals = financialManager.getActiveGoals()
+            val goal = goals.firstOrNull { goal ->
+                goal.title.isNotBlank() && text.contains(goal.title, ignoreCase = true)
+            } ?: goals.minByOrNull { it.targetDate }
+            if (goal == null) {
+                return "برای محاسبه برنامه پس‌انداز، ابتدا حداقل یک هدف مالی فعال ثبت کنید."
+            }
+            val remaining = (goal.targetAmount - goal.currentProgress).coerceAtLeast(0.0)
+            if (remaining <= 0.0 || goal.isCompleted) {
+                return "هدف «${goal.title}» تکمیل شده است و مبلغ باقی‌مانده‌ای ندارد."
+            }
+            val daysLeft = ((goal.targetDate - System.currentTimeMillis()) /
+                (24L * 60 * 60 * 1000)).toInt()
+            if (daysLeft <= 0) {
+                return "تاریخ هدف «${goal.title}» گذشته یا امروز است؛ لطفاً تاریخ هدف را بررسی کنید."
+            }
+            val monthsLeft = kotlin.math.ceil(daysLeft / 30.44).toInt().coerceAtLeast(1)
+            val monthly = remaining / monthsLeft
+            return "برای هدف «${goal.title}» حدود $monthsLeft ماه زمان باقی مانده است.\n" +
+                "پس‌انداز پیشنهادی ماهانه: ${com.maliar.pro.utils.CurrencyFormatter.format(monthly)}\n" +
+                "این مبلغ تخمینی است و قابل ویرایش توسط شماست."
+        }
+        val asksPurchase = (text.contains("\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645") ||
+            text.contains("\u0645\u06cc\u062e\u0648\u0627\u0645") ||
+            text.contains("\u0645\u06cc \u062e\u0648\u0627\u0647\u0645") ||
+            text.contains("\u0642\u0635\u062f \u062f\u0627\u0631\u0645")) &&
+            (text.contains("\u0628\u062e\u0631\u0645") || text.contains("\u062e\u0631\u06cc\u062f"))
+        if (asksPurchase) {
+            val amount = parsePersianAmount(text)
+            if (amount == null || amount <= 0.0) {
+                return "برای تصمیم‌یار خرید، مبلغ خرید را هم وارد کنید؛ مثلاً «می‌خواهم کالای ۳۰ میلیون تومانی بخرم»."
+            }
+            val balance = accountingManager.getBalance()
+            val after = balance - amount
+            val result = when {
+                balance <= 0.0 -> "با اطلاعات فعلی، موجودی مثبتی برای این خرید دیده نمی‌شود."
+                after < 0.0 -> "این خرید طبق موجودی فعلی فشار مالی ایجاد می‌کند و موجودی را منفی می‌کند."
+                amount > balance * 0.5 -> "این خرید بیش از نیمی از موجودی فعلی را مصرف می‌کند؛ بهتر است زمان یا مبلغ آن را دوباره بررسی کنید."
+                else -> "این خرید از نظر موجودی فعلی قابل انجام به نظر می‌رسد، اما پیشنهاد قطعی مالی نیست."
+            }
+            return "مبلغ خرید: ${com.maliar.pro.utils.CurrencyFormatter.format(amount)}\n" +
+                "موجودی فعلی: ${com.maliar.pro.utils.CurrencyFormatter.format(balance)}\n" +
+                "موجودی پیشنهادی پس از خرید: ${com.maliar.pro.utils.CurrencyFormatter.format(after)}\n" +
+                result
+        }
+        val asksScenario = text.contains("\u0627\u06af\u0631") &&
+            (text.contains("\u062e\u0631\u062c") || text.contains("\u0647\u0632\u06cc\u0646\u0647") ||
+                text.contains("\u062e\u0631\u06cc\u062f"))
+        if (asksScenario) {
+            val amount = parsePersianAmount(text)
+            if (amount == null || amount <= 0.0) return "لطفاً مبلغ خرید یا هزینه را واضح‌تر وارد کنید."
+            val before = accountingManager.getBalance()
+            val after = before - amount
+            val projectedExpense = accountingManager.getMonthlyExpense() + amount
+            val warning = if (after < 0.0) {
+                "هشدار: موجودی پیشنهادی منفی می‌شود."
+            } else {
+                "این فقط یک محاسبه پیشنهادی است و چیزی ثبت نخواهد شد."
+            }
+            return "قبل از هزینه: ${com.maliar.pro.utils.CurrencyFormatter.format(before)}\n" +
+                "پس از هزینه پیشنهادی: ${com.maliar.pro.utils.CurrencyFormatter.format(after)}\n" +
+                "هزینه دوره جاری پس از این سناریو: ${com.maliar.pro.utils.CurrencyFormatter.format(projectedExpense)}\n" +
+                warning
+        }
+        if (asksBalance && !asksDebt && !asksExpense && !asksIncome && asksQuery) {
+            val balance = accountingManager.getBalance()
+            return "موجودی فعلی شما: ${com.maliar.pro.utils.CurrencyFormatter.format(balance)}."
+        }
+        if ((!asksMonth && !asksToday) || !asksQuery || (asksExpense == asksIncome)) return null
+
+        if (asksToday) {
+            val dayStartCalendar = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                set(java.util.Calendar.MINUTE, 0)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            val dayStart = dayStartCalendar.timeInMillis
+            val dayEnd = dayStartCalendar.apply {
+                add(java.util.Calendar.DAY_OF_MONTH, 1)
+            }.timeInMillis
+            return if (asksExpense) {
+                val total = accountingManager.getAllExpensesList()
+                    .asSequence()
+                    .filter { it.date in dayStart until dayEnd }
+                    .sumOf { it.amount }
+                "مجموع هزینه‌های امروز: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}."
+            } else {
+                val total = accountingManager.getAllIncomesList()
+                    .asSequence()
+                    .filter { it.date in dayStart until dayEnd }
+                    .sumOf { it.amount }
+                "مجموع درآمدهای امروز: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}."
+            }
+        }
+
+        return when {
+            asksTop -> {
+                val expenses = accountingManager.getAllExpensesList()
+                    .filter { it.date >= accountingManager.getFinancialPeriodStartMillis() }
+                val top = expenses.groupBy { it.category.trim().ifBlank { "عمومی" } }
+                    .mapValues { (_, items) -> items.sumOf { it.amount } }
+                    .maxByOrNull { it.value }
+                if (top == null) "در دوره جاری هنوز هزینه‌ای ثبت نشده است."
+                else "بیشترین دسته هزینه در دوره جاری «${top.key}» با مبلغ ${com.maliar.pro.utils.CurrencyFormatter.format(top.value)} است."
+            }
+            asksExpense -> {
+                val total = accountingManager.getMonthlyExpense()
+                "مجموع هزینه‌های دوره جاری: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}."
+            }
+            else -> {
+                val total = accountingManager.getMonthlyIncome()
+                "مجموع درآمدهای دوره جاری: ${com.maliar.pro.utils.CurrencyFormatter.format(total)}."
+            }
         }
     }
 
@@ -285,9 +666,28 @@ class AssistantViewModel(
             val newBalance = accountingManager.getBalance()
             "✅ مبلغ $formattedAmount تومان به‌عنوان درآمد در حسابداری ثبت شد.\n💰 موجودی جدید: ${com.maliar.pro.utils.CurrencyFormatter.format(newBalance, "")} تومان"
         } else {
-            accountingManager.addExpense(Expense(amount = amount, description = description, date = Date().time))
+            accountingManager.addExpense(
+                Expense(
+                    amount = amount,
+                    description = description,
+                    category = inferExpenseCategory(description),
+                    date = Date().time
+                )
+            )
             val newBalance = accountingManager.getBalance()
             "✅ مبلغ $formattedAmount تومان به‌عنوان هزینه در حسابداری ثبت شد.\n💰 موجودی جدید: ${com.maliar.pro.utils.CurrencyFormatter.format(newBalance, "")} تومان"
+        }
+    }
+
+    /** Assigns a stable category when a natural-language expense omits one. */
+    private fun inferExpenseCategory(text: String): String {
+        val value = normalizeDigits(text).lowercase()
+        return when {
+            listOf("اجاره", "کرایه خانه", "رهن", "قبض", "قسط").any { value.contains(it) } -> "مسکن"
+            listOf("سیب زمینی", "سیب‌زمینی", "گوجه", "برنج", "گوشت", "مرغ", "نان", "میوه", "سبزی", "خواربار", "سوپر", "فروشگاه", "خوراک").any { value.contains(it) } -> "خوراک"
+            listOf("بنزین", "تاکسی", "اسنپ", "ماشین", "مترو", "اتوبوس").any { value.contains(it) } -> "حمل‌ونقل"
+            listOf("دارو", "پزشک", "درمان", "بیمارستان").any { value.contains(it) } -> "درمان"
+            else -> "عمومی"
         }
     }
 
@@ -610,6 +1010,7 @@ class AssistantViewModel(
         val totalAssets = financialManager.getTotalAssets()
         val totalDebts = financialManager.getTotalUnpaidDebts()
         val activeGoals = financialManager.getActiveGoals()
+        val marketRatesSection = buildMarketRatesSection()
 
         return """
             شما یک دستیار هوشمند مالی و شخصی به نام "مالیار" هستید و به اطلاعات همه بخش‌های برنامه (حسابداری، یادآوری‌ها، وضعیت مالی) دسترسی دارید.
@@ -625,12 +1026,43 @@ class AssistantViewModel(
             - کل دارایی‌ها (وضعیت مالی): ${com.maliar.pro.utils.CurrencyFormatter.format(totalAssets, "")} تومان
             - کل بدهی‌های پرداخت‌نشده (وضعیت مالی): ${com.maliar.pro.utils.CurrencyFormatter.format(totalDebts, "")} تومان
             - اهداف مالی فعال: ${activeGoals.size} عدد${if (activeGoals.isNotEmpty()) " (" + activeGoals.joinToString("، ") { it.title } + ")" else ""}
+            $marketRatesSection
 
-            شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید.
+            شما می‌توانید به سوالات مالی، برنامه‌ریزی، یادآوری و مشاوره پاسخ دهید و در صورت درخواست تحلیل یا خلاصه وضعیت، از اطلاعات همه بخش‌های بالا استفاده کنید. اگر نرخ طلا/ارز در بالا موجود بود و کاربر درباره خرید طلا/سکه/ارز، حفظ ارزش پول یا تخصیص بودجه به دارایی پرسید، آن نرخ‌ها را در کنار بودجه و موجودی کاربر تحلیل کنید (مثلاً چند گرم طلا با موجودی فعلی قابل خرید است، یا نسبت پس‌انداز به نرخ روز). اگر نرخی در دسترس نبود، صراحتاً بگویید نرخ لحظه‌ای در دسترس نیست و تحلیل را فقط بر مبنای داده‌های ثبت‌شده در برنامه بدهید؛ هرگز عددی را حدس نزنید.
 
             نکته‌ی بسیار مهم: شما توانایی فنی نوشتن یا ذخیره کردن هیچ‌چیزی در دیتابیس برنامه را ندارید (نه یادآوری، نه هزینه/درآمد، نه دارایی/بدهی/هدف). اگر همین پیام کاربر به این مکالمه رسیده، یعنی سیستم داخلی برنامه آن را به‌عنوان یک دستور اجرایی (ثبت یادآوری/هزینه/درآمد/دارایی/بدهی/هدف) تشخیص نداده است. پس هرگز عباراتی مثل «ثبت شد»، «یادآوری تنظیم شد»، «ذخیره کردم» را به‌کار نبرید، چون واقعاً چیزی ذخیره نشده و کاربر را گمراه می‌کند. در عوض، اگر پیام کاربر به‌نظر یک درخواست ثبت/یادآوری است، از او بخواهید دقیق‌تر و ساده‌تر بنویسد (مثلاً «یادآوری کن فردا ساعت ۵ ...» یا «۵۰ هزار تومان هزینه»)، تا سیستم داخلی بتواند آن را تشخیص دهد.
             لطفاً به زبان فارسی پاسخ دهید.
         """.trimIndent()
+    }
+
+    /**
+     * Best-effort, non-blocking read of the public gold/currency rates (see
+     * [com.maliar.pro.utils.MarketRateClient]) formatted as a prompt section. Bounded by a
+     * short timeout and wrapped so any failure (no internet, slow host, malformed JSON)
+     * silently yields an empty section - it must never delay or break an assistant reply.
+     */
+    private suspend fun buildMarketRatesSection(): String {
+        val rates = try {
+            kotlinx.coroutines.withTimeoutOrNull(4000) {
+                com.maliar.pro.utils.MarketRateClient(appContext).fetch()
+            }
+        } catch (e: Exception) {
+            null
+        } ?: return ""
+
+        if (rates.gold == null && rates.currency == null) return ""
+
+        val toToman = { rial: Double -> rial / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN }
+        val lines = mutableListOf<String>()
+        rates.gold?.let { lines.add("- نرخ هر گرم طلای ۱۸ عیار: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        rates.currency?.let { lines.add("- نرخ دلار: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        rates.coinEmami?.let { lines.add("- سکه امامی: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        rates.coinHalf?.let { lines.add("- نیم سکه: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        rates.coinQuarter?.let { lines.add("- ربع سکه: ${com.maliar.pro.utils.CurrencyFormatter.format(toToman(it), "تومان")}") }
+        if (lines.isEmpty()) return ""
+
+        val updated = rates.updatedAt?.let { " (به‌روزرسانی: $it)" } ?: ""
+        return "\nنرخ لحظه‌ای طلا و ارز$updated:\n" + lines.joinToString("\n")
     }
 
     private suspend fun callGapgptAI(message: String): String? = withContext(Dispatchers.IO) {

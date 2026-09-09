@@ -2,12 +2,59 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/profileFragment">
+    app:startDestination="@id/homeFragment">
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.maliar.pro.ui.home.HomeFragment"
+        android:label="خانه">
+        <action
+            android:id="@+id/action_homeFragment_to_budgetFragment"
+            app:destination="@id/budgetFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_forecastFragment"
+            app:destination="@id/forecastFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_supportFragment"
+            app:destination="@id/supportFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_financialReportsFragment"
+            app:destination="@id/financialReportsFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_installmentListFragment"
+            app:destination="@id/installmentListFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_debtListFragment"
+            app:destination="@id/debtListFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_goalListFragment"
+            app:destination="@id/goalListFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_assetListFragment"
+            app:destination="@id/assetListFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_financialStatusFragment"
+            app:destination="@id/financialStatusFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_checkListFragment"
+            app:destination="@id/checkListFragment" />
+        <action android:id="@+id/action_homeFragment_to_marketAssistantFragment" app:destination="@id/marketAssistantFragment" />
+    </fragment>
+    <fragment android:id="@+id/marketAssistantFragment" android:name="com.maliar.pro.ui.market.MarketAssistantFragment" android:label="بازاریار" />
 
     <fragment
         android:id="@+id/profileFragment"
         android:name="com.maliar.pro.ui.profile.ProfileFragment"
-        android:label="پروفایل" />
+        android:label="پروفایل">
+        <action
+            android:id="@+id/action_profileFragment_to_supportFragment"
+            app:destination="@id/supportFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/supportFragment"
+        android:name="com.maliar.pro.ui.support.SupportFragment"
+        android:label="پشتیبانی مالیار پرو" />
 
     <fragment
         android:id="@+id/accountingFragment"
@@ -93,7 +140,30 @@
             app:exitAnim="@anim/nav_fade_out"
             app:popEnterAnim="@anim/nav_fade_in"
             app:popExitAnim="@anim/nav_fade_out" />
+        <action
+            android:id="@+id/action_accountingFragment_to_budgetFragment"
+            app:destination="@id/budgetFragment" />
+        <action
+            android:id="@+id/action_accountingFragment_to_periodicPaymentFragment"
+            app:destination="@id/periodicPaymentFragment" />
+        <action
+            android:id="@+id/action_accountingFragment_to_forecastFragment"
+            app:destination="@id/forecastFragment" />
     </fragment>
+
+    <fragment
+        android:id="@+id/forecastFragment"
+        android:name="com.maliar.pro.ui.accounting.ForecastFragment"
+        android:label="آینده مالی من" />
+
+    <fragment
+        android:id="@+id/budgetFragment"
+        android:name="com.maliar.pro.ui.accounting.BudgetFragment"
+        android:label="بودجه من" />
+    <fragment
+        android:id="@+id/periodicPaymentFragment"
+        android:name="com.maliar.pro.ui.accounting.PeriodicPaymentFragment"
+        android:label="پرداخت‌های دوره‌ای" />
 
     <fragment
         android:id="@+id/dueSoonFragment"
@@ -191,7 +261,85 @@
             app:exitAnim="@anim/nav_fade_out"
             app:popEnterAnim="@anim/nav_fade_in"
             app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_assetListFragment"
+            app:destination="@id/assetListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_goldPortfolioFragment"
+            app:destination="@id/goldPortfolioFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_debtListFragment"
+            app:destination="@id/debtListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_goalListFragment"
+            app:destination="@id/goalListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_fixedIncomeListFragment"
+            app:destination="@id/fixedIncomeListFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
+
+        <action
+            android:id="@+id/action_financialStatusFragment_to_financialPreferencesFragment"
+            app:destination="@id/financialPreferencesFragment"
+            app:enterAnim="@anim/nav_fade_in"
+            app:exitAnim="@anim/nav_fade_out"
+            app:popEnterAnim="@anim/nav_fade_in"
+            app:popExitAnim="@anim/nav_fade_out" />
     </fragment>
+
+    <fragment
+        android:id="@+id/assetListFragment"
+        android:name="com.maliar.pro.ui.financial.AssetListFragment"
+        android:label="دارایی‌ها" />
+
+    <fragment
+        android:id="@+id/goldPortfolioFragment"
+        android:name="com.maliar.pro.ui.financial.GoldPortfolioFragment"
+        android:label="طلا و سکه" />
+
+    <fragment
+        android:id="@+id/debtListFragment"
+        android:name="com.maliar.pro.ui.financial.DebtListFragment"
+        android:label="بدهی‌ها" />
+
+    <fragment
+        android:id="@+id/goalListFragment"
+        android:name="com.maliar.pro.ui.financial.GoalListFragment"
+        android:label="اهداف مالی" />
+
+    <fragment
+        android:id="@+id/fixedIncomeListFragment"
+        android:name="com.maliar.pro.ui.financial.FixedIncomeListFragment"
+        android:label="درآمدهای ثابت" />
+
+    <fragment
+        android:id="@+id/financialPreferencesFragment"
+        android:name="com.maliar.pro.ui.financial.FinancialPreferencesFragment"
+        android:label="ترجیحات مالی" />
 
     <fragment
         android:id="@+id/apiKeysFragment"
