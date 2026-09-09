@@ -28,8 +28,10 @@ import kotlinx.coroutines.launch
  */
 class MarketAssistantFragment : Fragment() {
     private val manager by lazy { MarketAssistantManager(requireContext()) }
+    private val businessManager by lazy { BusinessManager(requireContext()) }
     private lateinit var productsBox: LinearLayout
     private var products: List<MarketProduct> = emptyList()
+    private var inventoryByName: Map<String, ProductInventory> = emptyMap()
 
     override fun onCreateView(inflater: android.view.LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         return try {
@@ -102,6 +104,10 @@ class MarketAssistantFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         viewLifecycleOwner.lifecycleScope.launch { manager.syncExistingBusinessPurchases() }
         viewLifecycleOwner.lifecycleScope.launch { manager.products().collectLatest { items -> products = items; renderProducts() } }
+        // Surfacing current stock right on each row is what makes a "خرید کالا" entry from
+        // the accounting screen visibly show up here immediately, instead of only silently
+        // adjusting an account balance the person has to go check separately.
+        viewLifecycleOwner.lifecycleScope.launch { businessManager.getInventory().collectLatest { items -> inventoryByName = items.associateBy { it.name.trim().lowercase() }; renderProducts() } }
     }
 
     private fun renderProducts() {
@@ -115,6 +121,12 @@ class MarketAssistantFragment : Fragment() {
                 content.addView(TextView(requireContext()).apply { text = p.name; textSize = 16f; setTypeface(null, 1); setTextColor(themeColor(R.color.text_primary)) })
                 val meta = listOf(p.category, p.brand, p.model).filter { it.isNotBlank() }.joinToString(" · ")
                 if (meta.isNotBlank()) content.addView(TextView(requireContext()).apply { text = meta; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 4, 0, 0) })
+                inventoryByName[p.name.trim().lowercase()]?.takeIf { it.quantity != 0.0 }?.let { stock ->
+                    content.addView(TextView(requireContext()).apply {
+                        text = "موجودی: ${if (stock.quantity == stock.quantity.toLong().toDouble()) stock.quantity.toLong().toString() else stock.quantity.toString()} عدد · میانگین بهای خرید ${com.maliar.pro.utils.CurrencyFormatter.format(stock.averageUnitCost)}"
+                        setTextColor(themeColor(R.color.text_secondary)); textSize = 12f; setPadding(0, 4, 0, 0)
+                    })
+                }
                 cardView
             } catch (t: Throwable) {
                 android.util.Log.e("MarketAssistantFragment", "Falling back to plain product row", t)

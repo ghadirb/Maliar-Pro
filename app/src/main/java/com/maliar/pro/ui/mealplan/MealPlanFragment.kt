@@ -19,9 +19,11 @@ import com.maliar.pro.R
 import com.maliar.pro.database.MealPlanEntry
 import com.maliar.pro.database.MealPlanManager
 import com.maliar.pro.database.FoodPriceManager
+import com.maliar.pro.database.MarketAssistantManager
 import com.maliar.pro.database.ShoppingList
 import com.maliar.pro.databinding.FragmentMealPlanBinding
 import com.maliar.pro.utils.AIHelper
+import com.maliar.pro.utils.MarketBackendClient
 import com.maliar.pro.utils.MealType
 import com.maliar.pro.utils.PreferencesManager
 import com.maliar.pro.viewmodels.MealPlanViewModel
@@ -249,7 +251,46 @@ class MealPlanFragment : Fragment() {
                 com.maliar.pro.database.FoodPriceSource.CATALOG_ESTIMATE -> "قیمت تقریبی؛ برای دقت بیشتر قیمت را وارد یا بازار را بررسی کنید"
             }
             row.findViewById<TextView>(R.id.itemCostText).text = formatCurrency(item.totalCost)
+            // Only the weakest tier (static catalog fallback) gets an online-check
+            // affordance - manual/history/market-check prices are already better than a
+            // fresh AI guess, so offering it there would be noise, not help.
+            val checkButton = row.findViewById<TextView>(R.id.itemCheckOnlineText)
+            if (item.unitPrice.source == com.maliar.pro.database.FoodPriceSource.CATALOG_ESTIMATE) {
+                checkButton.visibility = View.VISIBLE
+                checkButton.setOnClickListener { checkPriceOnline(item.ingredientName, checkButton) }
+            } else {
+                checkButton.visibility = View.GONE
+            }
             binding.shoppingListContainer.addView(row)
+        }
+    }
+
+    /**
+     * User-initiated only (tapping 🔎 next to one shopping-list item) - never triggered
+     * automatically while building a plan. Reuses the same local-first product price
+     * engine ("قیمت کالاها" / بازاریار) that the rest of the app uses: it checks
+     * Torob/Digikala first and falls back to the AI (grok-4) web-search proxy only if
+     * those come back empty, then saves the result so this and future plans pick it up
+     * as a "بررسی بازار" price instead of the static catalog guess.
+     */
+    private fun checkPriceOnline(ingredientName: String, trigger: TextView) {
+        trigger.isEnabled = false
+        trigger.text = "…"
+        lifecycleScope.launch {
+            val context = requireContext()
+            val manager = MarketAssistantManager(context)
+            val product = manager.ensureProduct(ingredientName, category = "خوراکی")
+            val rows = product?.let { MarketBackendClient.search(context, ingredientName, "retail") }
+            if (product != null && !rows.isNullOrEmpty()) {
+                rows.filter { it.price > 0 }.forEach {
+                    manager.addQuote(product.id, it.source, "RETAIL", it.price, it.min, it.max, it.confidence)
+                }
+                viewModel.latestPlan.value?.id?.let { viewModel.loadShoppingList(it) }
+            } else {
+                trigger.isEnabled = true
+                trigger.text = "🔎"
+                android.widget.Toast.makeText(context, "قیمتی برای «$ingredientName» پیدا نشد.", android.widget.Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

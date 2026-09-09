@@ -10,7 +10,9 @@ import androidx.room.Delete
 import kotlinx.coroutines.flow.Flow
 
 enum class GoldAssetKind(val label: String, val isWeighted: Boolean) {
-    GOLD_18("طلای ۱۸ عیار", true), GOLD_24("طلای ۲۴ عیار", true), MELTED_GOLD("طلای آب‌شده", true), GOLD_BAR("شمش طلا", true), FULL_COIN("سکه تمام", false), HALF_COIN("نیم‌سکه", false), QUARTER_COIN("ربع‌سکه", false), GRAM_COIN("سکه گرمی", false), OTHER("سایر", true)
+    GOLD_18("طلای ۱۸ عیار", true), GOLD_24("طلای ۲۴ عیار", true), MELTED_GOLD("طلای آب‌شده", true), GOLD_BAR("شمش طلا", true),
+    FULL_COIN("سکه تمام (امامی)", false), HALF_COIN("نیم‌سکه", false), QUARTER_COIN("ربع‌سکه", false), GRAM_COIN("سکه گرمی", false),
+    BAHAR_COIN("سکه بهار آزادی", false), PARSIAN_COIN("سکه پارسیان", false), OTHER("سایر (مثلاً سکه‌های خاص/سوت)", true)
 }
 enum class GoldTransactionType { BUY, SELL }
 
@@ -52,8 +54,23 @@ class GoldPortfolioManager(context: Context) {
     }
     suspend fun currentPrice(kind: GoldAssetKind): Double {
         val r = com.maliar.pro.utils.MarketRateClient(appContext).fetch(); val gold = (r?.gold ?: 0.0) / com.maliar.pro.utils.MarketRateClient.RIAL_TO_TOMAN
-        return when (kind) { GoldAssetKind.FULL_COIN -> (r?.coinEmami ?: 0.0) / 10; GoldAssetKind.HALF_COIN -> (r?.coinHalf ?: 0.0) / 10; GoldAssetKind.QUARTER_COIN -> (r?.coinQuarter ?: 0.0) / 10; GoldAssetKind.GOLD_24 -> gold * 24 / 18; else -> gold }
+        val live = when (kind) {
+            GoldAssetKind.FULL_COIN -> (r?.coinEmami ?: 0.0) / 10
+            GoldAssetKind.HALF_COIN -> (r?.coinHalf ?: 0.0) / 10
+            GoldAssetKind.QUARTER_COIN -> (r?.coinQuarter ?: 0.0) / 10
+            GoldAssetKind.BAHAR_COIN -> (r?.coinBahar ?: 0.0) / 10
+            GoldAssetKind.GRAM_COIN -> (r?.coinGerami ?: 0.0) / 10
+            GoldAssetKind.GOLD_24 -> gold * 24 / 18
+            GoldAssetKind.GOLD_18, GoldAssetKind.MELTED_GOLD, GoldAssetKind.GOLD_BAR -> gold
+            GoldAssetKind.PARSIAN_COIN, GoldAssetKind.OTHER -> 0.0
+        }
+        // The public rate feed doesn't cover every coin (Parsian coins in particular aren't
+        // published there at all). Rather than guessing with an unrelated gold/coin price,
+        // fall back to the person's own most recent trade for that exact kind.
+        return if (live > 0) live else lastKnownPrice(kind)
     }
+    private suspend fun lastKnownPrice(kind: GoldAssetKind): Double =
+        dao.transactionsList().filter { it.kind == kind }.maxByOrNull { it.date }?.unitPrice ?: 0.0
     suspend fun syncAllAssets() { GoldAssetKind.values().forEach { syncAsset(it) }; checkAlerts() }
     private suspend fun syncAsset(kind: GoldAssetKind) {
         val position = position(kind); val title = "کیف طلا: ${kind.label}"; val existing = assets.getAllAssetsList().firstOrNull { it.title == title }

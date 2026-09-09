@@ -17,6 +17,8 @@ data class MarketRates(
     @SerializedName("coinEmami") val coinEmami: Double? = null,
     @SerializedName("coinHalf") val coinHalf: Double? = null,
     @SerializedName("coinQuarter") val coinQuarter: Double? = null,
+    @SerializedName("coinGerami") val coinGerami: Double? = null,
+    @SerializedName("coinBahar") val coinBahar: Double? = null,
     @SerializedName("updatedAt") val updatedAt: String? = null,
     @SerializedName("source") val source: String? = null,
     @SerializedName("status") val status: String? = null
