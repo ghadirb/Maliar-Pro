@@ -149,7 +149,15 @@
         <action
             android:id="@+id/action_accountingFragment_to_forecastFragment"
             app:destination="@id/forecastFragment" />
+        <action
+            android:id="@+id/action_accountingFragment_to_businessTransactionListFragment"
+            app:destination="@id/businessTransactionListFragment" />
     </fragment>
+
+    <fragment
+        android:id="@+id/businessTransactionListFragment"
+        android:name="com.maliar.pro.ui.accounting.BusinessTransactionListFragment"
+        android:label="تراکنش‌های کسب‌وکار" />
 
     <fragment
         android:id="@+id/forecastFragment"

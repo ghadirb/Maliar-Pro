@@ -6,6 +6,7 @@ import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Spinner
+import android.widget.Toast
 import com.maliar.pro.database.Asset
 import com.maliar.pro.database.BusinessManager
 import com.maliar.pro.database.BusinessTransaction
@@ -34,7 +35,7 @@ class BusinessTransactionDialog(private val context: Context) {
         val box = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL; setPadding(48, 16, 48, 0)
             listOf(kindSpinner, title, quantity, unitCost, amount, note).forEach(::addView)
-            addView(android.widget.TextView(context).apply { text = "حساب مبدأ / پرداخت‌کننده" }); addView(from)
+            addView(android.widget.TextView(context).apply { text = "حساب مبدأ / پرداخت‌کننده (برای دیدن اثر روی موجودی حساب، الزامی است)" }); addView(from)
             addView(android.widget.TextView(context).apply { text = "حساب مقصد (فقط انتقال و تزریق)" }); addView(to)
         }
         AlertDialog.Builder(context).setTitle("عملیات کسب‌وکار").setView(box)
@@ -44,23 +45,38 @@ class BusinessTransactionDialog(private val context: Context) {
                 val cost = unitCost.text.toString().toDoubleOrNull() ?: 0.0
                 val entered = amount.text.toString().toDoubleOrNull() ?: 0.0
                 val total = if (selected == 0 && qty > 0 && cost > 0) qty * cost else entered
-                if (total <= 0) return@setPositiveButton
+                if (total <= 0) { Toast.makeText(context, "مبلغ معتبر وارد کنید.", Toast.LENGTH_LONG).show(); return@setPositiveButton }
                 val type = BusinessTransactionType.values()[selected]
                 val fromId = AccountSpinnerHelper.selectedAccountId(from, loaded)
                 val toId = AccountSpinnerHelper.selectedAccountId(to, loaded)
-                CoroutineScope(Dispatchers.IO).launch {
-                    if (type == BusinessTransactionType.BANK_FEE) {
-                        AccountingManager(context).addExpense(Expense(
-                            amount = total,
-                            description = "کارمزد بانکی: ${note.text}",
-                            date = System.currentTimeMillis(),
-                            category = "کارمزد بانکی",
-                            accountId = fromId
-                        ))
+                // PRODUCT_PURCHASE/OWNER_DRAW/BANK_FEE debit "from"; TRANSFER/CAPITAL_INJECTION
+                // credit "to". Recording still proceeds either way (per «تراکنش‌های کسب‌وکار»
+                // history), but without the account the balance genuinely won't move - worth
+                // an explicit warning instead of a silent no-op, which is what looked like "no
+                // effect at all" before this.
+                val needsFrom = type == BusinessTransactionType.PRODUCT_PURCHASE || type == BusinessTransactionType.OWNER_DRAW || type == BusinessTransactionType.BANK_FEE || type == BusinessTransactionType.TRANSFER
+                val needsTo = type == BusinessTransactionType.TRANSFER || type == BusinessTransactionType.CAPITAL_INJECTION
+                val missingAccount = (needsFrom && fromId == null) || (needsTo && toId == null)
+                CoroutineScope(Dispatchers.Main).launch {
+                    kotlinx.coroutines.withContext(Dispatchers.IO) {
+                        if (type == BusinessTransactionType.BANK_FEE) {
+                            AccountingManager(context).addExpense(Expense(
+                                amount = total,
+                                description = "کارمزد بانکی: ${note.text}",
+                                date = System.currentTimeMillis(),
+                                category = "کارمزد بانکی",
+                                accountId = fromId
+                            ))
+                        } else {
+                            BusinessManager(context).add(BusinessTransaction(type = type, amount = total,
+                                fromAccountId = fromId, toAccountId = toId, description = note.text.toString(),
+                                supplier = note.text.toString(), productName = title.text.toString(), quantity = qty, unitCost = cost))
+                        }
+                    }
+                    if (missingAccount) {
+                        Toast.makeText(context, "ثبت شد، اما چون حسابی انتخاب نشد موجودی هیچ حسابی تغییر نکرد. برای دیدن اثر روی حساب، دفعهٔ بعد یک حساب انتخاب کنید.", Toast.LENGTH_LONG).show()
                     } else {
-                        BusinessManager(context).add(BusinessTransaction(type = type, amount = total,
-                            fromAccountId = fromId, toAccountId = toId, description = note.text.toString(),
-                            supplier = note.text.toString(), productName = title.text.toString(), quantity = qty, unitCost = cost))
+                        Toast.makeText(context, "ثبت شد. از «مشاهدهٔ تراکنش‌های کسب‌وکار» می‌توانید آن را ببینید.", Toast.LENGTH_LONG).show()
                     }
                 }
             }.show()
