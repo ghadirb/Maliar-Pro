@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 @Entity(tableName = "market_products")
 data class MarketProduct(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val category: String = "", val brand: String = "", val model: String = "", val barcode: String = "", val createdAt: Long = System.currentTimeMillis())
@@ -47,7 +48,7 @@ class MarketAssistantManager(context: Context) {
     /** Includes legacy/manual price-screen purchases plus the accounting ledger's product
      * purchases. The ledger rows are derived at read time so edit/delete stays correct. */
     suspend fun purchaseHistory(product: MarketProduct): List<ProductPurchase> {
-        val saved = kotlinx.coroutines.flow.first(dao.purchases(product.id))
+        val saved = dao.purchases(product.id).first()
         val accounting = database.businessDao().getAllTransactionsList()
             .filter { it.type == BusinessTransactionType.PRODUCT_PURCHASE && it.productName.trim().equals(product.name.trim(), ignoreCase = true) }
             .map { ProductPurchase(id = -it.id, productId = product.id, purchasePrice = it.unitCost, quantity = it.quantity, purchasedAt = it.date, supplier = it.supplier) }
@@ -86,9 +87,10 @@ class MarketAssistantManager(context: Context) {
      * them on the price screen. */
     suspend fun localPrice(name: String): MarketPriceQuote? {
         val product = findProduct(name) ?: return null
-        return quotes(product.id).let { flow -> kotlinx.coroutines.flow.first(flow) }
+        val quotes = dao.quotes(product.id).first()
+        return quotes
             .firstOrNull { it.source == "ثبت دستی" }
-            ?: quotes(product.id).let { flow -> kotlinx.coroutines.flow.first(flow) }.firstOrNull()
+            ?: quotes.firstOrNull()
     }
     companion object {
         fun recommendation(purchases: List<ProductPurchase>, quotes: List<MarketPriceQuote>): String {
