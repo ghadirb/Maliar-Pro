@@ -2,10 +2,13 @@ package com.maliar.pro.dialogs
 
 import android.app.AlertDialog
 import android.content.Context
+import android.view.View
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import com.maliar.pro.database.Asset
 import com.maliar.pro.database.BusinessManager
@@ -23,21 +26,44 @@ class BusinessTransactionDialog(private val context: Context) {
     fun show() {
         val kinds = listOf("خرید کالا", "انتقال بین حساب‌ها", "برداشت شخصی", "تزریق سرمایه", "کارمزد بانکی/کارتخوان")
         val kindSpinner = Spinner(context).apply { adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, kinds) }
-        val title = EditText(context).apply { hint = "نام کالا / عنوان" }
-        val quantity = EditText(context).apply { hint = "تعداد (فقط خرید کالا)"; inputType = 2 }
+        val title = EditText(context).apply { hint = "نام کالا" }
+        val quantity = EditText(context).apply { hint = "تعداد"; inputType = 2 }
         val unitCost = EditText(context).apply { hint = "قیمت خرید هر واحد"; inputType = 2 }
         val amount = EditText(context).apply { hint = "مبلغ"; inputType = 2 }
-        val note = EditText(context).apply { hint = "توضیحات یا تأمین‌کننده (اختیاری)" }
+        val note = EditText(context).apply { hint = "توضیحات" }
+        val fromLabel = TextView(context)
+        val toLabel = TextView(context)
         val from = Spinner(context); val to = Spinner(context)
         var loaded = emptyList<Asset>()
         AccountSpinnerHelper.populate(context, from) { loaded = it }
         AccountSpinnerHelper.populate(context, to) { loaded = it }
+
+        // Each row is only shown for the kinds it actually applies to - a خرید کالا doesn't
+        // need a "to" account, and a برداشت شخصی doesn't need نام کالا/تعداد/قیمت خرید.
+        val purchaseRows = listOf(title, quantity, unitCost)
+        fun showOnly(views: Set<View>) { (purchaseRows + listOf(amount, note, fromLabel, from, toLabel, to)).forEach { it.visibility = if (it in views) View.VISIBLE else View.GONE } }
+        fun applyKind(position: Int) {
+            when (BusinessTransactionType.values()[position]) {
+                BusinessTransactionType.PRODUCT_PURCHASE -> { showOnly(setOf(title, quantity, unitCost, note, fromLabel, from)); fromLabel.text = "حساب پرداخت‌کننده" }
+                BusinessTransactionType.TRANSFER -> { showOnly(setOf(amount, note, fromLabel, from, toLabel, to)); fromLabel.text = "حساب مبدأ"; toLabel.text = "حساب مقصد" }
+                BusinessTransactionType.OWNER_DRAW -> { showOnly(setOf(amount, note, fromLabel, from)); fromLabel.text = "حساب برداشت" }
+                BusinessTransactionType.CAPITAL_INJECTION -> { showOnly(setOf(amount, note, toLabel, to)); toLabel.text = "حساب واریز" }
+                BusinessTransactionType.BANK_FEE -> { showOnly(setOf(amount, note, fromLabel, from)); fromLabel.text = "حساب کسرشده" }
+            }
+        }
+        kindSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) = applyKind(position)
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        note.hint = "توضیحات / تأمین‌کننده (اختیاری)"
         val box = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL; setPadding(48, 16, 48, 0)
-            listOf(kindSpinner, title, quantity, unitCost, amount, note).forEach(::addView)
-            addView(android.widget.TextView(context).apply { text = "حساب مبدأ / پرداخت‌کننده (برای دیدن اثر روی موجودی حساب، الزامی است)" }); addView(from)
-            addView(android.widget.TextView(context).apply { text = "حساب مقصد (فقط انتقال و تزریق)" }); addView(to)
+            addView(kindSpinner)
+            listOf(title, quantity, unitCost, amount, note).forEach(::addView)
+            addView(fromLabel); addView(from)
+            addView(toLabel); addView(to)
         }
+        applyKind(0)
         AlertDialog.Builder(context).setTitle("عملیات کسب‌وکار").setView(box)
             .setNegativeButton("لغو", null).setPositiveButton("ثبت") { _, _ ->
                 val selected = kindSpinner.selectedItemPosition
