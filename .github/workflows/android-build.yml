@@ -95,12 +95,17 @@ jobs:
           flavor="$(tr '[:lower:]' '[:upper:]' <<< "${store:0:1}")${store:1}"
           ./gradlew ":app:assemble${flavor}Debug" --no-daemon 2>&1 | tee /tmp/build.log
 
-      - name: Upload build log (debug diagnostics)
+      - name: Push build log to ci-logs branch (debug diagnostics)
         if: always() && github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: /tmp/build.log
+        run: |
+          git config user.email "ci@maliar.pro"
+          git config user.name "CI Log Bot"
+          git checkout --orphan ci-logs-debug
+          git rm -rf . >/dev/null 2>&1 || true
+          cp /tmp/build.log build.log
+          git add build.log
+          git commit -m "ci build log"
+          git push -f origin ci-logs-debug
 
       - name: Upload debug APK
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug' }}
