@@ -12,7 +12,6 @@ import com.google.android.material.card.MaterialCardView
 import com.maliar.pro.R
 import com.maliar.pro.database.*
 import com.maliar.pro.utils.MarketBackendClient
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -186,11 +185,11 @@ class MarketAssistantFragment : Fragment() {
             text = "دریافت قیمت آنلاین"
             setOnClickListener {
                 viewLifecycleOwner.lifecycleScope.launch {
-                    val rows = MarketBackendClient.search(requireContext(), product.name, "retail")
+                    val result = MarketBackendClient.search(requireContext(), product.name, "retail")
                     when {
-                        rows == null -> toast("ارتباط با سرویس آنلاین برقرار نشد. اتصال اینترنت و آدرس سرور (AI_BACKEND_URL / Apps Script) را بررسی کنید.")
-                        rows.isEmpty() -> toast("نتیجه‌ای پیدا نشد؛ ممکن است ترب/دیجی‌کالا موقتاً این جست‌وجو را مسدود کرده باشند یا نام کالا خیلی خاص باشد. جزئیات خطا در logcat ثبت می‌شود.")
-                        else -> { rows.filter { it.price > 0 }.forEach { manager.addQuote(product.id, it.source, "RETAIL", it.price, it.min, it.max, it.confidence) }; toast("${rows.size} قیمت بازار ثبت شد.") }
+                        result.quotes.isNotEmpty() -> { result.quotes.filter { it.price > 0 }.forEach { manager.addQuote(product.id, it.source, "RETAIL", it.price, it.min, it.max, it.confidence) }; toast("${result.quotes.size} قیمت بازار ثبت شد.") }
+                        result.errorMessage != null -> toast(result.errorMessage!!)
+                        else -> toast("نتیجه‌ای پیدا نشد؛ ممکن است ترب/دیجی‌کالا موقتاً این جست‌وجو را مسدود کرده باشند یا نام کالا خیلی خاص باشد.")
                     }
                 }
             }
@@ -273,29 +272,35 @@ class MarketAssistantFragment : Fragment() {
     } }
     private fun chooseProduct(action: (MarketProduct) -> Unit) { if (products.isEmpty()) { toast("ابتدا یک کالا ثبت کنید."); return }; AlertDialog.Builder(requireContext()).setTitle("انتخاب کالا").setItems(products.map { it.name }.toTypedArray()) { _, i -> action(products[i]) }.show() }
 
-    /** Checks every saved product's market price at once (retail only: Torob + Digikala,
-     *  then the grok-4 web-search fallback if those come back empty - same automatic
-     *  chain MarketBackendClient.search always runs, just fired for the whole list
-     *  instead of one product at a time) and writes the best result straight onto each
-     *  product's card, instead of opening a dialog per item. */
+    /** Checks every saved product's market price (retail only: Torob + Digikala, then the
+     *  grok-4 web-search fallback if those come back empty - same automatic chain
+     *  MarketBackendClient.search always runs, just fired for the whole list instead of
+     *  one product at a time) and writes the best result straight onto each product's
+     *  card, instead of opening a dialog per item. Runs sequentially (not in parallel) and
+     *  stops as soon as the shared daily AI quota is hit, rather than firing every
+     *  remaining request into the same wall - the quota is shared across every AI feature
+     *  in the app (chat assistant, gold analysis, market search), so a big product list
+     *  can otherwise exhaust it in a single tap. */
     private fun searchAllProducts() {
         if (products.isEmpty()) { toast("ابتدا یک کالا ثبت کنید."); return }
         toast("در حال بررسی قیمت بازار برای ${products.size} کالا…")
         viewLifecycleOwner.lifecycleScope.launch {
-            val results = products.map { p ->
-                async {
-                    val rows = MarketBackendClient.search(requireContext(), p.name, "retail")
-                    val best = rows?.filter { it.price > 0 }?.maxByOrNull { it.confidence }
-                    if (best != null) manager.addQuote(p.id, best.source, "RETAIL", best.price, best.min, best.max, best.confidence)
-                    p.id to best
-                }
-            }.map { it.await() }
             val updated = marketPriceByProductId.toMutableMap()
-            results.forEach { (id, best) -> if (best != null) updated[id] = best.price to best.source }
+            var found = 0; var checked = 0; var quotaMessage: String? = null
+            for (p in products) {
+                val result = MarketBackendClient.search(requireContext(), p.name, "retail")
+                checked++
+                val best = result.quotes.filter { it.price > 0 }.maxByOrNull { it.confidence }
+                if (best != null) { manager.addQuote(p.id, best.source, "RETAIL", best.price, best.min, best.max, best.confidence); updated[p.id] = best.price to best.source; found++ }
+                if (result.error == "ai_daily_limit_reached") { quotaMessage = result.errorMessage; break }
+            }
             marketPriceByProductId = updated
             renderProducts()
-            val found = results.count { it.second != null }
-            toast(if (found > 0) "برای $found از ${products.size} کالا قیمت بازار پیدا شد." else "برای هیچ‌کدام قیمتی پیدا نشد. اتصال اینترنت یا آدرس سرور را بررسی کنید؛ جزئیات خطا در logcat ثبت می‌شود.")
+            toast(when {
+                quotaMessage != null -> "$quotaMessage (تا اینجا $found از $checked کالای بررسی‌شده پیدا شد؛ ${products.size - checked} کالای باقی‌مانده بررسی نشد.)"
+                found > 0 -> "برای $found از ${products.size} کالا قیمت بازار پیدا شد."
+                else -> "برای هیچ‌کدام قیمتی پیدا نشد. اتصال اینترنت یا آدرس سرور را بررسی کنید؛ جزئیات خطا در logcat ثبت می‌شود."
+            })
         }
     }
     private fun form() = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(36, 0, 36, 0) }

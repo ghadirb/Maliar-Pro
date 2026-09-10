@@ -280,16 +280,17 @@ class MealPlanFragment : Fragment() {
             val context = requireContext()
             val manager = MarketAssistantManager(context)
             val product = manager.ensureProduct(ingredientName, category = "خوراکی")
-            val rows = product?.let { MarketBackendClient.search(context, ingredientName, "retail") }
-            if (product != null && !rows.isNullOrEmpty()) {
-                rows.filter { it.price > 0 }.forEach {
+            val result = product?.let { MarketBackendClient.search(context, ingredientName, "retail") }
+            if (product != null && result != null && result.quotes.isNotEmpty()) {
+                result.quotes.filter { it.price > 0 }.forEach {
                     manager.addQuote(product.id, it.source, "RETAIL", it.price, it.min, it.max, it.confidence)
                 }
                 viewModel.latestPlan.value?.id?.let { viewModel.loadShoppingList(it) }
             } else {
                 trigger.isEnabled = true
                 trigger.text = "🔎"
-                android.widget.Toast.makeText(context, "قیمتی برای «$ingredientName» پیدا نشد.", android.widget.Toast.LENGTH_SHORT).show()
+                val message = result?.errorMessage ?: "قیمتی برای «$ingredientName» پیدا نشد."
+                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
             }
         }
     }
