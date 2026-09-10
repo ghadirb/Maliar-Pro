@@ -59,6 +59,11 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
                 runCatching { financialManager.recordMarketRateSnapshot(currentRates) }
                 runCatching { financialManager.refreshGoldAssetValues() }
             }
+            // Re-prices هر دارایی طلا/سکه and fires any «هشدار قیمت» that has crossed its
+            // target. Without this, alerts silently only ever got evaluated on the rare
+            // occasion the person happened to have طلا و سکه open - defeating the point of
+            // a background price alert.
+            runCatching { com.maliar.pro.database.GoldPortfolioManager(applicationContext).syncAllAssets() }
 
             val marketInsight = if (prefs.isInsightMarketEnabled()) {
                 buildMarketRateInsight(prefs, previousRates, currentRates)
