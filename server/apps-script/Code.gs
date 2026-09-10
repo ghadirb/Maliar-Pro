@@ -366,6 +366,9 @@ function handleMarketDiagnostics_(params) {
   // specifically the web_search tool that causes the 504s seen above (a plain, no-tool
   // chat call is much cheaper for their gateway than one that has to actually browse).
   try { debug.plainGrokChatNoTool = marketAiPlainProbe_(); } catch (err) { debug.plainGrokChatNoTool = 'threw: ' + err; }
+  // Ground truth: exactly which model ids this GapGPT account can actually use, straight
+  // from their account (avoids guessing at names like "grok-4" vs "grok-3-mini" etc.).
+  try { debug.availableModels = marketAiListModels_(); } catch (err) { debug.availableModels = 'threw: ' + err; }
   out.debug = debug;
   out.aiConfig = (function() { const c = aiConfig_(); return { provider: c.provider, baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
   out.marketModel = getSetting_('AI_MARKET_MODEL', 'grok-4');
@@ -381,6 +384,27 @@ function marketAiPlainProbe_() {
   });
   const code = response.getResponseCode();
   return 'http ' + code + ': ' + response.getContentText().slice(0, 300);
+}
+
+// Standard OpenAI-compatible GET {baseUrl}/models - lists exactly which model ids this
+// GapGPT account can actually call, so AI_MARKET_MODEL can be set to a real, current
+// value instead of guessing (GapGPT's own naming for Grok has been observed to be
+// e.g. "grok-3-mini" rather than "grok-4", and it changes as xAI retires model ids).
+function marketAiListModels_() {
+  const cfg = aiConfig_();
+  const response = UrlFetchApp.fetch(cfg.baseUrl + '/models', {
+    method: 'get', muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + cfg.key }
+  });
+  const code = response.getResponseCode();
+  if (code < 200 || code >= 300) return 'http ' + code + ': ' + response.getContentText().slice(0, 500);
+  try {
+    const data = JSON.parse(response.getContentText());
+    const ids = ((data && data.data) || []).map(function(m) { return m.id; });
+    const grokIds = ids.filter(function(id) { return /grok/i.test(id); });
+    return { grokModelIds: grokIds, totalModelCount: ids.length };
+  } catch (err) {
+    return 'http 200 but unparsable: ' + response.getContentText().slice(0, 500);
+  }
 }
 
 // Manual diagnostic for بازاریار: select "testMarketDiagnostics_" in the function
