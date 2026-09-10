@@ -184,6 +184,7 @@ function routeRequest_(e) {
   if (path === 'marketSearch') return handleMarketSearch_(params);
   if (path === 'marketAiSearch') return handleMarketAiSearch_(params);
   if (path === 'marketParseMessage') return handleMarketParseMessage_(params);
+  if (path === 'marketDiagnostics') return handleMarketDiagnostics_(params);
 
   return jsonOutput_({ error: 'unknown_path' });
 }
@@ -333,11 +334,32 @@ function parseMarketAiPrice_(text) {
   }
 }
 
+// Browser-testable version of testMarketDiagnostics_ - open in any browser:
+//   {AI_BACKEND_URL}?path=marketDiagnostics&secret=YOUR_DEBUG_SECRET
+// (set a DEBUG_SECRET Script Property to any string you pick first, so this can't be
+// hit by anyone else even though the web app itself is deployed as "Anyone"). Returns
+// the same JSON directly on the page - no Apps Script editor / log panel needed.
+function handleMarketDiagnostics_(params) {
+  const secret = getSetting_('DEBUG_SECRET', '');
+  if (!secret || String(params.secret || '') !== secret) return jsonOutput_({ error: 'forbidden' });
+  const query = String(params.query || 'هندزفری').trim() || 'هندزفری';
+  const out = {};
+  try { out.torob = torobSearch_(query); } catch (err) { out.torob = 'threw: ' + err; }
+  try { out.digikala = digikalaSearch_(query); } catch (err) { out.digikala = 'threw: ' + err; }
+  try { out.aiSearch = JSON.parse(handleMarketAiSearch_({ query: query, deviceId: 'diagnostic-test-device' }).getContent()); }
+  catch (err) { out.aiSearch = 'threw: ' + err; }
+  out.aiConfig = (function() { const c = aiConfig_(); return { provider: c.provider, baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
+  out.marketModel = getSetting_('AI_MARKET_MODEL', 'grok-4');
+  return jsonOutput_(out);
+}
+
 // Manual diagnostic for بازاریار: select "testMarketDiagnostics_" in the function
 // dropdown at the top of the Apps Script editor and click Run. The small "Execution
 // started/completed" popup does NOT show Logger.log output, so instead of relying on
 // any log panel, the full result is written to a Script Property - open Project
 // Settings (gear icon) -> Script Properties and look for "LAST_MARKET_DIAGNOSTIC".
+// Prefer handleMarketDiagnostics_ above (open the URL in a browser) if this doesn't
+// show up either - it sidesteps the editor entirely.
 function testMarketDiagnostics_() {
   const query = 'هندزفری';
   const out = {};
