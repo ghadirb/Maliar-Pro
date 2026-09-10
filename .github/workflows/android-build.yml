@@ -23,6 +23,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -91,6 +93,7 @@ jobs:
           BAZAAR_IAB_PUBLIC_KEY: ${{ secrets.BAZAAR_IAB_PUBLIC_KEY }}
           MYKET_IAB_PUBLIC_KEY: ${{ secrets.MYKET_IAB_PUBLIC_KEY }}
         run: |
+          set -o pipefail
           store="${{ matrix.store }}"
           flavor="$(tr '[:lower:]' '[:upper:]' <<< "${store:0:1}")${store:1}"
           ./gradlew ":app:assemble${flavor}Debug" --no-daemon 2>&1 | tee /tmp/build.log
