@@ -53,7 +53,9 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val accountingManager = AccountingManager(context)
-                    val balance = accountingManager.getBalance()
+                    val period = com.maliar.pro.utils.BalancePeriodPreference.get(context)
+                    val isMonth = period == com.maliar.pro.utils.BalancePeriod.MONTH
+                    val balance = if (isMonth) accountingManager.getPeriodBalance() else accountingManager.getBalance()
                     val periodBalance = accountingManager.getPeriodBalance()
                     val allActiveReminders = SmartReminderManager(context).reconcileRecurringReminders()
                         .filter { !it.isCompleted }
@@ -64,7 +66,14 @@ class MaliarSummaryWidgetProvider : AppWidgetProvider() {
                     }
                     val rates = runCatching { com.maliar.pro.utils.MarketRateClient(context).fetch() }.getOrNull()
 
+                    views.setTextViewText(R.id.widgetBalanceLabel, if (isMonth) "تراز کل (ماه جاری)" else "تراز کل (سال جاری)")
                     views.setTextViewText(R.id.widgetBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(balance))
+                    // The secondary "تراز دوره" row is always the current month's figure - a
+                    // useful supplement when the headline is showing the yearly number, but
+                    // just a duplicate of the headline when the person picked ماه above, so
+                    // it's hidden in that case rather than showing the same number twice.
+                    views.setViewVisibility(R.id.widgetPeriodBalanceLabel, if (isMonth) android.view.View.GONE else android.view.View.VISIBLE)
+                    views.setViewVisibility(R.id.widgetPeriodBalanceText, if (isMonth) android.view.View.GONE else android.view.View.VISIBLE)
                     views.setTextViewText(R.id.widgetPeriodBalanceText, com.maliar.pro.utils.CurrencyFormatter.format(periodBalance))
                     views.setTextColor(
                         R.id.widgetPeriodBalanceText,

@@ -47,5 +47,6 @@ object BalancePeriodPreference {
             .edit()
             .putString(KEY_PERIOD, period.name)
             .apply()
+        runCatching { com.maliar.pro.widget.MaliarSummaryWidgetProvider.requestUpdate(context) }
     }
 }

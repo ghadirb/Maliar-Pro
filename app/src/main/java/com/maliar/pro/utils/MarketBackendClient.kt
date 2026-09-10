@@ -22,7 +22,8 @@ object MarketBackendClient {
     }
 
     private fun humanReadableError(code: String): String = when {
-        code == "ai_daily_limit_reached" -> "سهمیهٔ امروز جست‌وجوی آنلاین هوش مصنوعی تمام شده. سقف روزانه (AI_DAILY_LIMIT) را می‌توانید در تنظیمات Apps Script بالا ببرید، یا فردا دوباره امتحان کنید."
+        code == "quota_exhausted_local" -> "سهمیهٔ رایگان استفاده از هوش مصنوعی این نصب تمام شده. برای ادامه، کلید شخصی خودتان را در تنظیمات اضافه کنید یا اشتراک پریمیوم بگیرید."
+        code == "ai_daily_limit_reached" -> "سهمیهٔ امروز جست‌وجوی آنلاین هوش مصنوعی روی سرور تمام شده. سقف روزانه (AI_DAILY_LIMIT) را می‌توانید در تنظیمات Apps Script بالا ببرید، یا فردا دوباره امتحان کنید."
         code == "ai_provider_not_configured" -> "کلید هوش مصنوعی روی سرور تنظیم نشده (GAPGPT_API_KEY در Script Properties)."
         code == "market_web_search_requires_gapgpt" -> "جست‌وجوی آنلاین فقط با AI_PROVIDER=gapgpt کار می‌کند."
         code == "ai_unavailable" -> "سرویس هوش مصنوعی موقتاً در دسترس نیست."
@@ -57,7 +58,22 @@ object MarketBackendClient {
             val serverError = response.optString("error").takeIf { it.isNotBlank() }
             if (serverError != null) android.util.Log.w("MarketBackendClient", "marketSearch($query) server error: $serverError")
             val localResults = response.toRemoteQuotes(priceType)
-            if (localResults.isNotEmpty()) SearchResponse(localResults, null) else searchWithGrokFallback(root, query, priceType, context)
+            if (localResults.isNotEmpty()) return@runCatching SearchResponse(localResults, null)
+            // Torob/Digikala are free (no AI key used) and were just tried above with no
+            // gate needed. Falling through to the paid AI web-search from here on, though -
+            // route it through the SAME shared quota as the chat assistant / gold analysis
+            // (SubscriptionManager.canUseAi/recordAiUsage) instead of only the server's
+            // separate AI_DAILY_LIMIT, so there is one consistent number the person sees in
+            // «اشتراک پریمیوم» and "N از 15" is never out of sync with what actually ran out.
+            if (!SubscriptionManager.canUseAi(context)) return@runCatching SearchResponse(emptyList(), "quota_exhausted_local")
+            val aiResult = searchWithGrokFallback(root, query, priceType, context)
+            // Only counts as usage when the server actually attempted the paid call - not
+            // when it declined up front (its own daily limit) or the request never
+            // completed (network/HTTP failure), since no cost was incurred in those cases.
+            if (aiResult.error != "ai_daily_limit_reached" && aiResult.error?.startsWith("http_") != true && aiResult.error?.startsWith("exception:") != true) {
+                SubscriptionManager.recordAiUsage(context)
+            }
+            aiResult
         }.getOrElse { SearchResponse(emptyList(), "exception:${it.message ?: it::class.simpleName}") }
     }
     private suspend fun searchWithGrokFallback(root: String, query: String, priceType: String, context: Context): SearchResponse = withContext(Dispatchers.IO) {
