@@ -460,19 +460,11 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/businessTransactionButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="عملیات کسب‌وکار: خرید، انتقال، سرمایه و برداشت" />
-
-        <com.google.android.material.button.MaterialButton
             android:id="@+id/businessTransactionHistoryButton"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="📋 مشاهدهٔ تراکنش‌های کسب‌وکار ثبت‌شده" />
+            android:text="📋 تراکنش‌های کسب‌وکار (خرید، انتقال، سرمایه، برداشت)" />
 
         <!-- Income Card -->
         <com.google.android.material.card.MaterialCardView

@@ -17,7 +17,6 @@ import com.maliar.pro.dialogs.AddIncomeDialog
 import com.maliar.pro.dialogs.AddExpenseDialog
 import com.maliar.pro.dialogs.AddCheckDialog
 import com.maliar.pro.dialogs.AddInstallmentDialog
-import com.maliar.pro.dialogs.BusinessTransactionDialog
 import com.maliar.pro.viewmodels.AccountingViewModel
 import com.maliar.pro.viewmodels.AccountingViewModelFactory
 import com.maliar.pro.viewmodels.DueSoonViewModel
@@ -88,9 +87,6 @@ class AccountingFragment : Fragment() {
 
         binding.addExpenseButton.setOnClickListener {
             showAddExpenseDialog()
-        }
-        binding.businessTransactionButton.setOnClickListener {
-            BusinessTransactionDialog(requireContext()).show()
         }
         binding.businessTransactionHistoryButton.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_businessTransactionListFragment)

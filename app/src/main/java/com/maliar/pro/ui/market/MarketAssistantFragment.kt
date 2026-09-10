@@ -32,6 +32,7 @@ class MarketAssistantFragment : Fragment() {
     private lateinit var productsBox: LinearLayout
     private var products: List<MarketProduct> = emptyList()
     private var inventoryByName: Map<String, ProductInventory> = emptyMap()
+    private var marketPriceByProductId: Map<Long, Pair<Double, String>> = emptyMap()
 
     override fun onCreateView(inflater: android.view.LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         return try {
@@ -63,9 +64,8 @@ class MarketAssistantFragment : Fragment() {
         root.addView(TextView(requireContext()).apply { text = "قیمت کالاها"; textSize = 22f; setTypeface(null, 1) })
         root.addView(TextView(requireContext()).apply { text = "قیمت‌های دستی، سابقه خرید شما و قیمت‌های بررسی‌شده بازار."; setPadding(0, 8, 0, 18) })
         listOf(
-            "🔎 جستجوی قیمت بازار" to { chooseProduct { showMarket(it) } },
+            "🔎 جستجوی قیمت بازار (روی همه کالاها)" to { searchAllProducts() },
             "📦 کالاهای من" to { showAddProduct() },
-            "🏪 منابع عمده و خرده" to { showSources() },
             "🤖 مشاور خرید" to { chooseProduct { showAdvice(it) } }
         ).forEach { (label, action) ->
             root.addView(Button(requireContext()).apply { text = label; setOnClickListener { action() } }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 8 })
@@ -88,9 +88,8 @@ class MarketAssistantFragment : Fragment() {
         val cardView = inflater.inflate(R.layout.view_market_card, parent, false) as MaterialCardView
         val content = cardView.findViewById<LinearLayout>(R.id.marketCardContent)
         listOf(
-            "🔎 جستجوی قیمت بازار" to { chooseProduct { showMarket(it) } },
+            "🔎 جستجوی قیمت بازار (روی همه کالاها)" to { searchAllProducts() },
             "📦 کالاهای من" to { showAddProduct() },
-            "🏪 منابع عمده و خرده" to { showSources() },
             "🤖 مشاور خرید" to { chooseProduct { showAdvice(it) } }
         ).forEachIndexed { index, (label, action) ->
             val button = inflater.inflate(if (index == 0) R.layout.view_market_button_primary else R.layout.view_market_button_secondary, content, false) as MaterialButton
@@ -124,6 +123,12 @@ class MarketAssistantFragment : Fragment() {
                 inventoryByName[p.name.trim().lowercase()]?.takeIf { it.quantity != 0.0 }?.let { stock ->
                     content.addView(TextView(requireContext()).apply {
                         text = "موجودی: ${if (stock.quantity == stock.quantity.toLong().toDouble()) stock.quantity.toLong().toString() else stock.quantity.toString()} عدد · میانگین بهای خرید ${com.maliar.pro.utils.CurrencyFormatter.format(stock.averageUnitCost)}"
+                        setTextColor(themeColor(R.color.text_secondary)); textSize = 12f; setPadding(0, 4, 0, 0)
+                    })
+                }
+                marketPriceByProductId[p.id]?.let { (price, source) ->
+                    content.addView(TextView(requireContext()).apply {
+                        text = "🔎 قیمت بازار: ${com.maliar.pro.utils.CurrencyFormatter.format(price)} · $source"
                         setTextColor(themeColor(R.color.text_secondary)); textSize = 12f; setPadding(0, 4, 0, 0)
                     })
                 }
@@ -175,26 +180,22 @@ class MarketAssistantFragment : Fragment() {
         val box = form()
         val insight = TextView(requireContext()).apply { setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) }
         box.addView(insight)
-        box.addView(TextView(requireContext()).apply { text = "«دریافت قیمت آنلاین» ترب و دیجی‌کالا (برای خرده) و کانال‌های تلگرامی شما را که در «منابع عمده و خرده» ثبت کرده‌اید جست‌وجو می‌کند."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) })
-        val kind = Spinner(requireContext()).also { it.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, arrayOf("عمده", "خرده")); box.addView(it, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 }) }
+        box.addView(TextView(requireContext()).apply { text = "«دریافت قیمت آنلاین» ترب و دیجی‌کالا را جست‌وجو می‌کند و اگر نتیجه‌ای نداشتند، از جست‌وجوی وب مدل هوش مصنوعی (grok-4) کمک می‌گیرد."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) })
         box.addView((android.view.LayoutInflater.from(requireContext()).inflate(R.layout.view_market_button_secondary, box, false) as MaterialButton).apply {
             text = "دریافت قیمت آنلاین"
             setOnClickListener {
-                val remoteType = if (kind.selectedItemPosition == 0) "wholesale" else "retail"
-                val matchingKind = if (remoteType == "wholesale") "WHOLESALE" else "RETAIL"
                 viewLifecycleOwner.lifecycleScope.launch {
-                    val userSources = manager.sources().first().filter { it.isEnabled && it.priceType == matchingKind }.map { it.name to it.url }
-                    val rows = MarketBackendClient.search(requireContext(), product.name, remoteType, userSources)
+                    val rows = MarketBackendClient.search(requireContext(), product.name, "retail")
                     when {
                         rows == null -> toast("ارتباط با سرویس آنلاین برقرار نشد. اتصال اینترنت و آدرس سرور (AI_BACKEND_URL / Apps Script) را بررسی کنید.")
-                        rows.isEmpty() -> toast("نتیجه‌ای پیدا نشد؛ ممکن است ترب/دیجی‌کالا موقتاً این جست‌وجو را مسدود کرده باشند، یا کانالی برای «${if (matchingKind == "WHOLESALE") "عمده" else "خرده"}» ثبت نکرده باشید.")
-                        else -> { rows.filter { it.price > 0 }.forEach { manager.addQuote(product.id, it.source, if (it.priceType.lowercase() == "wholesale") "WHOLESALE" else "RETAIL", it.price, it.min, it.max, it.confidence) }; toast("${rows.size} قیمت بازار ثبت شد.") }
+                        rows.isEmpty() -> toast("نتیجه‌ای پیدا نشد؛ ممکن است ترب/دیجی‌کالا موقتاً این جست‌وجو را مسدود کرده باشند یا نام کالا خیلی خاص باشد. جزئیات خطا در logcat ثبت می‌شود.")
+                        else -> { rows.filter { it.price > 0 }.forEach { manager.addQuote(product.id, it.source, "RETAIL", it.price, it.min, it.max, it.confidence) }; toast("${rows.size} قیمت بازار ثبت شد.") }
                     }
                 }
             }
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 })
-        val price = field(box, "قیمت دستی (تومان)"); val source = field(box, "منبع (مثلاً ترب یا کانال فروشنده)")
-        val dialog = AlertDialog.Builder(requireContext()).setTitle(product.name).setView(box).setNeutralButton("ثبت خرید") { _, _ -> showPurchase(product) }.setNegativeButton("لغو", null).setPositiveButton("ثبت قیمت") { _, _ -> val amount = price.text.toString().cleanNumber(); if (amount != null && amount > 0) viewLifecycleOwner.lifecycleScope.launch { manager.addQuote(product.id, source.text.toString().ifBlank { "ثبت دستی" }, if (kind.selectedItemPosition == 0) "WHOLESALE" else "RETAIL", amount) } else toast("قیمت معتبر وارد کنید.") }.show()
+        val price = field(box, "قیمت دستی (تومان)"); val source = field(box, "منبع (مثلاً ترب یا فروشنده)")
+        val dialog = AlertDialog.Builder(requireContext()).setTitle(product.name).setView(box).setNeutralButton("ثبت خرید") { _, _ -> showPurchase(product) }.setNegativeButton("لغو", null).setPositiveButton("ثبت قیمت") { _, _ -> val amount = price.text.toString().cleanNumber(); if (amount != null && amount > 0) viewLifecycleOwner.lifecycleScope.launch { manager.addQuote(product.id, source.text.toString().ifBlank { "ثبت دستی" }, "RETAIL", amount) } else toast("قیمت معتبر وارد کنید.") }.show()
         viewLifecycleOwner.lifecycleScope.launch {
             val purchases = manager.purchaseHistory(product)
             val quotes = manager.quotes(product.id).first()
@@ -270,6 +271,32 @@ class MarketAssistantFragment : Fragment() {
             .setMessage(MarketAssistantManager.recommendation(purchases, quotes)).setPositiveButton("متوجه شدم", null).show()
     } }
     private fun chooseProduct(action: (MarketProduct) -> Unit) { if (products.isEmpty()) { toast("ابتدا یک کالا ثبت کنید."); return }; AlertDialog.Builder(requireContext()).setTitle("انتخاب کالا").setItems(products.map { it.name }.toTypedArray()) { _, i -> action(products[i]) }.show() }
+
+    /** Checks every saved product's market price at once (retail only: Torob + Digikala,
+     *  then the grok-4 web-search fallback if those come back empty - same automatic
+     *  chain MarketBackendClient.search always runs, just fired for the whole list
+     *  instead of one product at a time) and writes the best result straight onto each
+     *  product's card, instead of opening a dialog per item. */
+    private fun searchAllProducts() {
+        if (products.isEmpty()) { toast("ابتدا یک کالا ثبت کنید."); return }
+        toast("در حال بررسی قیمت بازار برای ${products.size} کالا…")
+        viewLifecycleOwner.lifecycleScope.launch {
+            val results = products.map { p ->
+                kotlinx.coroutines.async {
+                    val rows = MarketBackendClient.search(requireContext(), p.name, "retail")
+                    val best = rows?.filter { it.price > 0 }?.maxByOrNull { it.confidence }
+                    if (best != null) manager.addQuote(p.id, best.source, "RETAIL", best.price, best.min, best.max, best.confidence)
+                    p.id to best
+                }
+            }.map { it.await() }
+            val updated = marketPriceByProductId.toMutableMap()
+            results.forEach { (id, best) -> if (best != null) updated[id] = best.price to best.source }
+            marketPriceByProductId = updated
+            renderProducts()
+            val found = results.count { it.second != null }
+            toast(if (found > 0) "برای $found از ${products.size} کالا قیمت بازار پیدا شد." else "برای هیچ‌کدام قیمتی پیدا نشد. اتصال اینترنت یا آدرس سرور را بررسی کنید؛ جزئیات خطا در logcat ثبت می‌شود.")
+        }
+    }
     private fun form() = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(36, 0, 36, 0) }
     private fun String.cleanNumber(): Double? = replace(",", "").replace("٫", "").map { if (it in '۰'..'۹') ('0'.code + it.code - '۰'.code).toChar() else it }.joinToString("").toDoubleOrNull()
     private fun toast(message: String) = Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()

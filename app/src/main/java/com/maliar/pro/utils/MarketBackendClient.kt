@@ -31,6 +31,9 @@ object MarketBackendClient {
             connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             if (connection.responseCode !in 200..299) return@runCatching null
             val response = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            response.optString("error").takeIf { it.isNotBlank() }?.let {
+                android.util.Log.w("MarketBackendClient", "marketSearch($query) server error: $it")
+            }
             val localResults = response.toRemoteQuotes(priceType)
             if (localResults.isNotEmpty()) localResults else searchWithGrokFallback(root, query, priceType, context)
         }.getOrNull()
@@ -42,7 +45,11 @@ object MarketBackendClient {
             val body = JSONObject().put("query", query).put("priceType", priceType).put("deviceId", PreferencesManager(context).getOrCreateDeviceId())
             connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             if (connection.responseCode !in 200..299) return@runCatching emptyList()
-            JSONObject(connection.inputStream.bufferedReader().use { it.readText() }).toRemoteQuotes(priceType)
+            val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            json.optString("error").takeIf { it.isNotBlank() }?.let {
+                android.util.Log.w("MarketBackendClient", "marketAiSearch($query) server error: $it")
+            }
+            json.toRemoteQuotes(priceType)
         }.getOrDefault(emptyList())
     }
     private fun JSONObject.toRemoteQuotes(defaultType: String): List<RemoteQuote> = optJSONArray("results")?.let { rows -> List(rows.length()) { i -> rows.getJSONObject(i).let { row -> RemoteQuote(row.optString("source", "بازار"), row.optString("priceType", defaultType), row.optDouble("price"), row.optDouble("minPrice").takeIf { n -> !n.isNaN() }, row.optDouble("maxPrice").takeIf { n -> !n.isNaN() }, row.optDouble("confidence", .5)) } } } ?: emptyList()

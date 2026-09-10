@@ -113,6 +113,7 @@ class HomeFragment : Fragment() {
 
         binding.homeQuickAddExpense.setOnClickListener { AddExpenseDialog(requireContext(), viewModel).show() }
         binding.homeQuickAddIncome.setOnClickListener { AddIncomeDialog(requireContext(), viewModel).show() }
+        binding.homeQuickBusinessTransaction.setOnClickListener { com.maliar.pro.dialogs.BusinessTransactionDialog(requireContext()).show() }
         binding.homeQuickReport.setOnClickListener {
             findNavController().navigate(R.id.action_homeFragment_to_financialReportsFragment)
         }

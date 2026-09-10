@@ -196,6 +196,22 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/homeQuickBusinessTransaction"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="6dp"
+                android:background="@drawable/bg_category_dropdown"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="12dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🏪" android:textSize="18sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="کسب‌وکار" android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/homeQuickReport"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
