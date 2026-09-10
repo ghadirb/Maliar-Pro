@@ -334,19 +334,23 @@ function parseMarketAiPrice_(text) {
 }
 
 // Manual diagnostic for بازاریار: select "testMarketDiagnostics_" in the function
-// dropdown at the top of the Apps Script editor and click Run, then open View ->
-// Executions (or the Logger output under View -> Logs) to see exactly what Torob,
-// Digikala and the AI fallback each returned/errored with for a sample query. Doesn't
-// touch doGet/doPost so the "e is undefined" problem of calling those directly doesn't
-// apply here.
+// dropdown at the top of the Apps Script editor and click Run. The small "Execution
+// started/completed" popup does NOT show Logger.log output, so instead of relying on
+// any log panel, the full result is written to a Script Property - open Project
+// Settings (gear icon) -> Script Properties and look for "LAST_MARKET_DIAGNOSTIC".
 function testMarketDiagnostics_() {
   const query = 'هندزفری';
-  Logger.log('--- torobSearch_ ---');
-  try { Logger.log(JSON.stringify(torobSearch_(query))); } catch (err) { Logger.log('threw: ' + err); }
-  Logger.log('--- digikalaSearch_ ---');
-  try { Logger.log(JSON.stringify(digikalaSearch_(query))); } catch (err) { Logger.log('threw: ' + err); }
-  Logger.log('--- handleMarketAiSearch_ ---');
-  Logger.log(handleMarketAiSearch_({ query: query, deviceId: 'diagnostic-test-device' }).getContent());
+  const out = {};
+  try { out.torob = torobSearch_(query); } catch (err) { out.torob = 'threw: ' + err; }
+  try { out.digikala = digikalaSearch_(query); } catch (err) { out.digikala = 'threw: ' + err; }
+  try { out.aiSearch = JSON.parse(handleMarketAiSearch_({ query: query, deviceId: 'diagnostic-test-device' }).getContent()); }
+  catch (err) { out.aiSearch = 'threw: ' + err; }
+  out.aiConfig = (function() { const c = aiConfig_(); return { provider: c.provider, baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
+  out.marketModel = getSetting_('AI_MARKET_MODEL', 'grok-4');
+  const text = JSON.stringify(out, null, 2);
+  PropertiesService.getScriptProperties().setProperty('LAST_MARKET_DIAGNOSTIC', text);
+  Logger.log(text); // kept too, in case the log panel does pick it up
+  return text;
 }
 
 // Only accepts {name, url} pairs the user already saved on-device via "افزودن منبع"
