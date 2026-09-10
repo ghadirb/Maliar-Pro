@@ -234,7 +234,7 @@ function handleMarketSearch_(params) {
  * model id, 404 for an unsupported endpoint, quota, etc. - is visible instead of being
  * swallowed into a single generic "ai_unavailable".
  */
-function handleMarketAiSearch_(params) {
+function handleMarketAiSearch_(params, debugOut) {
   const query = String(params.query || '').trim();
   if (!query || query.length > 160) return jsonOutput_({ error: 'query is required' });
   const denied = requireAiFields_(params);
@@ -245,14 +245,14 @@ function handleMarketAiSearch_(params) {
   const systemPrompt = 'Use web search for Iranian prices. Return ONLY valid JSON: {"price":number,"minPrice":number,"maxPrice":number,"source":"","sourceUrl":""}. Prices must be TOMAN. With insufficient evidence return price 0. Never invent a price or URL.';
   const userPrompt = 'Find an approximate current retail market price in Iran for: ' + query;
 
-  const viaResponses = marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt);
+  const viaResponses = marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt, debugOut);
   if (viaResponses) return jsonOutput_(viaResponses);
-  const viaChat = marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt);
+  const viaChat = marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt, debugOut);
   if (viaChat) return jsonOutput_(viaChat);
   return jsonOutput_({ error: 'ai_unavailable' });
 }
 
-function marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt) {
+function marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt, debugOut) {
   try {
     const response = aiFetch_(cfg.baseUrl + '/responses', {
       apiKey: cfg.key,
@@ -266,13 +266,18 @@ function marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt) {
     });
     const code = response.getResponseCode();
     if (code < 200 || code >= 300) {
-      Logger.log('marketAiSearch(responses) http ' + code + ': ' + response.getContentText().slice(0, 300));
+      const detail = 'http ' + code + ': ' + response.getContentText().slice(0, 500);
+      Logger.log('marketAiSearch(responses) ' + detail);
+      if (debugOut) debugOut.responsesApi = detail;
       return null;
     }
     const data = JSON.parse(response.getContentText());
+    if (debugOut) debugOut.responsesApi = 'http 200, raw: ' + response.getContentText().slice(0, 500);
     return parseMarketAiPrice_(extractResponsesOutputText_(data));
   } catch (err) {
-    Logger.log('marketAiSearch(responses) error: ' + err);
+    const detail = 'threw: ' + err;
+    Logger.log('marketAiSearch(responses) ' + detail);
+    if (debugOut) debugOut.responsesApi = detail;
     return null;
   }
 }
@@ -280,7 +285,7 @@ function marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt) {
 // Falls back to the legacy chat-completions shape (kept in case a given GapGPT model
 // still routes web_search there). If xAI's 410 is what the proxy forwards, this will
 // also fail and the caller returns ai_unavailable, but with both attempts logged.
-function marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt) {
+function marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt, debugOut) {
   try {
     const response = aiFetch_(cfg.baseUrl + '/chat/completions', {
       apiKey: cfg.key,
@@ -294,14 +299,19 @@ function marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt)
     });
     const code = response.getResponseCode();
     if (code < 200 || code >= 300) {
-      Logger.log('marketAiSearch(chat) http ' + code + ': ' + response.getContentText().slice(0, 300));
+      const detail = 'http ' + code + ': ' + response.getContentText().slice(0, 500);
+      Logger.log('marketAiSearch(chat) ' + detail);
+      if (debugOut) debugOut.chatCompletions = detail;
       return null;
     }
     const data = JSON.parse(response.getContentText());
+    if (debugOut) debugOut.chatCompletions = 'http 200, raw: ' + response.getContentText().slice(0, 500);
     const text = String(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '');
     return parseMarketAiPrice_(text);
   } catch (err) {
-    Logger.log('marketAiSearch(chat) error: ' + err);
+    const detail = 'threw: ' + err;
+    Logger.log('marketAiSearch(chat) ' + detail);
+    if (debugOut) debugOut.chatCompletions = detail;
     return null;
   }
 }
@@ -344,10 +354,12 @@ function handleMarketDiagnostics_(params) {
   if (!secret || String(params.secret || '') !== secret) return jsonOutput_({ error: 'forbidden' });
   const query = String(params.query || 'هندزفری').trim() || 'هندزفری';
   const out = {};
-  try { out.torob = torobSearch_(query); } catch (err) { out.torob = 'threw: ' + err; }
-  try { out.digikala = digikalaSearch_(query); } catch (err) { out.digikala = 'threw: ' + err; }
-  try { out.aiSearch = JSON.parse(handleMarketAiSearch_({ query: query, deviceId: 'diagnostic-test-device' }).getContent()); }
+  const debug = {};
+  try { out.torob = torobSearch_(query, debug); } catch (err) { out.torob = 'threw: ' + err; }
+  try { out.digikala = digikalaSearch_(query, debug); } catch (err) { out.digikala = 'threw: ' + err; }
+  try { out.aiSearch = JSON.parse(handleMarketAiSearch_({ query: query, deviceId: 'diagnostic-test-device' }, debug).getContent()); }
   catch (err) { out.aiSearch = 'threw: ' + err; }
+  out.debug = debug;
   out.aiConfig = (function() { const c = aiConfig_(); return { provider: c.provider, baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
   out.marketModel = getSetting_('AI_MARKET_MODEL', 'grok-4');
   return jsonOutput_(out);
@@ -406,18 +418,22 @@ function telegramChannelUsername_(url) {
   return m ? m[1] : null;
 }
 
-function torobSearch_(query) {
+function torobSearch_(query, debugOut) {
   const url = 'https://api.torob.com/v4/base-product/search/?page=0&sort=popularity&size=8&source=next_desktop&query=' + encodeURIComponent(query) + '&q=' + encodeURIComponent(query);
   const res = UrlFetchApp.fetch(url, {
     muteHttpExceptions: true, followRedirects: true,
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json', 'Referer': 'https://torob.com/search/?query=' + encodeURIComponent(query) }
   });
-  if (res.getResponseCode() !== 200) {
-    Logger.log('torobSearch_ http ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
+  const code = res.getResponseCode();
+  if (code !== 200) {
+    const detail = 'http ' + code + ': ' + res.getContentText().slice(0, 500);
+    Logger.log('torobSearch_ ' + detail);
+    if (debugOut) debugOut.torob = detail;
     return [];
   }
   const data = JSON.parse(res.getContentText());
   const list = (data && data.results) || [];
+  if (debugOut) debugOut.torob = 'http 200, ' + list.length + ' raw results, body: ' + res.getContentText().slice(0, 500);
   if (!list.length) Logger.log('torobSearch_ 200 but no results for "' + query + '": ' + res.getContentText().slice(0, 300));
   return list.slice(0, 6).map(function(item) {
     const price = Number(item.price1 || item.price || 0);
@@ -430,18 +446,22 @@ function torobSearch_(query) {
   }).filter(function(r) { return r; });
 }
 
-function digikalaSearch_(query) {
+function digikalaSearch_(query, debugOut) {
   const url = 'https://api.digikala.com/v1/search/?q=' + encodeURIComponent(query) + '&page=1';
   const res = UrlFetchApp.fetch(url, {
     muteHttpExceptions: true, followRedirects: true,
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json', 'Referer': 'https://www.digikala.com/search/?q=' + encodeURIComponent(query) }
   });
-  if (res.getResponseCode() !== 200) {
-    Logger.log('digikalaSearch_ http ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
+  const code = res.getResponseCode();
+  if (code !== 200) {
+    const detail = 'http ' + code + ': ' + res.getContentText().slice(0, 500);
+    Logger.log('digikalaSearch_ ' + detail);
+    if (debugOut) debugOut.digikala = detail;
     return [];
   }
   const data = JSON.parse(res.getContentText());
   const list = (data && data.data && (data.data.products || data.data.sellable_products)) || [];
+  if (debugOut) debugOut.digikala = 'http 200, ' + list.length + ' raw results, body: ' + res.getContentText().slice(0, 500);
   if (!list.length) Logger.log('digikalaSearch_ 200 but no results for "' + query + '": ' + res.getContentText().slice(0, 300));
   return list.slice(0, 6).map(function(item) {
     const variant = item.default_variant || (item.variants && item.variants[0]) || {};
