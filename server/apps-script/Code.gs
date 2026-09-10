@@ -360,12 +360,20 @@ function handleMarketDiagnostics_(params) {
   const debug = {};
   try { out.torob = torobSearch_(query, debug); } catch (err) { out.torob = 'threw: ' + err; }
   try { out.digikala = digikalaSearch_(query, debug); } catch (err) { out.digikala = 'threw: ' + err; }
-  try { out.aiSearch = JSON.parse(handleMarketAiSearch_({ query: query, deviceId: 'diagnostic-test-device' }, debug).getContent()); }
+  // Unique deviceId per run - a debug endpoint shouldn't eat into the real per-device
+  // daily AI quota (which is what caused 'ai_daily_limit_reached' on repeated tests).
+  const debugDeviceId = 'diagnostic-' + Utilities.getUuid();
+  try { out.aiSearch = JSON.parse(handleMarketAiSearch_({ query: query, deviceId: debugDeviceId }, debug).getContent()); }
   catch (err) { out.aiSearch = 'threw: ' + err; }
   // Isolates whether grok-4 itself is reachable/fast via GapGPT, or whether it's
   // specifically the web_search tool that causes the 504s seen above (a plain, no-tool
   // chat call is much cheaper for their gateway than one that has to actually browse).
   try { debug.plainGrokChatNoTool = marketAiPlainProbe_(); } catch (err) { debug.plainGrokChatNoTool = 'threw: ' + err; }
+  // Comparison point: does a plain call to the SAME account's already-working general
+  // model (cfg.model, e.g. gpt-4o-mini) succeed while Grok-related calls time out? If
+  // so, this is a Grok-specific/plan-permission issue on the GapGPT side, not a general
+  // GapGPT/network outage.
+  try { debug.plainGpt4oMiniChat = marketAiPlainProbeModel_(aiConfig_().model); } catch (err) { debug.plainGpt4oMiniChat = 'threw: ' + err; }
   // Ground truth: exactly which model ids this GapGPT account can actually use, straight
   // from their account (avoids guessing at names like "grok-4" vs "grok-3-mini" etc.).
   try { debug.availableModels = marketAiListModels_(); } catch (err) { debug.availableModels = 'threw: ' + err; }
@@ -376,14 +384,17 @@ function handleMarketDiagnostics_(params) {
 }
 
 function marketAiPlainProbe_() {
+  return marketAiPlainProbeModel_(getSetting_('AI_MARKET_MODEL', 'grok-4'));
+}
+
+function marketAiPlainProbeModel_(model) {
   const cfg = aiConfig_();
-  const model = getSetting_('AI_MARKET_MODEL', 'grok-4');
   const response = aiFetch_(cfg.baseUrl + '/chat/completions', {
     apiKey: cfg.key,
     body: { model: model, max_tokens: 10, messages: [{ role: 'user', content: 'Reply with the single word: ok' }] }
   });
   const code = response.getResponseCode();
-  return 'http ' + code + ': ' + response.getContentText().slice(0, 300);
+  return 'model=' + model + ' http ' + code + ': ' + response.getContentText().slice(0, 300);
 }
 
 // Standard OpenAI-compatible GET {baseUrl}/models - lists exactly which model ids this
