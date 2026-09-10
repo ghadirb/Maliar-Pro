@@ -193,10 +193,13 @@ function routeRequest_(e) {
 // The APK never calls shops/channels directly. Providers live here so credentials,
 // caching, terms of use, and rate limits stay server-side.
 //  - Torob/Digikala: unofficial public JSON endpoints their own web/app clients use.
-//    No API key. Google's outbound IPs are occasionally rate-limited by their anti-bot
-//    layer (seen as an "ok":false / empty response) - this is a known, external
-//    limitation, not a bug in this script. Failures are swallowed per-provider so one
-//    blocked source never breaks the others.
+//    No API key. 2026-09 diagnostics showed both now actively bot-block Google's
+//    outbound IPs (Torob: an arcaptcha "are you a robot?" page; Digikala: an
+//    Akamai/Cloudflare-style blank challenge redirect) rather than occasionally
+//    rate-limiting - this is an external anti-bot wall, not a bug in this script, and
+//    there's no reliable server-side fix for it (short of a paid scraping/proxy
+//    service or an official partner API from either site). Failures are swallowed
+//    per-provider so one blocked source never breaks the others.
 //  - Telegram: only the *user's own* saved sources (from "منابع عمده و خرده") are
 //    queried, via the public https://t.me/s/<channel> preview page (no bot token, no
 //    login - this is the same page a browser sees for any public channel).
@@ -359,10 +362,25 @@ function handleMarketDiagnostics_(params) {
   try { out.digikala = digikalaSearch_(query, debug); } catch (err) { out.digikala = 'threw: ' + err; }
   try { out.aiSearch = JSON.parse(handleMarketAiSearch_({ query: query, deviceId: 'diagnostic-test-device' }, debug).getContent()); }
   catch (err) { out.aiSearch = 'threw: ' + err; }
+  // Isolates whether grok-4 itself is reachable/fast via GapGPT, or whether it's
+  // specifically the web_search tool that causes the 504s seen above (a plain, no-tool
+  // chat call is much cheaper for their gateway than one that has to actually browse).
+  try { debug.plainGrokChatNoTool = marketAiPlainProbe_(); } catch (err) { debug.plainGrokChatNoTool = 'threw: ' + err; }
   out.debug = debug;
   out.aiConfig = (function() { const c = aiConfig_(); return { provider: c.provider, baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
   out.marketModel = getSetting_('AI_MARKET_MODEL', 'grok-4');
   return jsonOutput_(out);
+}
+
+function marketAiPlainProbe_() {
+  const cfg = aiConfig_();
+  const model = getSetting_('AI_MARKET_MODEL', 'grok-4');
+  const response = aiFetch_(cfg.baseUrl + '/chat/completions', {
+    apiKey: cfg.key,
+    body: { model: model, max_tokens: 10, messages: [{ role: 'user', content: 'Reply with the single word: ok' }] }
+  });
+  const code = response.getResponseCode();
+  return 'http ' + code + ': ' + response.getContentText().slice(0, 300);
 }
 
 // Manual diagnostic for بازاریار: select "testMarketDiagnostics_" in the function
