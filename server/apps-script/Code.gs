@@ -209,7 +209,10 @@ function handleMarketSearch_(params) {
   const cached = CacheService.getScriptCache().get(cacheKey);
   if (cached) return jsonOutput_(JSON.parse(cached));
   const results = marketProviders_(priceType, sources).reduce(function(all, provider) {
-    try { return all.concat(provider(query, priceType) || []); } catch (err) { return all; }
+    try { return all.concat(provider(query, priceType) || []); } catch (err) {
+      Logger.log('marketSearch provider(' + (provider.name || 'anonymous') + ') threw: ' + err);
+      return all;
+    }
   }, []);
   const response = { query: query, priceType: priceType, checkedAt: Date.now(), results: results };
   CacheService.getScriptCache().put(cacheKey, JSON.stringify(response), 900);
@@ -217,8 +220,19 @@ function handleMarketSearch_(params) {
 }
 
 /** Last-resort live web search. This is called only after the deterministic shop/channel
- * search returned no price and only after an explicit tap in the app. Grok 4 was verified
- * on GapGPT's OpenAI-like endpoint to execute web_search; gpt-4o-mini rejected the tool. */
+ * search returned no price and only after an explicit tap in the app.
+ *
+ * 2026-09: xAI retired the "live search" tool on /chat/completions (the endpoint now
+ * returns HTTP 410 for it) - web_search only works through the newer Responses API
+ * (POST {baseUrl}/responses, body uses "input" instead of "messages"). That is very
+ * likely why this always failed with ai_unavailable: the request shape below was the
+ * old, now-dead one. We try the Responses shape first and fall back to the old
+ * chat-completions shape in case GapGPT's proxy needs it for a given model. Every
+ * failure is Logger.log'd (visible in the Apps Script "Executions" tab for the real
+ * request, no need to invoke doGet/doPost by hand) so the exact upstream error - wrong
+ * model id, 404 for an unsupported endpoint, quota, etc. - is visible instead of being
+ * swallowed into a single generic "ai_unavailable".
+ */
 function handleMarketAiSearch_(params) {
   const query = String(params.query || '').trim();
   if (!query || query.length > 160) return jsonOutput_({ error: 'query is required' });
@@ -226,26 +240,113 @@ function handleMarketAiSearch_(params) {
   if (denied) return denied;
   const cfg = aiConfig_();
   if (cfg.provider !== 'gapgpt') return jsonOutput_({ error: 'market_web_search_requires_gapgpt' });
+  const model = getSetting_('AI_MARKET_MODEL', 'grok-4');
+  const systemPrompt = 'Use web search for Iranian prices. Return ONLY valid JSON: {"price":number,"minPrice":number,"maxPrice":number,"source":"","sourceUrl":""}. Prices must be TOMAN. With insufficient evidence return price 0. Never invent a price or URL.';
+  const userPrompt = 'Find an approximate current retail market price in Iran for: ' + query;
+
+  const viaResponses = marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt);
+  if (viaResponses) return jsonOutput_(viaResponses);
+  const viaChat = marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt);
+  if (viaChat) return jsonOutput_(viaChat);
+  return jsonOutput_({ error: 'ai_unavailable' });
+}
+
+function marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt) {
+  try {
+    const response = aiFetch_(cfg.baseUrl + '/responses', {
+      apiKey: cfg.key,
+      body: {
+        model: model, tools: [{ type: 'web_search' }], temperature: 0.1,
+        input: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      }
+    });
+    const code = response.getResponseCode();
+    if (code < 200 || code >= 300) {
+      Logger.log('marketAiSearch(responses) http ' + code + ': ' + response.getContentText().slice(0, 300));
+      return null;
+    }
+    const data = JSON.parse(response.getContentText());
+    return parseMarketAiPrice_(extractResponsesOutputText_(data));
+  } catch (err) {
+    Logger.log('marketAiSearch(responses) error: ' + err);
+    return null;
+  }
+}
+
+// Falls back to the legacy chat-completions shape (kept in case a given GapGPT model
+// still routes web_search there). If xAI's 410 is what the proxy forwards, this will
+// also fail and the caller returns ai_unavailable, but with both attempts logged.
+function marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt) {
   try {
     const response = aiFetch_(cfg.baseUrl + '/chat/completions', {
       apiKey: cfg.key,
       body: {
-        model: getSetting_('AI_MARKET_MODEL', 'grok-4'), tools: [{ type: 'web_search' }], temperature: 0.1, max_tokens: 350,
+        model: model, tools: [{ type: 'web_search' }], temperature: 0.1, max_tokens: 350,
         messages: [
-          { role: 'system', content: 'Use web search for Iranian prices. Return ONLY valid JSON: {"price":number,"minPrice":number,"maxPrice":number,"source":"","sourceUrl":""}. Prices must be TOMAN. With insufficient evidence return price 0. Never invent a price or URL.' },
-          { role: 'user', content: 'Find an approximate current retail market price in Iran for: ' + query }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
         ]
       }
     });
-    if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) return jsonOutput_({ error: 'ai_unavailable' });
+    const code = response.getResponseCode();
+    if (code < 200 || code >= 300) {
+      Logger.log('marketAiSearch(chat) http ' + code + ': ' + response.getContentText().slice(0, 300));
+      return null;
+    }
     const data = JSON.parse(response.getContentText());
     const text = String(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '');
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return jsonOutput_({ results: [], checkedAt: Date.now() });
-    const result = JSON.parse(match[0]); const price = Number(result.price || 0);
-    if (!(price > 0) || !isFinite(price)) return jsonOutput_({ results: [], checkedAt: Date.now() });
-    return jsonOutput_({ checkedAt: Date.now(), results: [{ source: String(result.source || 'جست‌وجوی وب Grok').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] });
-  } catch (err) { return jsonOutput_({ error: 'ai_unavailable' }); }
+    return parseMarketAiPrice_(text);
+  } catch (err) {
+    Logger.log('marketAiSearch(chat) error: ' + err);
+    return null;
+  }
+}
+
+// Responses API replies with {output: [{content: [{type:'output_text', text: '...'}]}]}
+// (some proxies also add a convenience top-level output_text string) - handle both.
+function extractResponsesOutputText_(data) {
+  if (data && data.output_text) return String(data.output_text);
+  const items = (data && data.output) || [];
+  for (var i = 0; i < items.length; i++) {
+    const content = items[i].content || [];
+    for (var j = 0; j < content.length; j++) {
+      const part = content[j];
+      if (part && (part.type === 'output_text' || part.type === 'text') && part.text) return String(part.text);
+    }
+  }
+  return '';
+}
+
+function parseMarketAiPrice_(text) {
+  const match = String(text || '').match(/\{[\s\S]*\}/);
+  if (!match) return { results: [], checkedAt: Date.now() };
+  try {
+    const result = JSON.parse(match[0]);
+    const price = Number(result.price || 0);
+    if (!(price > 0) || !isFinite(price)) return { results: [], checkedAt: Date.now() };
+    return { checkedAt: Date.now(), results: [{ source: String(result.source || 'جست‌وجوی وب Grok').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] };
+  } catch (err) {
+    return { results: [], checkedAt: Date.now() };
+  }
+}
+
+// Manual diagnostic for بازاریار: select "testMarketDiagnostics_" in the function
+// dropdown at the top of the Apps Script editor and click Run, then open View ->
+// Executions (or the Logger output under View -> Logs) to see exactly what Torob,
+// Digikala and the AI fallback each returned/errored with for a sample query. Doesn't
+// touch doGet/doPost so the "e is undefined" problem of calling those directly doesn't
+// apply here.
+function testMarketDiagnostics_() {
+  const query = 'هندزفری';
+  Logger.log('--- torobSearch_ ---');
+  try { Logger.log(JSON.stringify(torobSearch_(query))); } catch (err) { Logger.log('threw: ' + err); }
+  Logger.log('--- digikalaSearch_ ---');
+  try { Logger.log(JSON.stringify(digikalaSearch_(query))); } catch (err) { Logger.log('threw: ' + err); }
+  Logger.log('--- handleMarketAiSearch_ ---');
+  Logger.log(handleMarketAiSearch_({ query: query, deviceId: 'diagnostic-test-device' }).getContent());
 }
 
 // Only accepts {name, url} pairs the user already saved on-device via "افزودن منبع"
@@ -285,9 +386,13 @@ function torobSearch_(query) {
     muteHttpExceptions: true, followRedirects: true,
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json', 'Referer': 'https://torob.com/search/?query=' + encodeURIComponent(query) }
   });
-  if (res.getResponseCode() !== 200) return [];
+  if (res.getResponseCode() !== 200) {
+    Logger.log('torobSearch_ http ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
+    return [];
+  }
   const data = JSON.parse(res.getContentText());
   const list = (data && data.results) || [];
+  if (!list.length) Logger.log('torobSearch_ 200 but no results for "' + query + '": ' + res.getContentText().slice(0, 300));
   return list.slice(0, 6).map(function(item) {
     const price = Number(item.price1 || item.price || 0);
     if (!(price > 0)) return null;
@@ -305,9 +410,13 @@ function digikalaSearch_(query) {
     muteHttpExceptions: true, followRedirects: true,
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json', 'Referer': 'https://www.digikala.com/search/?q=' + encodeURIComponent(query) }
   });
-  if (res.getResponseCode() !== 200) return [];
+  if (res.getResponseCode() !== 200) {
+    Logger.log('digikalaSearch_ http ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
+    return [];
+  }
   const data = JSON.parse(res.getContentText());
   const list = (data && data.data && (data.data.products || data.data.sellable_products)) || [];
+  if (!list.length) Logger.log('digikalaSearch_ 200 but no results for "' + query + '": ' + res.getContentText().slice(0, 300));
   return list.slice(0, 6).map(function(item) {
     const variant = item.default_variant || (item.variants && item.variants[0]) || {};
     const rial = Number((variant.price && (variant.price.selling_price || variant.price.rrp_price)) || item.price || 0);
