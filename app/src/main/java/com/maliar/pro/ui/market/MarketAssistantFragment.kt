@@ -12,6 +12,7 @@ import com.google.android.material.card.MaterialCardView
 import com.maliar.pro.R
 import com.maliar.pro.database.*
 import com.maliar.pro.utils.MarketBackendClient
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -282,7 +283,7 @@ class MarketAssistantFragment : Fragment() {
         toast("در حال بررسی قیمت بازار برای ${products.size} کالا…")
         viewLifecycleOwner.lifecycleScope.launch {
             val results = products.map { p ->
-                kotlinx.coroutines.async {
+                async {
                     val rows = MarketBackendClient.search(requireContext(), p.name, "retail")
                     val best = rows?.filter { it.price > 0 }?.maxByOrNull { it.confidence }
                     if (best != null) manager.addQuote(p.id, best.source, "RETAIL", best.price, best.min, best.max, best.confidence)
