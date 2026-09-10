@@ -42,6 +42,12 @@
 //      AI_MARKET_MODEL      = grok-4  (optional live-web fallback for product prices)
 //      AI_STT_MODEL         = whisper-1  (یا gapgpt/whisper-1 برای GapGPT)
 //      AI_TTS_MODEL         = gpt-4o-mini-tts  (یا tts-1)
+//      -- optional second live-web fallback for بازاریار/برنامه‌غذایی/لیست‌خرید price
+//         lookups (netarz.ir - OpenAI-compatible gateway, used ONLY for live price
+//         search, not for the app's regular AI chat) --
+//      NETARZ_API_KEY       = your netarz.ir key (starts with sk-ntz-v1-)
+//      NETARZ_BASE_URL      = https://netarz.ir/api/ai/v1  (default, usually leave unset)
+//      NETARZ_MARKET_MODEL  = openrouter/perplexity/sonar-pro-search  (default)
 // 4. Deploy -> New deployment -> type: "Web app".
 //      Execute as: Me
 //      Who has access: Anyone
@@ -240,18 +246,40 @@ function handleMarketSearch_(params) {
 function handleMarketAiSearch_(params, debugOut) {
   const query = String(params.query || '').trim();
   if (!query || query.length > 160) return jsonOutput_({ error: 'query is required' });
-  const denied = requireAiFields_(params);
-  if (denied) return denied;
-  const cfg = aiConfig_();
-  if (cfg.provider !== 'gapgpt') return jsonOutput_({ error: 'market_web_search_requires_gapgpt' });
-  const model = getSetting_('AI_MARKET_MODEL', 'grok-4');
+  // Quota-only gate: unlike handleAiChat_/handleAiStt_/handleAiTts_ this endpoint does
+  // NOT require the *primary* provider (AI_PROVIDER/GAPGPT_API_KEY) to be configured,
+  // because it can run entirely on the netarz.ir fallback below (used by بازاریار, and
+  // by "بررسی بازار" price checks from برنامه‌غذایی/لیست‌خرید, which all share this same
+  // endpoint via MarketBackendClient.search's grok-fallback call).
+  const deviceId = String(params.deviceId || '').trim();
+  if (!deviceId || deviceId.length > 128) return jsonOutput_({ error: 'deviceId is required' });
+  if (!consumeAiQuota_(deviceId)) return jsonOutput_({ error: 'ai_daily_limit_reached', limit: aiLimit_() });
+
   const systemPrompt = 'Use web search for Iranian prices. Return ONLY valid JSON: {"price":number,"minPrice":number,"maxPrice":number,"source":"","sourceUrl":""}. Prices must be TOMAN. With insufficient evidence return price 0. Never invent a price or URL.';
   const userPrompt = 'Find an approximate current retail market price in Iran for: ' + query;
 
-  const viaResponses = marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt, debugOut);
-  if (viaResponses) return jsonOutput_(viaResponses);
-  const viaChat = marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt, debugOut);
-  if (viaChat) return jsonOutput_(viaChat);
+  // 1) Primary provider's own live-web model (e.g. grok-4 via GapGPT), when configured.
+  // Falls through (instead of returning) on empty results too, not just on hard errors,
+  // so a "couldn't find it" reply from Grok still lets the netarz/Perplexity fallback
+  // below have a try, rather than surfacing a false "not found" to the user.
+  const cfg = aiConfig_();
+  if (cfg.provider === 'gapgpt' && cfg.key) {
+    const model = getSetting_('AI_MARKET_MODEL', 'grok-4');
+    const viaResponses = marketAiSearchViaResponses_(cfg, model, systemPrompt, userPrompt, debugOut);
+    if (viaResponses && viaResponses.results && viaResponses.results.length) return jsonOutput_(viaResponses);
+    const viaChat = marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt, debugOut);
+    if (viaChat && viaChat.results && viaChat.results.length) return jsonOutput_(viaChat);
+  } else if (debugOut) {
+    debugOut.responsesApi = 'skipped (AI_PROVIDER is not gapgpt, or GAPGPT_API_KEY is unset)';
+  }
+
+  // 2) Fall back to Perplexity "Sonar Pro Search" via netarz.ir - a separate live-search
+  // model/key from the app's regular AI provider, used only here since Torob/Digikala are
+  // bot-blocked and GapGPT's Grok web-search route is unreliable (410/504s - see the
+  // 2026-09 diagnostics notes above marketProviders_).
+  const viaNetarz = marketAiSearchViaNetarz_(systemPrompt, userPrompt, debugOut);
+  if (viaNetarz) return jsonOutput_(viaNetarz);
+
   return jsonOutput_({ error: 'ai_unavailable' });
 }
 
@@ -319,6 +347,56 @@ function marketAiSearchViaChatCompletions_(cfg, model, systemPrompt, userPrompt,
   }
 }
 
+// netarz.ir is a separate OpenAI-compatible gateway (base_url https://netarz.ir/api/ai/v1)
+// used ONLY as a live-web-search fallback for product-price lookups - NOT for the app's
+// regular AI chat/meal-plan text, which keeps using AI_PROVIDER (gapgpt/liara) via
+// aiConfig_(). Its "openrouter/perplexity/sonar-pro-search" model does its own live web
+// search on a plain /chat/completions call, no special "tools"/"web_search" param needed
+// (unlike the GapGPT/Grok attempts above), per netarz's own docs.
+function netarzConfig_() {
+  return {
+    key: getSetting_('NETARZ_API_KEY', ''),
+    baseUrl: getSetting_('NETARZ_BASE_URL', 'https://netarz.ir/api/ai/v1'),
+    model: getSetting_('NETARZ_MARKET_MODEL', 'openrouter/perplexity/sonar-pro-search')
+  };
+}
+
+function marketAiSearchViaNetarz_(systemPrompt, userPrompt, debugOut) {
+  const cfg = netarzConfig_();
+  if (!cfg.key) {
+    if (debugOut) debugOut.netarz = 'skipped (NETARZ_API_KEY not configured)';
+    return null;
+  }
+  try {
+    const response = aiFetch_(cfg.baseUrl + '/chat/completions', {
+      apiKey: cfg.key,
+      body: {
+        model: cfg.model, temperature: 0.1, max_tokens: 350,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      }
+    });
+    const code = response.getResponseCode();
+    if (code < 200 || code >= 300) {
+      const detail = 'http ' + code + ': ' + response.getContentText().slice(0, 500);
+      Logger.log('marketAiSearch(netarz) ' + detail);
+      if (debugOut) debugOut.netarz = detail;
+      return null;
+    }
+    const data = JSON.parse(response.getContentText());
+    if (debugOut) debugOut.netarz = 'http 200, raw: ' + response.getContentText().slice(0, 500);
+    const text = String(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '');
+    return parseMarketAiPrice_(text, 'جست‌وجوی وب Perplexity');
+  } catch (err) {
+    const detail = 'threw: ' + err;
+    Logger.log('marketAiSearch(netarz) ' + detail);
+    if (debugOut) debugOut.netarz = detail;
+    return null;
+  }
+}
+
 // Responses API replies with {output: [{content: [{type:'output_text', text: '...'}]}]}
 // (some proxies also add a convenience top-level output_text string) - handle both.
 function extractResponsesOutputText_(data) {
@@ -334,14 +412,14 @@ function extractResponsesOutputText_(data) {
   return '';
 }
 
-function parseMarketAiPrice_(text) {
+function parseMarketAiPrice_(text, defaultSource) {
   const match = String(text || '').match(/\{[\s\S]*\}/);
   if (!match) return { results: [], checkedAt: Date.now() };
   try {
     const result = JSON.parse(match[0]);
     const price = Number(result.price || 0);
     if (!(price > 0) || !isFinite(price)) return { results: [], checkedAt: Date.now() };
-    return { checkedAt: Date.now(), results: [{ source: String(result.source || 'جست‌وجوی وب Grok').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] };
+    return { checkedAt: Date.now(), results: [{ source: String(result.source || defaultSource || 'جست‌وجوی وب Grok').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] };
   } catch (err) {
     return { results: [], checkedAt: Date.now() };
   }
@@ -380,6 +458,7 @@ function handleMarketDiagnostics_(params) {
   out.debug = debug;
   out.aiConfig = (function() { const c = aiConfig_(); return { provider: c.provider, baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
   out.marketModel = getSetting_('AI_MARKET_MODEL', 'grok-4');
+  out.netarzConfig = (function() { const c = netarzConfig_(); return { baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
   return jsonOutput_(out);
 }
 
@@ -434,6 +513,7 @@ function testMarketDiagnostics_() {
   catch (err) { out.aiSearch = 'threw: ' + err; }
   out.aiConfig = (function() { const c = aiConfig_(); return { provider: c.provider, baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
   out.marketModel = getSetting_('AI_MARKET_MODEL', 'grok-4');
+  out.netarzConfig = (function() { const c = netarzConfig_(); return { baseUrl: c.baseUrl, hasKey: !!c.key, model: c.model }; })();
   const text = JSON.stringify(out, null, 2);
   PropertiesService.getScriptProperties().setProperty('LAST_MARKET_DIAGNOSTIC', text);
   Logger.log(text); // kept too, in case the log panel does pick it up
