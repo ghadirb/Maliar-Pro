@@ -217,7 +217,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
-            android:visibility="gone"
             app:cardBackgroundColor="@color/card_background"
             app:cardCornerRadius="20dp"
             app:cardElevation="1dp">
@@ -235,10 +234,6 @@
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="‹" android:textSize="28sp" android:textColor="@color/text_secondary" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-        <!-- بازاریار temporarily disabled per request - card kept (visibility=gone) with
-             its id intact rather than deleted, so HomeFragment's view-binding reference
-             still compiles and the card can be switched back on later by just removing
-             android:visibility="gone" above, with no other code changes needed. -->
 
         <!-- ===================== 4. این ماه چطور گذشت؟ ===================== -->
         <com.google.android.material.card.MaterialCardView
