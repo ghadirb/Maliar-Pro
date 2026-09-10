@@ -300,12 +300,50 @@
                 android:orientation="vertical"
                 android:padding="20dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="تراز کل (سال جاری)"
-                    android:textColor="@color/hero_card_text_secondary"
-                    android:textSize="12sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:id="@+id/accountingBalanceLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="تراز کل (سال جاری)"
+                        android:textColor="@color/hero_card_text_secondary"
+                        android:textSize="12sp" />
+
+                    <!-- همان گزینه سال/ماه که در تب خانه هم هست - انتخاب کاربر بین دو تب مشترک است -->
+                    <LinearLayout
+                        android:id="@+id/accountingBalancePeriodToggle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_period_toggle_track"
+                        android:orientation="horizontal"
+                        android:padding="2dp">
+                        <TextView
+                            android:id="@+id/accountingBalancePeriodYear"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingStart="12dp"
+                            android:paddingTop="4dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="4dp"
+                            android:text="سال"
+                            android:textSize="11sp" />
+                        <TextView
+                            android:id="@+id/accountingBalancePeriodMonth"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingStart="12dp"
+                            android:paddingTop="4dp"
+                            android:paddingEnd="12dp"
+                            android:paddingBottom="4dp"
+                            android:text="ماه"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/balanceAmount"

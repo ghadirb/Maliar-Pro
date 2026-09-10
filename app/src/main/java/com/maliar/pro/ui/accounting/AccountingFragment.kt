@@ -147,17 +147,28 @@ class AccountingFragment : Fragment() {
                 binding.expenseAmount.text = formatCurrency(expense)
             }
         }
+        setupBalancePeriodToggle()
         lifecycleScope.launch {
-            viewModel.balance.collect { balance ->
-                binding.balanceAmount.text = formatCurrency(balance)
-                // Same red highlight as the period balance below - a plain white "-" on
-                // this dark green card is very easy to miss at a glance, so make a
-                // negative total balance visually unmistakable too.
-                binding.balanceAmount.setTextColor(
-                    if (balance < 0) android.graphics.Color.parseColor("#FFCDD2")
-                    else android.graphics.Color.WHITE
-                )
-            }
+            // "تراز کل" switches between the yearly and monthly figures per the shared
+            // سال/ماه toggle above it - same preference as the Home tab, so both screens
+            // never disagree about which one the user picked.
+            kotlinx.coroutines.flow.combine(
+                viewModel.balance,
+                viewModel.monthlyBalance,
+                com.maliar.pro.utils.BalancePeriodPreference.current(requireContext())
+            ) { yearly, monthly, period -> period to (if (period == com.maliar.pro.utils.BalancePeriod.YEAR) yearly else monthly) }
+                .collect { (period, balance) ->
+                    binding.balanceAmount.text = formatCurrency(balance)
+                    binding.accountingBalanceLabel.text =
+                        if (period == com.maliar.pro.utils.BalancePeriod.YEAR) "تراز کل (سال جاری)" else "تراز کل (ماه جاری)"
+                    // Same red highlight as the period balance below - a plain white "-" on
+                    // this dark green card is very easy to miss at a glance, so make a
+                    // negative balance visually unmistakable too.
+                    binding.balanceAmount.setTextColor(
+                        if (balance < 0) android.graphics.Color.parseColor("#FFCDD2")
+                        else android.graphics.Color.WHITE
+                    )
+                }
         }
         lifecycleScope.launch {
             viewModel.checkList.collect { list ->
@@ -427,6 +438,30 @@ class AccountingFragment : Fragment() {
                     }
                 }
             }
+        }
+    }
+
+    /** سال/ماه chip toggle above "تراز کل" - writes the same shared preference the Home
+     *  tab reads, so switching it here also switches Home's "موجودی کل". */
+    private fun setupBalancePeriodToggle() {
+        fun applyStyle(period: com.maliar.pro.utils.BalancePeriod) {
+            val selectedBg = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.bg_period_toggle_selected)
+            val isYear = period == com.maliar.pro.utils.BalancePeriod.YEAR
+            binding.accountingBalancePeriodYear.background = if (isYear) selectedBg else null
+            binding.accountingBalancePeriodMonth.background = if (!isYear) selectedBg else null
+            binding.accountingBalancePeriodYear.setTextColor(if (isYear) android.graphics.Color.parseColor("#1B1B1B") else android.graphics.Color.WHITE)
+            binding.accountingBalancePeriodMonth.setTextColor(if (!isYear) android.graphics.Color.parseColor("#1B1B1B") else android.graphics.Color.WHITE)
+        }
+
+        applyStyle(com.maliar.pro.utils.BalancePeriodPreference.get(requireContext()))
+        binding.accountingBalancePeriodYear.setOnClickListener {
+            com.maliar.pro.utils.BalancePeriodPreference.set(requireContext(), com.maliar.pro.utils.BalancePeriod.YEAR)
+        }
+        binding.accountingBalancePeriodMonth.setOnClickListener {
+            com.maliar.pro.utils.BalancePeriodPreference.set(requireContext(), com.maliar.pro.utils.BalancePeriod.MONTH)
+        }
+        lifecycleScope.launch {
+            com.maliar.pro.utils.BalancePeriodPreference.current(requireContext()).collect { applyStyle(it) }
         }
     }
 

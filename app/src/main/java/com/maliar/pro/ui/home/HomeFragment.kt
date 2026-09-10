@@ -70,8 +70,23 @@ class HomeFragment : Fragment() {
 
         renderHeader()
         setupClickListeners()
+        setupBalancePeriodToggle()
 
-        lifecycleScope.launch { viewModel.balance.collect { binding.homeBalanceText.text = CurrencyFormatter.format(it) } }
+        // "موجودی کل" switches between the yearly and monthly figures per the shared
+        // سال/ماه toggle above it - both flows already exist on the ViewModel, this just
+        // picks which one to render.
+        lifecycleScope.launch {
+            kotlinx.coroutines.flow.combine(
+                viewModel.balance,
+                viewModel.monthlyBalance,
+                com.maliar.pro.utils.BalancePeriodPreference.current(requireContext())
+            ) { yearly, monthly, period -> period to (if (period == com.maliar.pro.utils.BalancePeriod.YEAR) yearly else monthly) }
+                .collect { (period, amount) ->
+                    binding.homeBalanceText.text = CurrencyFormatter.format(amount)
+                    binding.homeBalanceLabel.text =
+                        if (period == com.maliar.pro.utils.BalancePeriod.YEAR) "موجودی کل (سال جاری)" else "موجودی کل (ماه جاری)"
+                }
+        }
 
         // Hero card income/expense + qualitative month status + "این ماه چطور گذشت؟" bars,
         // all driven off the same two numbers so they can never disagree with each other.
@@ -105,6 +120,30 @@ class HomeFragment : Fragment() {
         binding.homeGreetingText.text = "سلام 👋"
         val (y, m, d) = PersianCalendarHelper.getCurrentJalaliDate()
         binding.homeDateText.text = "امروز، ${PersianCalendarHelper.formatJalali(y, m, d)}"
+    }
+
+    /** سال/ماه chip toggle above "موجودی کل" - just writes the shared preference; the
+     *  StateFlow collected above re-renders the number and label automatically. */
+    private fun setupBalancePeriodToggle() {
+        fun applyStyle(period: com.maliar.pro.utils.BalancePeriod) {
+            val selectedBg = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.bg_period_toggle_selected)
+            val isYear = period == com.maliar.pro.utils.BalancePeriod.YEAR
+            binding.homeBalancePeriodYear.background = if (isYear) selectedBg else null
+            binding.homeBalancePeriodMonth.background = if (!isYear) selectedBg else null
+            binding.homeBalancePeriodYear.setTextColor(if (isYear) Color.parseColor("#1B1B1B") else Color.WHITE)
+            binding.homeBalancePeriodMonth.setTextColor(if (!isYear) Color.parseColor("#1B1B1B") else Color.WHITE)
+        }
+
+        applyStyle(com.maliar.pro.utils.BalancePeriodPreference.get(requireContext()))
+        binding.homeBalancePeriodYear.setOnClickListener {
+            com.maliar.pro.utils.BalancePeriodPreference.set(requireContext(), com.maliar.pro.utils.BalancePeriod.YEAR)
+        }
+        binding.homeBalancePeriodMonth.setOnClickListener {
+            com.maliar.pro.utils.BalancePeriodPreference.set(requireContext(), com.maliar.pro.utils.BalancePeriod.MONTH)
+        }
+        lifecycleScope.launch {
+            com.maliar.pro.utils.BalancePeriodPreference.current(requireContext()).collect { applyStyle(it) }
+        }
     }
 
     private fun setupClickListeners() {
