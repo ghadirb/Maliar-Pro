@@ -18,7 +18,6 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
-import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.maliar.pro.databinding.ActivityMainBinding
 import com.maliar.pro.utils.AnnouncementManager
@@ -507,6 +506,19 @@ class MainActivity : AppCompatActivity() {
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHostFragment.navController
 
-        binding.bottomNavigation.setupWithNavController(navController)
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            runCatching {
+                val options = androidx.navigation.navOptions {
+                    launchSingleTop = true
+                    restoreState = false
+                    popUpTo(item.itemId) { saveState = false }
+                }
+                navController.navigate(item.itemId, null, options)
+                true
+            }.getOrDefault(false)
+        }
+        binding.bottomNavigation.setOnItemReselectedListener { item ->
+            navController.popBackStack(item.itemId, false)
+        }
     }
 }

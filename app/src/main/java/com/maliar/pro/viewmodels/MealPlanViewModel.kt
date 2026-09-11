@@ -72,6 +72,11 @@ class MealPlanViewModel(private val mealPlanManager: MealPlanManager) : ViewMode
         }
     }
 
+    fun saveOnlinePlan(weekStart: Long, budget: Double, entries: List<MealPlanEntry>) {
+        _isGenerating.value = true
+        viewModelScope.launch { mealPlanManager.saveCustomPlan(weekStart, budget, entries); _shoppingList.value = null; _isGenerating.value = false }
+    }
+
     fun loadShoppingList(planId: Long) {
         viewModelScope.launch {
             _shoppingList.value = mealPlanManager.getShoppingList(planId)
@@ -80,6 +85,10 @@ class MealPlanViewModel(private val mealPlanManager: MealPlanManager) : ViewMode
 
     fun hideShoppingList() {
         _shoppingList.value = null
+    }
+
+    fun updateEntry(entry: MealPlanEntry, recipeName: String, estimatedCost: Double) {
+        viewModelScope.launch { mealPlanManager.updateEntry(entry, recipeName, estimatedCost) }
     }
 }
 

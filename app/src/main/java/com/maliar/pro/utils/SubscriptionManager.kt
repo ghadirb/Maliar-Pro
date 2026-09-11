@@ -45,13 +45,13 @@ object SubscriptionManager {
     //      "https://script.google.com/macros/s/XXXXX/exec?path=status"
     //      "https://script.google.com/macros/s/XXXXX/exec?path=request"
     //      "https://script.google.com/macros/s/XXXXX/exec?path=verifyStore"
-    const val STATUS_URL = "https://script.google.com/macros/s/AKfycbzh8tDg66U3vCSVbHJYjEwBbAktOMPxj7N4tspLPyw9bT5lBm-CS-d7R46qxfLRxwbW/exec?path=status"
-    const val REQUEST_URL = "https://script.google.com/macros/s/AKfycbzh8tDg66U3vCSVbHJYjEwBbAktOMPxj7N4tspLPyw9bT5lBm-CS-d7R46qxfLRxwbW/exec?path=request"
+    const val STATUS_URL = "https://script.google.com/macros/s/AKfycbyknX6jghzFv6Ofm1t5MgU0reB2UpEht2j0cyEfJbDFOdCA2YlVD0R9cQVbyUjONGI/exec?path=status"
+    const val REQUEST_URL = "https://script.google.com/macros/s/AKfycbyknX6jghzFv6Ofm1t5MgU0reB2UpEht2j0cyEfJbDFOdCA2YlVD0R9cQVbyUjONGI/exec?path=request"
 
     // Verifies a Bazaar/Myket in-app-purchase token server-to-server (with Bazaar's/
     // Myket's own APIs) BEFORE granting premium days - see /server/index.js's
     // /payment/verify-store route and README for the API credentials you need to fill in.
-    const val VERIFY_STORE_URL = "https://script.google.com/macros/s/AKfycbzh8tDg66U3vCSVbHJYjEwBbAktOMPxj7N4tspLPyw9bT5lBm-CS-d7R46qxfLRxwbW/exec?path=verifyStore"
+    const val VERIFY_STORE_URL = "https://script.google.com/macros/s/AKfycbyknX6jghzFv6Ofm1t5MgU0reB2UpEht2j0cyEfJbDFOdCA2YlVD0R9cQVbyUjONGI/exec?path=verifyStore"
 
     const val FREE_AI_LIFETIME_LIMIT = 15
 

@@ -33,6 +33,9 @@ interface MealPlanDao {
     @Insert
     suspend fun insertEntries(entries: List<MealPlanEntry>)
 
+    @androidx.room.Update
+    suspend fun updateEntry(entry: MealPlanEntry)
+
     @Query("DELETE FROM meal_plan_entries WHERE mealPlanId = :planId")
     suspend fun deleteEntriesForPlan(planId: Long)
 }

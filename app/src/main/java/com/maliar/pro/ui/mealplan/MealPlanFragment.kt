@@ -26,6 +26,7 @@ import com.maliar.pro.utils.AIHelper
 import com.maliar.pro.utils.MarketBackendClient
 import com.maliar.pro.utils.MealType
 import com.maliar.pro.utils.PreferencesManager
+import com.maliar.pro.utils.RecipeCatalog
 import com.maliar.pro.viewmodels.MealPlanViewModel
 import com.maliar.pro.viewmodels.MealPlanViewModelFactory
 import com.maliar.pro.viewmodels.PERSIAN_WEEKDAY_NAMES
@@ -49,7 +50,7 @@ class MealPlanFragment : Fragment() {
 
         binding.generatePlanButton.setOnClickListener {
             val budget = binding.budgetInput.text.toString().toDoubleOrNull() ?: 0.0
-            viewModel.generatePlan(weekStartMillis(), budget)
+            requestOnlinePlanOrFallback(weekStartMillis(), budget)
             binding.shoppingListCard.visibility = View.GONE
         }
         binding.managePricesButton.setOnClickListener { showPriceManager() }
@@ -91,6 +92,30 @@ class MealPlanFragment : Fragment() {
         }
     }
 
+    private fun requestOnlinePlanOrFallback(weekStart: Long, budget: Double) {
+        lifecycleScope.launch {
+            val prompt = "یک برنامه غذایی هفتگی فارسی تولید کن. فقط JSON معتبر با کلید entries بده؛ هر entry شامل day (0 تا 6)، mealType (BREAKFAST/LUNCH/DINNER/SNACK)، recipeName و estimatedCost عددی به تومان باشد. برای هر روز صبحانه، ناهار، شام و میان‌وعده پیشنهاد بده. بودجه هفتگی: $budget"
+            val raw = AIHelper.generateText(requireContext(), "برنامه‌ریز غذای خانوادگی هستی. فقط JSON معتبر و بدون توضیح.", prompt)
+            val parsed = raw?.let { parseOnlineEntries(it) }
+            if (parsed.isNullOrEmpty()) viewModel.generatePlan(weekStart, budget)
+            else viewModel.saveOnlinePlan(weekStart, budget, parsed)
+        }
+    }
+
+    private fun parseOnlineEntries(raw: String): List<MealPlanEntry> = runCatching {
+        val arrayText = raw.substringAfter("[").substringBeforeLast("]", "")
+        if (arrayText.isBlank()) return@runCatching emptyList()
+        val itemRegex = Regex("\\{[^{}]*\\}")
+        itemRegex.findAll(arrayText).mapNotNull { match ->
+            val obj = org.json.JSONObject(match.value)
+            val day = obj.optInt("day", -1)
+            val type = obj.optString("mealType", "").uppercase()
+            val name = obj.optString("recipeName", "").trim()
+            if (day !in 0..6 || type !in setOf("BREAKFAST", "LUNCH", "DINNER", "SNACK") || name.isBlank() || RecipeCatalog.RECIPES.none { it.name == name }) null
+            else MealPlanEntry(dayOfWeek = day, mealType = type, recipeName = name, estimatedCost = obj.optDouble("estimatedCost", 0.0), mealPlanId = 0)
+        }.toList().takeIf { it.size >= 7 }
+    }.getOrDefault(emptyList())
+
     private fun renderPlan(entries: List<MealPlanEntry>) {
         binding.daysContainer.removeAllViews()
         binding.emptyStateText.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
@@ -121,11 +146,24 @@ class MealPlanFragment : Fragment() {
                     text = "$label: ${entry.recipeName}  (${formatCurrency(entry.estimatedCost)})"
                     textSize = 13f
                     setPadding(0, 4, 0, 4)
+                    setOnClickListener { showEditEntry(entry) }
                 }
                 rows.addView(row)
             }
             binding.daysContainer.addView(card)
         }
+    }
+
+    private fun showEditEntry(entry: MealPlanEntry) {
+        val box = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 8, 32, 8) }
+        val name = EditText(requireContext()).apply { hint = "نام غذا"; setText(entry.recipeName); setSingleLine(true) }
+        val cost = EditText(requireContext()).apply { hint = "هزینه تقریبی"; setText(entry.estimatedCost.toLong().toString()); inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; setSingleLine(true) }
+        box.addView(name); box.addView(cost)
+        AlertDialog.Builder(requireContext()).setTitle("ویرایش وعده").setView(box)
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                if (name.text.isNotBlank()) viewModel.updateEntry(entry, name.text.toString(), cost.text.toString().toDoubleOrNull() ?: entry.estimatedCost)
+            }.show()
     }
 
     private fun showPriceManager() {

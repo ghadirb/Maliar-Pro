@@ -102,7 +102,22 @@ class MarketAssistantFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         viewLifecycleOwner.lifecycleScope.launch { manager.syncExistingBusinessPurchases() }
-        viewLifecycleOwner.lifecycleScope.launch { manager.products().collectLatest { items -> products = items; renderProducts() } }
+        viewLifecycleOwner.lifecycleScope.launch {
+            manager.products().collectLatest { items ->
+                products = items
+                // Rehydrate the latest persisted market quote for every card. Without
+                // this, quotes were saved in Room but only appeared until the screen
+                // was left, making it look as if the previous search had disappeared.
+                val latest = mutableMapOf<Long, Pair<Double, String>>()
+                items.forEach { product ->
+                    manager.quotes(product.id).first().firstOrNull()?.let { quote ->
+                        latest[product.id] = quote.price to quote.source
+                    }
+                }
+                marketPriceByProductId = latest
+                renderProducts()
+            }
+        }
         // Surfacing current stock right on each row is what makes a "خرید کالا" entry from
         // the accounting screen visibly show up here immediately, instead of only silently
         // adjusting an account balance the person has to go check separately.

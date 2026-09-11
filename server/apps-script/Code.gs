@@ -39,6 +39,7 @@
 //      AI_PROVIDER          = gapgpt (or liara)
 //      GAPGPT_API_KEY       = provider key (Script Property only)
 //      AI_MODEL             = gpt-4o-mini
+//      AI_LIFETIME_LIMIT    = 15   (shared free AI allowance per device)
 //      AI_MARKET_MODEL      = grok-4  (optional live-web fallback for product prices)
 //      AI_STT_MODEL         = whisper-1  (یا gapgpt/whisper-1 برای GapGPT)
 //      AI_TTS_MODEL         = gpt-4o-mini-tts  (یا tts-1)
@@ -47,7 +48,8 @@
 //         search, not for the app's regular AI chat) --
 //      NETARZ_API_KEY       = your netarz.ir key (starts with sk-ntz-v1-)
 //      NETARZ_BASE_URL      = https://netarz.ir/api/ai/v1  (default, usually leave unset)
-//      NETARZ_MARKET_MODEL  = openrouter/perplexity/sonar-pro-search  (default)
+//      TAVILY_API_KEY       = your Tavily search key (optional, preferred for price lookup)
+//      NETARZ_MARKET_MODEL  = openrouter/perplexity/sonar  (default fallback)
 // 4. Deploy -> New deployment -> type: "Web app".
 //      Execute as: Me
 //      Who has access: Anyone
@@ -273,12 +275,17 @@ function handleMarketAiSearch_(params, debugOut) {
     debugOut.responsesApi = 'skipped (AI_PROVIDER is not gapgpt, or GAPGPT_API_KEY is unset)';
   }
 
-  // 2) Fall back to Perplexity "Sonar Pro Search" via netarz.ir - a separate live-search
+  // 2) Prefer Tavily's search API: it is a direct web-search result feed and is
+  // substantially cheaper/faster than asking a reasoning model to browse.
+  const viaTavily = marketAiSearchViaTavily_(query, debugOut);
+  if (viaTavily) { Logger.log('marketAiSearch provider=Tavily query=' + query); return jsonOutput_(viaTavily); }
+
+  // 3) Fall back to Perplexity Sonar via netarz.ir - a separate live-search
   // model/key from the app's regular AI provider, used only here since Torob/Digikala are
   // bot-blocked and GapGPT's Grok web-search route is unreliable (410/504s - see the
   // 2026-09 diagnostics notes above marketProviders_).
   const viaNetarz = marketAiSearchViaNetarz_(systemPrompt, userPrompt, debugOut);
-  if (viaNetarz) return jsonOutput_(viaNetarz);
+  if (viaNetarz) { Logger.log('marketAiSearch provider=Perplexity-Sonar query=' + query); return jsonOutput_(viaNetarz); }
 
   return jsonOutput_({ error: 'ai_unavailable' });
 }
@@ -357,8 +364,47 @@ function netarzConfig_() {
   return {
     key: getSetting_('NETARZ_API_KEY', ''),
     baseUrl: getSetting_('NETARZ_BASE_URL', 'https://netarz.ir/api/ai/v1'),
-    model: getSetting_('NETARZ_MARKET_MODEL', 'openrouter/perplexity/sonar-pro-search')
+    model: getSetting_('NETARZ_MARKET_MODEL', 'openrouter/perplexity/sonar')
   };
+}
+
+/** AvalAI-hosted Tavily search fallback. AvalAI exposes Tavily at the OpenAI-compatible
+ * search endpoint, so the user's AvalAI key belongs in Script Properties only. */
+function marketAiSearchViaTavily_(query, debugOut) {
+  const key = getSetting_('TAVILY_API_KEY', '');
+  if (!key) { if (debugOut) debugOut.tavily = 'skipped (TAVILY_API_KEY not configured)'; return null; }
+  try {
+    const response = UrlFetchApp.fetch('https://api.avalai.ir/v1/search/tavily-search', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + key },
+      payload: JSON.stringify({ query: query + ' قیمت تومان', max_results: 5 })
+    });
+    const code = response.getResponseCode();
+    if (code < 200 || code >= 300) { if (debugOut) debugOut.tavily = 'http ' + code; return null; }
+    const data = JSON.parse(response.getContentText());
+    const text = String(data.answer || '') + '\n' + (data.results || []).map(function(r) { return String(r.title || '') + ' ' + String(r.content || r.snippet || '') + ' ' + String(r.url || ''); }).join('\n');
+    const parsed = parseMarketAiPrice_(text, 'جست‌وجوی Tavily');
+    if ((!parsed || !parsed.results || !parsed.results.length) && text) {
+      // Tavily returns ranked snippets, not a JSON object. Extract explicit Toman
+      // amounts as a conservative fallback; never guess from bare small numbers.
+      const matches = text.match(/(?:قیمت|تومان|تومن|ریال)[^\d۰-۹]{0,24}([\d۰-۹][\d۰-۹,،.]*)|([\d۰-۹][\d۰-۹,،.]*)[^\d۰-۹]{0,12}(?:تومان|تومن)/gi) || [];
+      const values = matches.map(function(raw) {
+        const digits = String(raw).replace(/[۰-۹]/g, function(c) { return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)); }).replace(/[^\d]/g, '');
+        return Number(digits);
+      }).filter(function(n) { return n >= 1000 && n < 1e12; });
+      if (values.length) {
+        const price = Math.round(values.reduce(function(a, b) { return a + b; }, 0) / values.length);
+        return { checkedAt: Date.now(), results: [{ source: 'جست‌وجوی Tavily', sourceUrl: '', priceType: 'retail', price: price, minPrice: Math.min.apply(null, values), maxPrice: Math.max.apply(null, values), confidence: .35 }] };
+      }
+    }
+    if (parsed && parsed.results && parsed.results.length) return parsed;
+    if (debugOut) debugOut.tavily = 'no parseable price';
+    return null;
+  } catch (err) {
+    Logger.log('marketAiSearch(tavily) threw: ' + err);
+    if (debugOut) debugOut.tavily = String(err);
+    return null;
+  }
 }
 
 function marketAiSearchViaNetarz_(systemPrompt, userPrompt, debugOut) {
@@ -537,13 +583,10 @@ function marketProviders_(priceType, sources) {
   // source, confidence}] function. Torob/Digikala only make sense for retail; wholesale
   // pricing in Iran mostly lives in Telegram supplier channels, which is why those are
   // driven entirely by the user's own saved sources for both price types.
-  const providers = [];
-  if (priceType === 'retail') { providers.push(torobSearch_); providers.push(digikalaSearch_); }
-  (sources || []).forEach(function(src) {
-    const channel = telegramChannelUsername_(src.url);
-    if (channel) providers.push(function(query, type) { return telegramChannelSearch_(channel, src.name || channel, query, type); });
-  });
-  return providers;
+  // Temporarily disabled at the user's request: Torob, Digikala and Telegram are
+  // currently slow/blocked. Price lookup goes directly to Tavily, then Sonar.
+  Logger.log('marketProviders_: deterministic providers disabled; using Tavily -> Sonar');
+  return [];
 }
 
 function telegramChannelUsername_(url) {
@@ -686,14 +729,16 @@ function aiConfig_() {
 }
 
 function aiLimit_() {
-  return Math.max(1, parseInt(getSetting_('AI_DAILY_LIMIT', '10'), 10));
+  // One shared free allowance per device. This deliberately ignores the legacy
+  // AI_DAILY_LIMIT property so an old deployment cannot silently reintroduce a second
+  // 10-per-day quota while the app displays the unified 15-message allowance.
+  return Math.max(1, parseInt(getSetting_('AI_LIFETIME_LIMIT', '15'), 10));
 }
 
 function aiUsageKey_(deviceId) {
-  const day = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'UTC', 'yyyyMMdd');
   const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(deviceId));
   const safe = Utilities.base64EncodeWebSafe(digest).replace(/=+$/, '');
-  return 'ai_usage_' + day + '_' + safe;
+  return 'ai_usage_lifetime_' + safe;
 }
 
 function consumeAiQuota_(deviceId) {

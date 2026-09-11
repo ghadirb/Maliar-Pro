@@ -41,6 +41,17 @@ class MealPlanManager(context: Context) {
     fun getLatestPlan(): Flow<MealPlan?> = dao.getLatestPlan()
     fun getEntries(planId: Long): Flow<List<MealPlanEntry>> = dao.getEntries(planId)
 
+    suspend fun updateEntry(entry: MealPlanEntry, recipeName: String, estimatedCost: Double) {
+        dao.updateEntry(entry.copy(recipeName = recipeName.trim(), estimatedCost = estimatedCost.coerceAtLeast(0.0)))
+    }
+
+    suspend fun saveCustomPlan(weekStartDate: Long, budget: Double, entries: List<MealPlanEntry>): Long {
+        dao.getPlanForWeek(weekStartDate)?.let { old -> dao.deleteEntriesForPlan(old.id); dao.deletePlan(old) }
+        val id = dao.insertPlan(MealPlan(weekStartDate = weekStartDate, budget = budget))
+        dao.insertEntries(entries.map { it.copy(id = 0, mealPlanId = id) })
+        return id
+    }
+
     /** All of the person's own Expense rows recognized as food purchases (item #1 of the
      *  spec) - matched via [FoodCatalog.isLikelyFoodExpense], which requires the
      *  expense's own category to be blank/food-adjacent before scanning its description
