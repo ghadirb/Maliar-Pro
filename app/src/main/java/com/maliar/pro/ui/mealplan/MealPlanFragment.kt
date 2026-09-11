@@ -113,7 +113,7 @@ class MealPlanFragment : Fragment() {
             val name = obj.optString("recipeName", "").trim()
             if (day !in 0..6 || type !in setOf("BREAKFAST", "LUNCH", "DINNER", "SNACK") || name.isBlank() || RecipeCatalog.RECIPES.none { it.name == name }) null
             else MealPlanEntry(dayOfWeek = day, mealType = type, recipeName = name, estimatedCost = obj.optDouble("estimatedCost", 0.0), mealPlanId = 0)
-        }.toList().takeIf { it.size >= 7 }
+        }.toList().let { entries -> if (entries.size >= 7) entries else emptyList() }
     }.getOrDefault(emptyList())
 
     private fun renderPlan(entries: List<MealPlanEntry>) {
