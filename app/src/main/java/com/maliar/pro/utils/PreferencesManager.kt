@@ -8,6 +8,8 @@ import com.maliar.pro.models.APIKey
 
 class PreferencesManager(context: Context) {
 
+    private val appContext = context.applicationContext
+
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
@@ -348,7 +350,8 @@ class PreferencesManager(context: Context) {
     fun getOrCreateDeviceId(): String {
         val existing = prefs.getString(KEY_DEVICE_ID, null)
         if (!existing.isNullOrBlank()) return existing
-        val fresh = java.util.UUID.randomUUID().toString()
+        val androidId = android.provider.Settings.Secure.getString(appContext.contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+        val fresh = if (!androidId.isNullOrBlank()) "android:$androidId" else java.util.UUID.randomUUID().toString()
         prefs.edit().putString(KEY_DEVICE_ID, fresh).apply()
         return fresh
     }

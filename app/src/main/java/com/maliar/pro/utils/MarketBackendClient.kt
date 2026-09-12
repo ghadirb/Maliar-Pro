@@ -58,6 +58,7 @@ object MarketBackendClient {
             val serverError = response.optString("error").takeIf { it.isNotBlank() }
             if (serverError != null) android.util.Log.w("MarketBackendClient", "marketSearch($query) server error: $serverError")
             val localResults = response.toRemoteQuotes(priceType)
+            android.util.Log.i("MarketBackendClient", "marketSearch($query) deterministicResults=${localResults.size} error=${serverError ?: "none"}")
             if (localResults.isNotEmpty()) return@runCatching SearchResponse(localResults, null)
             // Torob/Digikala are free (no AI key used) and were just tried above with no
             // gate needed. Falling through to the paid AI web-search from here on, though -
@@ -73,6 +74,7 @@ object MarketBackendClient {
             if (aiResult.error != "ai_daily_limit_reached" && aiResult.error?.startsWith("http_") != true && aiResult.error?.startsWith("exception:") != true) {
                 SubscriptionManager.recordAiUsage(context)
             }
+            android.util.Log.i("MarketBackendClient", "marketAiSearch($query) results=${aiResult.quotes.size} error=${aiResult.error ?: "none"} sources=${aiResult.quotes.joinToString { it.source }} localRemaining=${SubscriptionManager.remainingFreeLifetime(context)}")
             aiResult
         }.getOrElse { SearchResponse(emptyList(), "exception:${it.message ?: it::class.simpleName}") }
     }

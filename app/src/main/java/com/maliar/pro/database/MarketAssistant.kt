@@ -97,12 +97,15 @@ class MarketAssistantManager(context: Context) {
             val wholesale = quotes.filter { it.priceType == "WHOLESALE" }
             val retail = quotes.filter { it.priceType == "RETAIL" }
             val last = purchases.firstOrNull()?.purchasePrice
-            val market = (wholesale.ifEmpty { quotes }).map { it.price }.average().takeIf { !it.isNaN() }
+            // Current online lookup is retail-only; choose wholesale only when it truly exists.
+            val marketQuotes = wholesale.ifEmpty { retail }
+            val market = marketQuotes.map { it.price }.average().takeIf { !it.isNaN() }
             if (market == null) return "هنوز قیمت بازار ثبت نشده است. ابتدا یک قیمت یا پیام فروشنده اضافه کنید."
             val target = market * .97
             val retailAverage = retail.map { it.price }.average().takeIf { !it.isNaN() }
             return buildString {
-                append("میانگین قیمت عمده: ${market.toLong()} تومان\nپیشنهاد خرید: حداکثر ${target.toLong()} تومان")
+                val label = if (wholesale.isNotEmpty()) "عمده" else "خرده"
+                append("میانگین قیمت $label: ${market.toLong()} تومان\nپیشنهاد خرید: حداکثر ${target.toLong()} تومان")
                 if (last != null) append("\nآخرین خرید شما: ${last.toLong()} تومان (${if (last > market) "بالاتر" else "پایین‌تر"} از میانگین بازار)")
                 if (retailAverage != null && retailAverage > market) append("\nحاشیه فروش خرده نسبت به عمده: ${(((retailAverage - market) / market) * 100).toInt()}٪")
             }
