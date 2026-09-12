@@ -53,6 +53,7 @@
 //      AVALAI_SONAR_MODEL   = sonar  (optional, default shown)
 //      ENABLE_TAVILY        = false  (enable only after your AvalAI Tavily endpoint succeeds)
 //      NETARZ_MARKET_MODEL  = openrouter/perplexity/sonar  (default fallback)
+//      PRICE_CACHE_INGEST_TOKEN = random secret shared with the private GitHub cache workflow
 // 4. Deploy -> New deployment -> type: "Web app".
 //      Execute as: Me
 //      Who has access: Anyone
