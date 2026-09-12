@@ -374,15 +374,19 @@ function marketAiSearchViaTavily_(query, debugOut) {
   const key = getSetting_('TAVILY_API_KEY', '');
   if (!key) { if (debugOut) debugOut.tavily = 'skipped (TAVILY_API_KEY not configured)'; return null; }
   try {
-    const response = UrlFetchApp.fetch('https://api.avalai.ir/v1/search/tavily-search', {
+    const response = UrlFetchApp.fetch('https://api.avalai.ir/v1/chat/completions', {
       method: 'post', contentType: 'application/json', muteHttpExceptions: true,
       headers: { Authorization: 'Bearer ' + key },
-      payload: JSON.stringify({ query: query + ' قیمت تومان', max_results: 5 })
+      payload: JSON.stringify({ model: 'tavily-search', temperature: 0.1, max_tokens: 500,
+        messages: [
+          { role: 'system', content: 'Search the live web for current Iranian retail prices. Return ONLY valid JSON: {"results":[{"source":"","sourceUrl":"","price":0,"minPrice":0,"maxPrice":0}]} with prices in Toman. Include direct product/store URLs when available; never invent prices or URLs.' },
+          { role: 'user', content: query + ' قیمت خرده‌فروشی فعلی در ایران' }
+        ] })
     });
     const code = response.getResponseCode();
     if (code < 200 || code >= 300) { if (debugOut) debugOut.tavily = 'http ' + code; return null; }
     const data = JSON.parse(response.getContentText());
-    const text = String(data.answer || '') + '\n' + (data.results || []).map(function(r) { return String(r.title || '') + ' ' + String(r.content || r.snippet || '') + ' ' + String(r.url || ''); }).join('\n');
+    const text = String(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || data.answer || '') + '\n' + (data.results || []).map(function(r) { return String(r.title || '') + ' ' + String(r.content || r.snippet || '') + ' ' + String(r.url || ''); }).join('\n');
     const parsed = parseMarketAiPrice_(text, 'جست‌وجوی Tavily');
     if ((!parsed || !parsed.results || !parsed.results.length) && text) {
       // Tavily returns ranked snippets, not a JSON object. Extract explicit Toman

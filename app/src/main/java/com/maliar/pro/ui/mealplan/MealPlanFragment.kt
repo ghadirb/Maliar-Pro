@@ -321,7 +321,7 @@ class MealPlanFragment : Fragment() {
             val result = product?.let { MarketBackendClient.search(context, ingredientName, "retail") }
             if (product != null && result != null && result.quotes.isNotEmpty()) {
                 result.quotes.filter { it.price > 0 }.forEach {
-                    manager.addQuote(product.id, it.source, "RETAIL", it.price, it.min, it.max, it.confidence)
+                    manager.addQuote(product.id, it.source, it.priceType.uppercase(), it.price, it.min, it.max, it.confidence, it.sourceUrl)
                 }
                 viewModel.latestPlan.value?.id?.let { viewModel.loadShoppingList(it) }
             } else {

@@ -1,6 +1,8 @@
 package com.maliar.pro.ui.market
 
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -195,6 +197,8 @@ class MarketAssistantFragment : Fragment() {
         val box = form()
         val insight = TextView(requireContext()).apply { setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) }
         box.addView(insight)
+        val quotesBox = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+        box.addView(quotesBox)
         box.addView(TextView(requireContext()).apply { text = "«دریافت قیمت آنلاین» ترب و دیجی‌کالا را جست‌وجو می‌کند و اگر نتیجه‌ای نداشتند، از جست‌وجوی وب مدل هوش مصنوعی (grok-4) کمک می‌گیرد."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) })
         box.addView((android.view.LayoutInflater.from(requireContext()).inflate(R.layout.view_market_button_secondary, box, false) as MaterialButton).apply {
             text = "دریافت قیمت آنلاین"
@@ -202,7 +206,7 @@ class MarketAssistantFragment : Fragment() {
                 viewLifecycleOwner.lifecycleScope.launch {
                     val result = MarketBackendClient.search(requireContext(), product.name, "retail")
                     when {
-                        result.quotes.isNotEmpty() -> { result.quotes.filter { it.price > 0 }.forEach { manager.addQuote(product.id, it.source, "RETAIL", it.price, it.min, it.max, it.confidence) }; toast("${result.quotes.size} قیمت بازار ثبت شد.") }
+                        result.quotes.isNotEmpty() -> { result.quotes.filter { it.price > 0 }.forEach { manager.addQuote(product.id, it.source, it.priceType.uppercase(), it.price, it.min, it.max, it.confidence, it.sourceUrl) }; toast("${result.quotes.size} قیمت بازار ثبت شد.") }
                         result.errorMessage != null -> toast(result.errorMessage!!)
                         else -> toast("نتیجه‌ای پیدا نشد؛ ممکن است ترب/دیجی‌کالا موقتاً این جست‌وجو را مسدود کرده باشند یا نام کالا خیلی خاص باشد.")
                     }
@@ -217,6 +221,19 @@ class MarketAssistantFragment : Fragment() {
             val last = purchases.firstOrNull()?.purchasePrice
             val average = purchases.map { it.purchasePrice }.average().takeIf { !it.isNaN() }
             val latest = quotes.firstOrNull()
+            quotesBox.removeAllViews()
+            quotes.filter { it.price > 0 }.forEach { quote ->
+                val row = TextView(requireContext()).apply {
+                    text = "${quote.source} · ${quote.price.toLong()} تومان · ${quote.priceType}\n" +
+                        if (quote.sourceUrl.isBlank()) "لینک منبع موجود نیست" else "مشاهده لینک فروشگاه"
+                    setPadding(0, 8, 0, 8)
+                    setTextColor(themeColor(R.color.text_secondary))
+                    if (quote.sourceUrl.isNotBlank()) setOnClickListener {
+                        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(quote.sourceUrl))) }
+                    }
+                }
+                quotesBox.addView(row)
+            }
             insight.text = buildString {
                 if (last != null) append("آخرین خرید شما: ${last.toLong()} تومان\n")
                 if (average != null) append("میانگین خرید شما: ${average.toLong()} تومان\n")
@@ -306,7 +323,7 @@ class MarketAssistantFragment : Fragment() {
                 val result = MarketBackendClient.search(requireContext(), p.name, "retail")
                 checked++
                 val best = result.quotes.filter { it.price > 0 }.maxByOrNull { it.confidence }
-                if (best != null) { manager.addQuote(p.id, best.source, "RETAIL", best.price, best.min, best.max, best.confidence); updated[p.id] = best.price to best.source; found++ }
+                if (best != null) { manager.addQuote(p.id, best.source, best.priceType.uppercase(), best.price, best.min, best.max, best.confidence, best.sourceUrl); updated[p.id] = best.price to best.source; found++ }
                 if (result.error == "ai_daily_limit_reached") { quotaMessage = result.errorMessage; break }
             }
             marketPriceByProductId = updated

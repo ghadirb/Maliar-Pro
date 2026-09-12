@@ -80,7 +80,7 @@ class MarketAssistantManager(context: Context) {
     suspend fun addSource(name: String, url: String, priceType: String) = dao.addSource(MarketSource(name = name.trim(), url = url.trim(), priceType = priceType))
     suspend fun updateSource(source: MarketSource, name: String, url: String, priceType: String, isEnabled: Boolean) = dao.updateSource(source.copy(name = name.trim(), url = url.trim(), priceType = priceType, isEnabled = isEnabled))
     suspend fun deleteSource(sourceId: Long) = dao.deleteSource(sourceId)
-    suspend fun addQuote(productId: Long, source: String, priceType: String, price: Double, min: Double? = null, max: Double? = null, confidence: Double = .6) = dao.addQuote(MarketPriceQuote(productId = productId, source = source.trim(), priceType = priceType, price = price, minPrice = min, maxPrice = max, confidence = confidence))
+    suspend fun addQuote(productId: Long, source: String, priceType: String, price: Double, min: Double? = null, max: Double? = null, confidence: Double = .6, sourceUrl: String = "") = dao.addQuote(MarketPriceQuote(productId = productId, source = source.trim(), priceType = priceType, price = price, minPrice = min, maxPrice = max, confidence = confidence, sourceUrl = sourceUrl.trim()))
 
     /** One place for price selection throughout the app. It never performs a hidden
      * network request: online quotes are used only after the person explicitly refreshed
