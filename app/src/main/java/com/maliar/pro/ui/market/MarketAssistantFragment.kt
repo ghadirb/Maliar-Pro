@@ -199,7 +199,7 @@ class MarketAssistantFragment : Fragment() {
         box.addView(insight)
         val quotesBox = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
         box.addView(quotesBox)
-        box.addView(TextView(requireContext()).apply { text = "«دریافت قیمت آنلاین» ترب و دیجی‌کالا را جست‌وجو می‌کند و اگر نتیجه‌ای نداشتند، از جست‌وجوی وب مدل هوش مصنوعی (grok-4) کمک می‌گیرد."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) })
+        box.addView(TextView(requireContext()).apply { text = "«دریافت قیمت آنلاین» ترب و دیجی‌کالا را جست‌وجو می‌کند و اگر نتیجه‌ای نداشتند، از جست‌وجوی وب مدل هوش مصنوعی (جست‌وجوی وب) کمک می‌گیرد."; setTextColor(themeColor(R.color.text_secondary)); setPadding(0, 0, 0, 12) })
         box.addView((android.view.LayoutInflater.from(requireContext()).inflate(R.layout.view_market_button_secondary, box, false) as MaterialButton).apply {
             text = "دریافت قیمت آنلاین"
             setOnClickListener {
@@ -305,7 +305,7 @@ class MarketAssistantFragment : Fragment() {
     private fun chooseProduct(action: (MarketProduct) -> Unit) { if (products.isEmpty()) { toast("ابتدا یک کالا ثبت کنید."); return }; AlertDialog.Builder(requireContext()).setTitle("انتخاب کالا").setItems(products.map { it.name }.toTypedArray()) { _, i -> action(products[i]) }.show() }
 
     /** Checks every saved product's market price (retail only: Torob + Digikala, then the
-     *  grok-4 web-search fallback if those come back empty - same automatic chain
+     *  جست‌وجوی وب web-search fallback if those come back empty - same automatic chain
      *  MarketBackendClient.search always runs, just fired for the whole list instead of
      *  one product at a time) and writes the best result straight onto each product's
      *  card, instead of opening a dialog per item. Runs sequentially (not in parallel) and

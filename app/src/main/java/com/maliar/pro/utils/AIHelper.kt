@@ -196,17 +196,24 @@ object AIHelper {
             val key = personalKey(context)
             if (key != null) {
                 val result = generateWithPersonalKey(key, systemPrompt, userPrompt)
-                if (result != null) return@withContext result
+                if (result != null) {
+                    android.util.Log.i("AIHelper", "generateText provider=personal result=success")
+                    return@withContext result
+                }
                 // Same reasoning as synthesizeSpeech: don't give up just because the
                 // person's own key happened to fail this one time.
             }
-            if (!SubscriptionManager.canUseAi(context)) return@withContext null
+            if (!SubscriptionManager.canUseAi(context)) {
+                android.util.Log.i("AIHelper", "generateText provider=shared skipped=quota_exhausted")
+                return@withContext null
+            }
             val messages = JSONArray().apply {
                 put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
                 put(JSONObject().apply { put("role", "user"); put("content", userPrompt) })
             }
             val result = AIBackendClient.chat(context, messages)
             if (result != null) SubscriptionManager.recordAiUsage(context)
+            android.util.Log.i("AIHelper", "generateText provider=shared result=${if (result == null) "failure" else "success"} remaining=${SubscriptionManager.remainingFreeLifetime(context)}")
             result
         }
 

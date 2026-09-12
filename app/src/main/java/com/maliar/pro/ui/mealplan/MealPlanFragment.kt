@@ -94,11 +94,17 @@ class MealPlanFragment : Fragment() {
 
     private fun requestOnlinePlanOrFallback(weekStart: Long, budget: Double) {
         lifecycleScope.launch {
+            android.util.Log.i("MealPlan", "generatePlan online-first started")
             val prompt = "یک برنامه غذایی هفتگی فارسی تولید کن. فقط JSON معتبر با کلید entries بده؛ هر entry شامل day (0 تا 6)، mealType (BREAKFAST/LUNCH/DINNER/SNACK)، recipeName و estimatedCost عددی به تومان باشد. برای هر روز صبحانه، ناهار، شام و میان‌وعده پیشنهاد بده. بودجه هفتگی: $budget"
             val raw = AIHelper.generateText(requireContext(), "برنامه‌ریز غذای خانوادگی هستی. فقط JSON معتبر و بدون توضیح.", prompt)
             val parsed = raw?.let { parseOnlineEntries(it) }
-            if (parsed.isNullOrEmpty()) viewModel.generatePlan(weekStart, budget)
-            else viewModel.saveOnlinePlan(weekStart, budget, parsed)
+            if (parsed.isNullOrEmpty()) {
+                android.util.Log.i("MealPlan", "generatePlan source=local-fallback")
+                viewModel.generatePlan(weekStart, budget)
+            } else {
+                android.util.Log.i("MealPlan", "generatePlan source=online entries=${parsed.size}")
+                viewModel.saveOnlinePlan(weekStart, budget, parsed)
+            }
         }
     }
 
@@ -307,7 +313,7 @@ class MealPlanFragment : Fragment() {
      * User-initiated only (tapping 🔎 next to one shopping-list item) - never triggered
      * automatically while building a plan. Reuses the same local-first product price
      * engine ("قیمت کالاها" / بازاریار) that the rest of the app uses: it checks
-     * Torob/Digikala first and falls back to the AI (grok-4) web-search proxy only if
+     * Torob/Digikala first and falls back to the AI (جست‌وجوی وب) web-search proxy only if
      * those come back empty, then saves the result so this and future plans pick it up
      * as a "بررسی بازار" price instead of the static catalog guess.
      */

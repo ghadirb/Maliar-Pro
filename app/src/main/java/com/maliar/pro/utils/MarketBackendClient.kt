@@ -75,7 +75,7 @@ object MarketBackendClient {
             // separate AI_DAILY_LIMIT, so there is one consistent number the person sees in
             // «اشتراک پریمیوم» and "N از 15" is never out of sync with what actually ran out.
             if (!SubscriptionManager.canUseAi(context)) return@runCatching SearchResponse(emptyList(), "quota_exhausted_local")
-            val aiResult = searchWithGrokFallback(root, query, priceType, context)
+            val aiResult = searchWithAiFallback(root, query, priceType, context)
             // Only counts as usage when the server actually attempted the paid call - not
             // when it declined up front (its own daily limit) or the request never
             // completed (network/HTTP failure), since no cost was incurred in those cases.
@@ -86,7 +86,7 @@ object MarketBackendClient {
             aiResult
         }.getOrElse { SearchResponse(emptyList(), "exception:${it.message ?: it::class.simpleName}") }
     }
-    private suspend fun searchWithGrokFallback(root: String, query: String, priceType: String, context: Context): SearchResponse = withContext(Dispatchers.IO) {
+    private suspend fun searchWithAiFallback(root: String, query: String, priceType: String, context: Context): SearchResponse = withContext(Dispatchers.IO) {
         runCatching {
             val endpoint = if (root.contains("script.google.com", true)) "$root?path=marketAiSearch" else "$root/market/ai-search"
             val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply { requestMethod = "POST"; doOutput = true; connectTimeout = 20_000; readTimeout = 45_000; setRequestProperty("Content-Type", "application/json") }

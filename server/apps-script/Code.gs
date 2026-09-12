@@ -1,4 +1,4 @@
-﻿// Google Apps Script version of the Maliar Pro billing backend - a free, no-hosting-
+// Google Apps Script version of the Maliar Pro billing backend - a free, no-hosting-
 // needed alternative to the Node.js server in /server. Uses PropertiesService as a tiny
 // key-value store (no Google Sheet needed) and UrlFetchApp to call the gateway's API.
 //
@@ -533,7 +533,7 @@ function parseMarketAiPrice_(text, defaultSource) {
     }
     const price = Number(result.price || 0);
     if (!(price > 0) || !isFinite(price)) return { results: [], checkedAt: Date.now() };
-    return { checkedAt: Date.now(), results: [{ source: String(result.source || defaultSource || 'جست‌وجوی وب Grok').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] };
+    return { checkedAt: Date.now(), results: [{ source: String(result.source || defaultSource || 'جست‌وجوی وب').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] };
   } catch (err) {
     return { results: [], checkedAt: Date.now() };
   }
