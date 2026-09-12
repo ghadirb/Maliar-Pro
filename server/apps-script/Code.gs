@@ -49,6 +49,9 @@
 //      NETARZ_API_KEY       = your netarz.ir key (starts with sk-ntz-v1-)
 //      NETARZ_BASE_URL      = https://netarz.ir/api/ai/v1  (default, usually leave unset)
 //      TAVILY_API_KEY       = your Tavily search key (optional, preferred for price lookup)
+//      AVALAI_API_KEY       = your AvalAI key (preferred; can also serve Tavily + Sonar)
+//      AVALAI_SONAR_MODEL   = sonar  (optional, default shown)
+//      ENABLE_TAVILY        = false  (enable only after your AvalAI Tavily endpoint succeeds)
 //      NETARZ_MARKET_MODEL  = openrouter/perplexity/sonar  (default fallback)
 // 4. Deploy -> New deployment -> type: "Web app".
 //      Execute as: Me
@@ -277,10 +280,18 @@ function handleMarketAiSearch_(params, debugOut) {
 
   // 2) Prefer Tavily's search API: it is a direct web-search result feed and is
   // substantially cheaper/faster than asking a reasoning model to browse.
-  const viaTavily = marketAiSearchViaTavily_(query, debugOut);
-  if (viaTavily) { Logger.log('marketAiSearch provider=Tavily query=' + query); return jsonOutput_(viaTavily); }
+  if (getSetting_('ENABLE_TAVILY', 'false') === 'true') {
+    const viaTavily = marketAiSearchViaTavily_(query, debugOut);
+    if (viaTavily) { Logger.log('marketAiSearch provider=Tavily query=' + query); return jsonOutput_(viaTavily); }
+  } else if (debugOut) {
+    debugOut.tavily = 'disabled (ENABLE_TAVILY is false)';
+  }
 
-  // 3) Fall back to Perplexity Sonar via netarz.ir - a separate live-search
+  // 3) Perplexity Sonar through AvalAI (same provider/model family, separate gateway).
+  const viaAvalaiSonar = marketAiSearchViaAvalaiSonar_(systemPrompt, userPrompt, debugOut);
+  if (viaAvalaiSonar) { Logger.log('marketAiSearch provider=Perplexity-Sonar-AvalAI query=' + query); return jsonOutput_(viaAvalaiSonar); }
+
+  // 4) Fall back to Perplexity Sonar via netarz.ir - a separate live-search
   // model/key from the app's regular AI provider, used only here since Torob/Digikala are
   // bot-blocked and GapGPT's Grok web-search route is unreliable (410/504s - see the
   // 2026-09 diagnostics notes above marketProviders_).
@@ -371,22 +382,18 @@ function netarzConfig_() {
 /** AvalAI-hosted Tavily search fallback. AvalAI exposes Tavily at the OpenAI-compatible
  * search endpoint, so the user's AvalAI key belongs in Script Properties only. */
 function marketAiSearchViaTavily_(query, debugOut) {
-  const key = getSetting_('TAVILY_API_KEY', '');
+  const key = getSetting_('AVALAI_API_KEY', getSetting_('TAVILY_API_KEY', ''));
   if (!key) { if (debugOut) debugOut.tavily = 'skipped (TAVILY_API_KEY not configured)'; return null; }
   try {
-    const response = UrlFetchApp.fetch('https://api.avalai.ir/v1/chat/completions', {
+    const response = UrlFetchApp.fetch('https://api.avalai.ir/v1/search/tavily-search', {
       method: 'post', contentType: 'application/json', muteHttpExceptions: true,
       headers: { Authorization: 'Bearer ' + key },
-      payload: JSON.stringify({ model: 'tavily-search', temperature: 0.1, max_tokens: 500,
-        messages: [
-          { role: 'system', content: 'Search the live web for current Iranian retail prices. Return ONLY valid JSON: {"results":[{"source":"","sourceUrl":"","price":0,"minPrice":0,"maxPrice":0}]} with prices in Toman. Include direct product/store URLs when available; never invent prices or URLs.' },
-          { role: 'user', content: query + ' قیمت خرده‌فروشی فعلی در ایران' }
-        ] })
+      payload: JSON.stringify({ query: query + ' قیمت خرده‌فروشی فعلی در ایران', max_results: 5, search_depth: 'basic', include_answer: true })
     });
     const code = response.getResponseCode();
     if (code < 200 || code >= 300) { if (debugOut) debugOut.tavily = 'http ' + code; return null; }
     const data = JSON.parse(response.getContentText());
-    const text = String(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || data.answer || '') + '\n' + (data.results || []).map(function(r) { return String(r.title || '') + ' ' + String(r.content || r.snippet || '') + ' ' + String(r.url || ''); }).join('\n');
+    const text = String(data.answer || '') + '\n' + (data.results || []).map(function(r) { return String(r.title || '') + ' ' + String(r.content || r.snippet || '') + ' ' + String(r.url || ''); }).join('\n');
     const parsed = parseMarketAiPrice_(text, 'جست‌وجوی Tavily');
     if ((!parsed || !parsed.results || !parsed.results.length) && text) {
       // Tavily returns ranked snippets, not a JSON object. Extract explicit Toman
@@ -407,6 +414,27 @@ function marketAiSearchViaTavily_(query, debugOut) {
   } catch (err) {
     Logger.log('marketAiSearch(tavily) threw: ' + err);
     if (debugOut) debugOut.tavily = String(err);
+    return null;
+  }
+}
+
+function marketAiSearchViaAvalaiSonar_(systemPrompt, userPrompt, debugOut) {
+  const key = getSetting_('AVALAI_API_KEY', getSetting_('TAVILY_API_KEY', ''));
+  if (!key) { if (debugOut) debugOut.avalaiSonar = 'skipped (AVALAI_API_KEY not configured)'; return null; }
+  try {
+    const response = aiFetch_('https://api.avalai.ir/v1/chat/completions', {
+      apiKey: key,
+      body: { model: getSetting_('AVALAI_SONAR_MODEL', 'sonar'), temperature: 0.1, max_tokens: 350,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] }
+    });
+    const code = response.getResponseCode();
+    if (code < 200 || code >= 300) { if (debugOut) debugOut.avalaiSonar = 'http ' + code + ': ' + response.getContentText().slice(0, 300); return null; }
+    const data = JSON.parse(response.getContentText());
+    const text = String(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '');
+    return parseMarketAiPrice_(text, 'جست‌وجوی وب Perplexity (AvalAI)');
+  } catch (err) {
+    Logger.log('marketAiSearch(avalai-sonar) threw: ' + err);
+    if (debugOut) debugOut.avalaiSonar = String(err);
     return null;
   }
 }
