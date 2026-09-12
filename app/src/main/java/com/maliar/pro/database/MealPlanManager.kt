@@ -5,6 +5,7 @@ import com.maliar.pro.utils.FoodCatalog
 import com.maliar.pro.utils.MealType
 import com.maliar.pro.utils.Recipe
 import com.maliar.pro.utils.RecipeCatalog
+import com.maliar.pro.utils.MarketBackendClient
 import kotlinx.coroutines.flow.Flow
 
 /** [amount] is per one FoodCatalog "standard purchase unit" (see FoodItemDef.unitLabel).
@@ -31,6 +32,10 @@ data class ShoppingListItem(
 data class ShoppingList(val items: List<ShoppingListItem>, val totalCost: Double)
 
 class MealPlanManager(context: Context) {
+
+    private val appContext = context.applicationContext
+    private var automaticOnlineLookups = 0
+    private val automaticOnlineLookupLimit = 8
 
     private val dao = AppDatabase.getDatabase(context).mealPlanDao()
     private val accountingManager = AccountingManager(context)
@@ -68,7 +73,7 @@ class MealPlanManager(context: Context) {
      *  ingredient, otherwise (4) the static catalog fallback, clearly marked estimated.
      *  Tiers 2 (average) and 3 (online price) are intentionally not implemented yet - this
      *  is the offline "پایه" stage; AI/online pricing is a later stage. */
-    suspend fun getPriceFor(ingredientName: String): FoodPrice {
+    suspend fun getPriceFor(ingredientName: String, allowAutomaticOnlineLookup: Boolean = false): FoodPrice {
         val catalogItem = FoodCatalog.ITEMS.find { it.name == ingredientName }
         val unitLabel = catalogItem?.unitLabel ?: ""
         foodPriceManager.find(ingredientName)?.let { manual ->
@@ -89,7 +94,22 @@ class MealPlanManager(context: Context) {
         else productPricing.localPrice(ingredientName)?.let { quote ->
             FoodPrice(quote.price, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.MARKET_CHECK)
         }
+        ?: if (allowAutomaticOnlineLookup && automaticOnlineLookups < automaticOnlineLookupLimit) {
+            automaticOnlineLookups++
+            fetchOnlinePrice(ingredientName, unitLabel)?.let { quote ->
+                FoodPrice(quote.price, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.MARKET_CHECK)
+            }
+        } else null
         ?: FoodPrice(catalogItem?.fallbackPricePerUnit ?: 0.0, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.CATALOG_ESTIMATE)
+    }
+
+    private suspend fun fetchOnlinePrice(ingredientName: String, unitLabel: String): MarketPriceQuote? {
+        val product = productPricing.ensureProduct(ingredientName, category = "خوراکی") ?: return null
+        val response = MarketBackendClient.search(appContext, ingredientName, "retail")
+        response.quotes.filter { it.price > 0 }.forEach { quote ->
+            productPricing.addQuote(product.id, quote.source, quote.priceType.uppercase(), quote.price, quote.min, quote.max, quote.confidence, quote.sourceUrl)
+        }
+        return productPricing.localPrice(ingredientName)
     }
 
     private fun recipeCost(recipe: Recipe, prices: Map<String, FoodPrice>): Double =
@@ -108,6 +128,7 @@ class MealPlanManager(context: Context) {
      * Returns the new plan's id.
      */
     suspend fun generateWeeklyPlan(weekStartDate: Long, budget: Double, includeSnack: Boolean = true): Long {
+        automaticOnlineLookups = 0
         dao.getPlanForWeek(weekStartDate)?.let { existing ->
             dao.deleteEntriesForPlan(existing.id)
             dao.deletePlan(existing)
@@ -119,7 +140,7 @@ class MealPlanManager(context: Context) {
             .toSet()
 
         val allIngredientNames = RecipeCatalog.RECIPES.flatMap { it.ingredients.map { i -> i.name } }.toSet()
-        val prices = allIngredientNames.associateWith { getPriceFor(it) }
+        val prices = allIngredientNames.associateWith { getPriceFor(it, allowAutomaticOnlineLookup = true) }
 
         val mealTypes = if (includeSnack) MealType.values().toList() else MealType.values().filter { it != MealType.SNACK }
         val lastUsedByMealType = mutableMapOf<MealType, MutableList<String>>()
@@ -180,6 +201,7 @@ class MealPlanManager(context: Context) {
      * wants what's actually missing.
      */
     suspend fun getShoppingList(planId: Long): ShoppingList {
+        automaticOnlineLookups = 0
         val entries = dao.getEntriesList(planId)
         val recipesByName = RecipeCatalog.RECIPES.associateBy { it.name }
 
@@ -199,7 +221,7 @@ class MealPlanManager(context: Context) {
             .filterKeys { it !in recentlyPurchased }
             .filterValues { it > 0 }
             .map { (name, fraction) ->
-                val price = getPriceFor(name)
+                val price = getPriceFor(name, allowAutomaticOnlineLookup = true)
                 val roundedUnits = Math.ceil(fraction * 10) / 10.0
                 ShoppingListItem(
                     ingredientName = name,

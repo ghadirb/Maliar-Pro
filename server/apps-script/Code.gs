@@ -495,6 +495,14 @@ function parseMarketAiPrice_(text, defaultSource) {
   if (!match) return { results: [], checkedAt: Date.now() };
   try {
     const result = JSON.parse(match[0]);
+    if (Array.isArray(result.results)) {
+      const rows = result.results.map(function(row) {
+        const price = Number(row && row.price || 0);
+        if (!(price > 0) || !isFinite(price)) return null;
+        return { source: String(row.source || defaultSource || 'جست‌وجوی وب').slice(0, 120), sourceUrl: String(row.sourceUrl || row.url || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(row.minPrice || price) || price, maxPrice: Number(row.maxPrice || price) || price, confidence: Number(row.confidence || .45) };
+      }).filter(function(row) { return row; });
+      return { checkedAt: Date.now(), results: rows };
+    }
     const price = Number(result.price || 0);
     if (!(price > 0) || !isFinite(price)) return { results: [], checkedAt: Date.now() };
     return { checkedAt: Date.now(), results: [{ source: String(result.source || defaultSource || 'جست‌وجوی وب Grok').slice(0, 120), sourceUrl: String(result.sourceUrl || '').slice(0, 500), priceType: 'retail', price: price, minPrice: Number(result.minPrice || price) || price, maxPrice: Number(result.maxPrice || price) || price, confidence: 0.45 }] };
