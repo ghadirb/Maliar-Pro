@@ -88,19 +88,19 @@ class MealPlanManager(context: Context) {
             .filter { it.second == ingredientName }
             .maxByOrNull { it.first.date }
             ?.first?.amount
-        return if (lastUserPrice != null) {
-            FoodPrice(lastUserPrice, isEstimated = false, unitLabel = unitLabel, source = FoodPriceSource.EXPENSE_HISTORY)
+        if (lastUserPrice != null) {
+            return FoodPrice(lastUserPrice, isEstimated = false, unitLabel = unitLabel, source = FoodPriceSource.EXPENSE_HISTORY)
         }
-        else productPricing.localPrice(ingredientName)?.let { quote ->
-            FoodPrice(quote.price, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.MARKET_CHECK)
+        productPricing.localPrice(ingredientName)?.let { quote ->
+            return FoodPrice(quote.price, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.MARKET_CHECK)
         }
-        ?: if (allowAutomaticOnlineLookup && automaticOnlineLookups < automaticOnlineLookupLimit) {
+        if (allowAutomaticOnlineLookup && automaticOnlineLookups < automaticOnlineLookupLimit) {
             automaticOnlineLookups++
             fetchOnlinePrice(ingredientName, unitLabel)?.let { quote ->
-                FoodPrice(quote.price, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.MARKET_CHECK)
+                return FoodPrice(quote.price, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.MARKET_CHECK)
             }
-        } else null
-        ?: FoodPrice(catalogItem?.fallbackPricePerUnit ?: 0.0, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.CATALOG_ESTIMATE)
+        }
+        return FoodPrice(catalogItem?.fallbackPricePerUnit ?: 0.0, isEstimated = true, unitLabel = unitLabel, source = FoodPriceSource.CATALOG_ESTIMATE)
     }
 
     private suspend fun fetchOnlinePrice(ingredientName: String, unitLabel: String): MarketPriceQuote? {
