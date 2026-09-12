@@ -11,7 +11,15 @@ import java.net.URL
 
 /** Market data crosses the network only through the configured Apps Script proxy. */
 object MarketBackendClient {
-    data class RemoteQuote(val source: String, val priceType: String, val price: Double, val min: Double?, val max: Double?, val confidence: Double)
+    data class RemoteQuote(
+        val source: String,
+        val priceType: String,
+        val price: Double,
+        val min: Double?,
+        val max: Double?,
+        val confidence: Double,
+        val sourceUrl: String = ""
+    )
 
     /** [error] is the raw machine code from the server (e.g. "ai_daily_limit_reached",
      * "ai_provider_not_configured") when [quotes] came back empty because of an explicit
@@ -91,5 +99,17 @@ object MarketBackendClient {
             SearchResponse(json.toRemoteQuotes(priceType), serverError)
         }.getOrElse { SearchResponse(emptyList(), "exception:${it.message ?: it::class.simpleName}") }
     }
-    private fun JSONObject.toRemoteQuotes(defaultType: String): List<RemoteQuote> = optJSONArray("results")?.let { rows -> List(rows.length()) { i -> rows.getJSONObject(i).let { row -> RemoteQuote(row.optString("source", "بازار"), row.optString("priceType", defaultType), row.optDouble("price"), row.optDouble("minPrice").takeIf { n -> !n.isNaN() }, row.optDouble("maxPrice").takeIf { n -> !n.isNaN() }, row.optDouble("confidence", .5)) } } } ?: emptyList()
+    private fun JSONObject.toRemoteQuotes(defaultType: String): List<RemoteQuote> = optJSONArray("results")?.let { rows ->
+        List(rows.length()) { i -> rows.getJSONObject(i).let { row ->
+            RemoteQuote(
+                source = row.optString("source", "بازار"),
+                priceType = row.optString("priceType", defaultType),
+                price = row.optDouble("price"),
+                min = row.optDouble("minPrice").takeIf { n -> !n.isNaN() },
+                max = row.optDouble("maxPrice").takeIf { n -> !n.isNaN() },
+                confidence = row.optDouble("confidence", .5),
+                sourceUrl = row.optString("sourceUrl", "")
+            )
+        } }
+    } ?: emptyList()
 }
