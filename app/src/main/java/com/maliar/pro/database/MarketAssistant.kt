@@ -42,6 +42,8 @@ data class MarketSource(@PrimaryKey(autoGenerate = true) val id: Long = 0, val n
 }
 
 class MarketAssistantManager(context: Context) {
+    /** Cached online quotes remain useful for one week. Manual entries never expire. */
+    private val onlineQuoteTtlMs = 7L * 24L * 60L * 60L * 1000L
     private val database = AppDatabase.getDatabase(context)
     private val dao = database.marketAssistantDao()
     fun products() = dao.products(); fun sources() = dao.sources(); fun quotes(id: Long) = dao.quotes(id); fun purchases(id: Long) = dao.purchases(id)
@@ -88,10 +90,12 @@ class MarketAssistantManager(context: Context) {
     suspend fun localPrice(name: String): MarketPriceQuote? {
         val product = findProduct(name) ?: return null
         val quotes = dao.quotes(product.id).first()
-        return quotes
-            .firstOrNull { it.source == "ثبت دستی" }
-            ?: quotes.firstOrNull()
+        val cutoff = System.currentTimeMillis() - onlineQuoteTtlMs
+        // Manual entries are permanent; online quotes expire after one week.
+        return quotes.firstOrNull { it.source.trim().contains("دستی") }
+            ?: quotes.firstOrNull { it.checkedAt >= cutoff }
     }
+
     companion object {
         fun recommendation(purchases: List<ProductPurchase>, quotes: List<MarketPriceQuote>): String {
             val wholesale = quotes.filter { it.priceType == "WHOLESALE" }

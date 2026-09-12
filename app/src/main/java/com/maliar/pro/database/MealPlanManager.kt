@@ -69,10 +69,11 @@ class MealPlanManager(context: Context) {
             .sortedByDescending { it.first.date }
     }
 
-    /** Priority order per the spec: (1) the person's own last recorded price for this
-     *  ingredient, otherwise (4) the static catalog fallback, clearly marked estimated.
-     *  Tiers 2 (average) and 3 (online price) are intentionally not implemented yet - this
-     *  is the offline "پایه" stage; AI/online pricing is a later stage. */
+    /** Priority order: manual food price, purchase history, cached market quote, a
+     * bounded automatic online lookup (when enabled by the caller), then the static
+     * catalog estimate. Market quotes are cached by MarketAssistantManager.
+     * All online values remain marked as estimates because they are market observations,
+     * not confirmed invoices. */
     suspend fun getPriceFor(ingredientName: String, allowAutomaticOnlineLookup: Boolean = false): FoodPrice {
         val catalogItem = FoodCatalog.ITEMS.find { it.name == ingredientName }
         val unitLabel = catalogItem?.unitLabel ?: ""

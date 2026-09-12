@@ -193,6 +193,7 @@ function routeRequest_(e) {
   if (path === 'aiStt') return handleAiStt_(params);
   if (path === 'aiTts') return handleAiTts_(params);
   if (path === 'marketSearch') return handleMarketSearch_(params);
+  if (path === 'priceCacheUpdate') return handlePriceCacheUpdate_(params);
   if (path === 'marketAiSearch') return handleMarketAiSearch_(params);
   if (path === 'marketParseMessage') return handleMarketParseMessage_(params);
   if (path === 'marketDiagnostics') return handleMarketDiagnostics_(params);
@@ -214,6 +215,30 @@ function routeRequest_(e) {
 //  - Telegram: only the *user's own* saved sources (from "منابع عمده و خرده") are
 //    queried, via the public https://t.me/s/<channel> preview page (no bot token, no
 //    login - this is the same page a browser sees for any public channel).
+function handlePriceCacheUpdate_(params) {
+  const expected = getSetting_('PRICE_CACHE_INGEST_TOKEN', '');
+  if (!expected || String(params.token || '') !== expected) return jsonOutput_({ error: 'unauthorized' });
+  const raw = String(params.cache || '');
+  if (!raw || raw.length > 9000) return jsonOutput_({ error: 'invalid_cache' });
+  try { const parsed = JSON.parse(raw); PropertiesService.getScriptProperties().setProperty('SHARED_PRICE_CACHE', JSON.stringify(parsed)); return jsonOutput_({ ok: true, updatedAt: parsed.updatedAt || Date.now() }); }
+  catch (err) { return jsonOutput_({ error: 'invalid_json' }); }
+}
+
+function sharedPriceResults_(query, priceType) {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty('SHARED_PRICE_CACHE');
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    const age = Date.now() - Number(data.updatedAt || 0);
+    if (age < 0 || age > 8 * 24 * 60 * 60 * 1000) return [];
+    return (data.prices || []).filter(function (p) {
+      return p && p.name && String(p.name).toLowerCase().indexOf(query.toLowerCase()) >= 0 && Number(p.price) > 0;
+    }).map(function (p) {
+      return { source: p.source || ('shared-cache/' + (data.provider || 'AvalAI')), sourceUrl: p.sourceUrl || '', priceType: priceType.toUpperCase(), price: Number(p.price), confidence: Number(p.confidence || .55), checkedAt: Number(p.checkedAt || data.updatedAt) };
+    });
+  } catch (err) { Logger.log('sharedPriceResults failed: ' + err); return []; }
+}
+
 function handleMarketSearch_(params) {
   const query = String(params.query || '').trim();
   const priceType = String(params.priceType || 'retail').toLowerCase();
@@ -223,6 +248,8 @@ function handleMarketSearch_(params) {
   const cacheKey = 'market_cache_' + Utilities.base64EncodeWebSafe(query + ':' + priceType + ':' + sources.map(function(s) { return s.url; }).join(',')).replace(/[+/=]/g, '').slice(0, 180);
   const cached = CacheService.getScriptCache().get(cacheKey);
   if (cached) return jsonOutput_(JSON.parse(cached));
+  const shared = sharedPriceResults_(query, priceType);
+  if (shared.length) return jsonOutput_({ query: query, priceType: priceType, checkedAt: Date.now(), results: shared, provider: 'shared-price-cache' });
   const results = marketProviders_(priceType, sources).reduce(function(all, provider) {
     try { return all.concat(provider(query, priceType) || []); } catch (err) {
       Logger.log('marketSearch provider(' + (provider.name || 'anonymous') + ') threw: ' + err);
