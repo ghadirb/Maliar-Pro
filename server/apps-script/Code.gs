@@ -220,8 +220,20 @@ function handlePriceCacheUpdate_(params) {
   const expected = getSetting_('PRICE_CACHE_INGEST_TOKEN', '');
   if (!expected || String(params.token || '') !== expected) return jsonOutput_({ error: 'unauthorized' });
   const raw = String(params.cache || '');
-  if (!raw || raw.length > 9000) return jsonOutput_({ error: 'invalid_cache' });
-  try { const parsed = JSON.parse(raw); PropertiesService.getScriptProperties().setProperty('SHARED_PRICE_CACHE', JSON.stringify(parsed)); return jsonOutput_({ ok: true, updatedAt: parsed.updatedAt || Date.now() }); }
+  if (!raw || raw.length > 50000) return jsonOutput_({ error: 'invalid_cache' });
+  try {
+    const parsed = JSON.parse(raw);
+    const rows = (Array.isArray(parsed.prices) ? parsed.prices : []).filter(function(p) {
+      return p && p.name && Number(p.price) > 0 && isFinite(Number(p.price));
+    }).map(function(p) {
+      return { name: String(p.name).slice(0, 80), price: Number(p.price), currency: String(p.currency || 'IRR').slice(0, 8), source: String(p.source || 'AvalAI web search').slice(0, 100), sourceUrl: String(p.sourceUrl || '').slice(0, 300), checkedAt: String(p.checkedAt || '').slice(0, 30) };
+    });
+    const compact = { updatedAt: Number(parsed.updatedAt || Date.now()), provider: String(parsed.provider || 'shared-price-cache').slice(0, 60), prices: rows };
+    let encoded = JSON.stringify(compact);
+    while (encoded.length > 8500 && compact.prices.length) { compact.prices.pop(); encoded = JSON.stringify(compact); }
+    PropertiesService.getScriptProperties().setProperty('SHARED_PRICE_CACHE', encoded);
+    return jsonOutput_({ ok: true, updatedAt: compact.updatedAt, count: compact.prices.length });
+  }
   catch (err) { return jsonOutput_({ error: 'invalid_json' }); }
 }
 
