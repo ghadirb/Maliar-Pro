@@ -64,9 +64,10 @@ object MarketBackendClient {
             if (connection.responseCode !in 200..299) return@runCatching SearchResponse(emptyList(), "http_${connection.responseCode}")
             val response = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
             val serverError = response.optString("error").takeIf { it.isNotBlank() }
+            val responseProvider = response.optString("provider").takeIf { it.isNotBlank() }
             if (serverError != null) android.util.Log.w("MarketBackendClient", "marketSearch($query) server error: $serverError")
             val localResults = response.toRemoteQuotes(priceType)
-            android.util.Log.i("MarketBackendClient", "marketSearch($query) deterministicResults=${localResults.size} error=${serverError ?: "none"}")
+            android.util.Log.i("MarketBackendClient", "marketSearch($query) results=${localResults.size} provider=${responseProvider ?: "none"} error=${serverError ?: "none"}")
             if (localResults.isNotEmpty()) return@runCatching SearchResponse(localResults, null)
             // Torob/Digikala are free (no AI key used) and were just tried above with no
             // gate needed. Falling through to the paid AI web-search from here on, though -
