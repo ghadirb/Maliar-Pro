@@ -37,7 +37,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      # GitHub's Ubuntu runners already provide ANDROID_HOME and the command-line tools.
+      # setup-android@v3 currently asks sdkmanager for the retired `tools` package, which
+      # fails before Gradle is reached (see CI log: "Failed to find package 'tools'").
+      # Let Gradle resolve only this project's declared SDK components instead.
       - uses: gradle/actions/setup-gradle@v3
 
       # The keystore is decoded only in the temporary CI workspace. Do not generate a
