@@ -15,8 +15,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
                MealPlan::class, MealPlanEntry::class, UserFoodPrice::class, MarketRateHistory::class,
                MonthlyBudget::class, PeriodicPayment::class, MarketProduct::class,
                MarketPriceQuote::class, ProductPurchase::class, MarketSource::class,
-               BusinessTransaction::class, ProductInventory::class, GoldTransaction::class, GoldPriceAlert::class],
-    version = 25,
+               BusinessTransaction::class, ProductInventory::class, GoldTransaction::class, GoldPriceAlert::class,
+               Customer::class, CustomerLedgerEntry::class],
+    version = 27,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +37,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun marketAssistantDao(): MarketAssistantDao
     abstract fun businessDao(): BusinessDao
     abstract fun goldPortfolioDao(): GoldPortfolioDao
+    abstract fun customerDao(): CustomerDao
     
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -329,6 +331,23 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("CREATE TABLE IF NOT EXISTS gold_price_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, kind TEXT NOT NULL, targetPrice REAL NOT NULL, direction TEXT NOT NULL, isActive INTEGER NOT NULL DEFAULT 1, createdAt INTEGER NOT NULL)")
             }
         }
+        /** Customer ledger is fully additive. Existing accounts, sales and debtors stay
+         * untouched; new credit-sale/payment rows carry their own immutable audit trail. */
+        private val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, phoneNumber TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS customer_ledger_entries (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, customerId INTEGER NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, date INTEGER NOT NULL, dueDate INTEGER, note TEXT NOT NULL DEFAULT '', linkedIncomeId INTEGER, accountId INTEGER, createdAt INTEGER NOT NULL)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_customer_ledger_entries_customerId_date ON customer_ledger_entries (customerId, date)")
+            }
+        }
+        private val MIGRATION_26_27 = object : Migration(26, 27) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE assets ADD COLUMN purchaseDate INTEGER")
+                database.execSQL("ALTER TABLE assets ADD COLUMN purchasePrice REAL")
+                database.execSQL("ALTER TABLE assets ADD COLUMN marketSource TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE assets ADD COLUMN marketUpdatedAt INTEGER")
+            }
+        }
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -343,7 +362,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "maliar_pro_database"
-                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25)
+                ).addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
                  .fallbackToDestructiveMigration()
                  .build()
                 INSTANCE = instance

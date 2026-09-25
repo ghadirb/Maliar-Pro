@@ -91,7 +91,9 @@ class AssetListFragment : Fragment() {
                     val limitLabel = asset.dailyLimit?.let {
                         " · سقف روزانه ${CurrencyFormatter.format(it)}"
                     } ?: ""
-                    val subtitle = "$typeLabel · $purposeLabel$limitLabel"
+                    val basis = asset.purchasePrice?.let { " · قیمت خرید ${CurrencyFormatter.format(it)}" }.orEmpty()
+                    val source = asset.marketSource.takeIf { it.isNotBlank() }?.let { " · بر اساس نرخ $it" }.orEmpty()
+                    val subtitle = "$typeLabel · $purposeLabel$limitLabel$basis$source"
                     FinancialEntryItem(
                         id = asset.id,
                         title = asset.title,

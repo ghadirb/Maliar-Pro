@@ -20,7 +20,13 @@ data class Asset(
      *  behaves exactly as before (a plain fixed amount the user typed in). */
     val goldGrams: Double? = null,
     val purpose: AccountPurpose = AccountPurpose.NORMAL,
-    val dailyLimit: Double? = null
+    val dailyLimit: Double? = null,
+    /** Optional cost basis and acquisition date for real asset tracking. */
+    val purchaseDate: Long? = null,
+    val purchasePrice: Double? = null,
+    /** Only populated when a live rate actually refreshed this asset; never guessed. */
+    val marketSource: String = "",
+    val marketUpdatedAt: Long? = null
 )
 
 enum class AccountPurpose {

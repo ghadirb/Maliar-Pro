@@ -11,6 +11,7 @@ import androidx.work.WorkerParameters
 import com.maliar.pro.database.AccountingManager
 import com.maliar.pro.database.BudgetManager
 import com.maliar.pro.database.Debt
+import com.maliar.pro.database.CustomerManager
 import com.maliar.pro.database.Expense
 import com.maliar.pro.database.FinancialGoal
 import com.maliar.pro.database.FinancialStatusManager
@@ -77,6 +78,7 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
             val debtInsight = if (prefs.isInsightDebtEnabled()) {
                 buildDebtInsight(financialManager.getAllDebtsList())
             } else null
+            val customerInsight = buildCustomerReceivableInsight(CustomerManager(applicationContext).getBalancesList())
             val budgetInsight = if (prefs.isInsightBudgetEnabled()) {
                 buildBudgetInsight(applicationContext, expenses)
             } else null
@@ -92,7 +94,7 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
             val projectionInsight = if (prefs.isInsightProjectionEnabled()) {
                 buildProjectionInsight(incomes, expenses)
             } else null
-            val message = periodicPaymentInsight ?: installmentInsight ?: debtInsight ?: budgetInsight
+            val message = periodicPaymentInsight ?: installmentInsight ?: debtInsight ?: customerInsight ?: budgetInsight
                 ?: goalInsight ?: categorySwingInsight ?: marketInsight ?: savingsInsight ?: projectionInsight
             if (message != null) {
                 val finalMessage = tryRephraseWithAi(message) ?: message
@@ -159,6 +161,14 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
             remainingDays == 0 -> "امروز موعد سررسید بدهی «${due.title}» به مبلغ $amount تومان است."
             else -> "$remainingDays روز دیگر بدهی «${due.title}» به مبلغ $amount تومان سررسید می‌شود."
         }
+    }
+
+    /** A gentle, data-backed reminder for a customer balance with no movement for 30 days. */
+    private fun buildCustomerReceivableInsight(customers: List<com.maliar.pro.database.CustomerBalance>): String? {
+        val now = System.currentTimeMillis()
+        val stale = customers.filter { it.balance > 0.0 && it.lastTransactionAt != null && now - it.lastTransactionAt >= 30L * DAY_MILLIS }
+            .maxByOrNull { it.balance } ?: return null
+        return "ماندهٔ ${stale.customer.name} به مبلغ ${String.format("%,.0f", stale.balance)} تومان بیش از ۳۰ روز بدون گردش مانده است؛ در صورت نیاز، یادآوری یا پیگیری پرداخت را بررسی کنید."
     }
 
     /** Compares each active goal's actual progress against the linear progress it *should*

@@ -50,7 +50,7 @@ class FinancialStatusManager(context: Context) {
     }
     
     suspend fun addAsset(name: String, amount: Double): Long {
-        val asset = Asset(type = AssetType.OTHER, title = name, value = amount)
+        val asset = Asset(type = AssetType.OTHER, title = name, value = amount, purchaseDate = System.currentTimeMillis(), purchasePrice = amount)
         return financialDao.insertAsset(asset)
     }
 
@@ -74,7 +74,11 @@ class FinancialStatusManager(context: Context) {
                 value = value,
                 goldGrams = grams,
                 purpose = purpose,
-                dailyLimit = dailyLimit?.takeIf { it > 0.0 }
+                dailyLimit = dailyLimit?.takeIf { it > 0.0 },
+                purchaseDate = System.currentTimeMillis(),
+                purchasePrice = value.takeIf { it > 0.0 },
+                marketSource = rate?.source.orEmpty(),
+                marketUpdatedAt = rate?.let { System.currentTimeMillis() }
             )
         )
         if (purpose != AccountPurpose.NORMAL) setAccountPurpose(id, purpose)
@@ -94,7 +98,7 @@ class FinancialStatusManager(context: Context) {
         for (asset in goldAssets) {
             val newValue = asset.goldGrams!! * goldPerGramToman
             if (kotlin.math.abs(newValue - asset.value) > 1.0) {
-                financialDao.updateAsset(asset.copy(value = newValue, updatedAt = System.currentTimeMillis()))
+                financialDao.updateAsset(asset.copy(value = newValue, updatedAt = System.currentTimeMillis(), marketSource = rate.source.orEmpty(), marketUpdatedAt = System.currentTimeMillis()))
             }
         }
     }

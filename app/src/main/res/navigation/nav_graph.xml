@@ -157,7 +157,16 @@
     <fragment
         android:id="@+id/businessTransactionListFragment"
         android:name="com.maliar.pro.ui.accounting.BusinessTransactionListFragment"
-        android:label="تراکنش‌های کسب‌وکار" />
+        android:label="تراکنش‌های کسب‌وکار">
+        <action
+            android:id="@+id/action_businessTransactionListFragment_to_customerLedgerFragment"
+            app:destination="@id/customerLedgerFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/customerLedgerFragment"
+        android:name="com.maliar.pro.ui.accounting.CustomerLedgerFragment"
+        android:label="مشتریان و حساب نسیه" />
 
     <fragment
         android:id="@+id/forecastFragment"

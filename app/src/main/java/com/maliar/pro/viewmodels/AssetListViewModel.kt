@@ -30,7 +30,8 @@ class AssetListViewModel(private val financialManager: FinancialStatusManager) :
     ) {
         viewModelScope.launch {
             val id = financialManager.addAsset(
-                Asset(type = type, title = name, value = amount, description = description, purpose = purpose, dailyLimit = dailyLimit)
+                Asset(type = type, title = name, value = amount, description = description, purpose = purpose, dailyLimit = dailyLimit,
+                    purchaseDate = System.currentTimeMillis(), purchasePrice = amount.takeIf { it > 0.0 })
             )
             if (purpose == AccountPurpose.DAILY_SPENDING) {
                 financialManager.setAccountPurpose(id, purpose)

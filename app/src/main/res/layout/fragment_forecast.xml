@@ -203,6 +203,13 @@
                     android:text="برآورد ۳۰ روز آینده"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
+                <TextView
+                    android:id="@+id/forecastReasonText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

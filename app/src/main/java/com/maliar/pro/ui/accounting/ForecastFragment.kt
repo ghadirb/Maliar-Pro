@@ -95,5 +95,13 @@ class ForecastFragment : Fragment() {
             )
         )
         binding.forecastPeriodLabelText.text = "برآورد $selectedDays روز آینده · بر اساس اطلاعات ثبت‌شده"
+        val start = AccountingManager(requireContext()).getFinancialPeriodStartMillis()
+        val observedDays = (((System.currentTimeMillis() - start) / (24L * 60 * 60 * 1000)) + 1).coerceAtLeast(1)
+        val confidence = when {
+            observedDays >= 20 -> "متوسط"
+            observedDays >= 7 -> "محدود"
+            else -> "پایین"
+        }
+        binding.forecastReasonText.text = "دلیل: میانگین درآمد و هزینهٔ ثبت‌شده، درآمد ثابت و تعهدات فعال. اطمینان تقریبی: $confidence؛ هزینه یا درآمد غیرمنتظره در این برآورد نیست."
     }
 }
