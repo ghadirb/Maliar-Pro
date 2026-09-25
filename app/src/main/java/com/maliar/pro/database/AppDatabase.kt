@@ -335,9 +335,12 @@ abstract class AppDatabase : RoomDatabase() {
          * untouched; new credit-sale/payment rows carry their own immutable audit trail. */
         private val MIGRATION_25_26 = object : Migration(25, 26) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, phoneNumber TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
-                database.execSQL("CREATE TABLE IF NOT EXISTS customer_ledger_entries (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, customerId INTEGER NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, date INTEGER NOT NULL, dueDate INTEGER, note TEXT NOT NULL DEFAULT '', linkedIncomeId INTEGER, accountId INTEGER, createdAt INTEGER NOT NULL)")
-                database.execSQL("CREATE INDEX IF NOT EXISTS index_customer_ledger_entries_customerId_date ON customer_ledger_entries (customerId, date)")
+                // Keep this SQL byte-for-byte compatible with Room's generated schema:
+                // Kotlin constructor defaults are not SQLite DEFAULT values, and this
+                // entity declares no Room index. A previous version added both, causing
+                // Room's post-migration schema validation to abort app startup.
+                database.execSQL("CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, phoneNumber TEXT NOT NULL, description TEXT NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+                database.execSQL("CREATE TABLE IF NOT EXISTS customer_ledger_entries (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, customerId INTEGER NOT NULL, type TEXT NOT NULL, amount REAL NOT NULL, date INTEGER NOT NULL, dueDate INTEGER, note TEXT NOT NULL, linkedIncomeId INTEGER, accountId INTEGER, createdAt INTEGER NOT NULL)")
             }
         }
         private val MIGRATION_26_27 = object : Migration(26, 27) {
