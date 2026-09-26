@@ -91,6 +91,7 @@ class AccountingFragment : Fragment() {
         binding.businessTransactionHistoryButton.setOnClickListener {
             findNavController().navigate(R.id.action_accountingFragment_to_businessTransactionListFragment)
         }
+        binding.financialInsightsButton.setOnClickListener { findNavController().navigate(R.id.action_accountingFragment_to_financialInsightsFragment) }
 
         binding.addCheckButton.setOnClickListener {
             showAddCheckDialog()

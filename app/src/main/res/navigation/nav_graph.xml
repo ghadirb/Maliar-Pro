@@ -152,6 +152,7 @@
         <action
             android:id="@+id/action_accountingFragment_to_businessTransactionListFragment"
             app:destination="@id/businessTransactionListFragment" />
+        <action android:id="@+id/action_accountingFragment_to_financialInsightsFragment" app:destination="@id/financialInsightsFragment" />
     </fragment>
 
     <fragment
@@ -162,6 +163,8 @@
             android:id="@+id/action_businessTransactionListFragment_to_customerLedgerFragment"
             app:destination="@id/customerLedgerFragment" />
     </fragment>
+
+    <fragment android:id="@+id/financialInsightsFragment" android:name="com.maliar.pro.ui.accounting.FinancialInsightsFragment" android:label="تحلیل مالی هوشمند" />
 
     <fragment
         android:id="@+id/customerLedgerFragment"

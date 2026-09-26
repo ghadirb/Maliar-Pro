@@ -504,6 +504,13 @@
             android:layout_marginBottom="12dp"
             android:text="📊 کسب‌وکار من (فروش، موجودی و تراکنش‌ها)" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/financialInsightsButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="تحلیل مالی هوشمند" />
+
         <!-- Income Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/incomeCard"

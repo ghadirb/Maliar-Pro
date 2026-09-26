@@ -103,6 +103,7 @@ class BusinessTransactionListFragment : Fragment() {
         box.addView(line("تعداد فروش کالا", "${summary.periodSaleCount} مورد"))
         box.addView(line("ارزش بهای تمام‌شدهٔ موجودی", CurrencyFormatter.format(summary.inventoryCostValue)))
         box.addView(line("دریافتنی از مشتریان", CurrencyFormatter.format(receivables)))
+        box.addView(line("پرداختی مرتبط با کسب‌وکار", CurrencyFormatter.format(summary.relatedPayments)))
         if (inventory.isNotEmpty()) box.addView(line("کالای ناموجود", "${summary.outOfStockCount} مورد"))
         summary.bestSellingProduct?.let { box.addView(line("پرفروش‌ترین کالا", "${it.name} · ${CurrencyFormatter.format(it.sales)}")) }
         summary.lowestProfitProduct?.let { box.addView(line("کم‌سودترین کالای ثبت‌شده", "${it.name} · ${CurrencyFormatter.format(it.profit)}")) }

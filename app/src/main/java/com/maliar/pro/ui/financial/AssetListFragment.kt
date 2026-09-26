@@ -93,7 +93,8 @@ class AssetListFragment : Fragment() {
                     } ?: ""
                     val basis = asset.purchasePrice?.let { " · قیمت خرید ${CurrencyFormatter.format(it)}" }.orEmpty()
                     val source = asset.marketSource.takeIf { it.isNotBlank() }?.let { " · بر اساس نرخ $it" }.orEmpty()
-                    val subtitle = "$typeLabel · $purposeLabel$limitLabel$basis$source"
+                    val pnl = asset.purchasePrice?.let { " · سود/زیان تقریبی ${CurrencyFormatter.format(asset.value - it)}" }.orEmpty()
+                    val subtitle = "$typeLabel · $purposeLabel$limitLabel$basis$pnl$source"
                     FinancialEntryItem(
                         id = asset.id,
                         title = asset.title,

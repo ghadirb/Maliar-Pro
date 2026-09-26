@@ -17,6 +17,7 @@ data class BusinessDashboardSummary(
     val bestSellingProduct: ProductPerformance?,
     val lowestProfitProduct: ProductPerformance?,
     val lowStockProducts: List<ProductInventory>
+    ,val relatedPayments: Double
 )
 
 data class ProductPerformance(val name: String, val sales: Double, val profit: Double, val count: Int)
@@ -41,6 +42,7 @@ object BusinessDashboardCalculator {
             bestSellingProduct = products.maxByOrNull { it.sales },
             lowestProfitProduct = products.minByOrNull { it.profit },
             lowStockProducts = inventory.filter { it.quantity in 0.0..1.0 }.sortedBy { it.quantity }.take(3)
+            ,relatedPayments = transactions.filter { it.type == BusinessTransactionType.BANK_FEE || it.type == BusinessTransactionType.OWNER_DRAW }.filter { it.date >= periodStart }.sumOf { it.amount }
         )
     }
 }
