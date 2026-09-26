@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import com.maliar.pro.utils.CustomerLedgerCalculator
 
 data class CustomerBalance(
     val customer: Customer,
@@ -104,9 +105,7 @@ class CustomerManager(context: Context) {
     }
 
     private fun summarize(customer: Customer, entries: List<CustomerLedgerEntry>): CustomerBalance {
-        val sales = entries.filter { it.type == CustomerLedgerType.CREDIT_SALE }.sumOf { it.amount }
-        val payments = entries.filter { it.type == CustomerLedgerType.PAYMENT }.sumOf { it.amount }
-        val adjustments = entries.filter { it.type == CustomerLedgerType.ADJUSTMENT }.sumOf { it.amount }
-        return CustomerBalance(customer, sales, payments, adjustments, sales + adjustments - payments, entries.maxOfOrNull { it.date })
+        val totals = CustomerLedgerCalculator.totals(entries)
+        return CustomerBalance(customer, totals.sales, totals.payments, totals.adjustments, totals.balance, entries.maxOfOrNull { it.date })
     }
 }

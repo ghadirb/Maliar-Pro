@@ -98,7 +98,19 @@ class FinancialInsightWorker(context: Context, params: WorkerParameters) : Corou
                 ?: goalInsight ?: categorySwingInsight ?: marketInsight ?: savingsInsight ?: projectionInsight
             if (message != null) {
                 val finalMessage = tryRephraseWithAi(message) ?: message
-                NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage, isMarketInsight = message == marketInsight)
+                val kind = when {
+                    message == periodicPaymentInsight -> "periodic_payment"
+                    message == installmentInsight -> "installment"
+                    message == debtInsight -> "debt"
+                    message == customerInsight -> "customer"
+                    message == budgetInsight -> "budget"
+                    message == goalInsight -> "goal"
+                    message == categorySwingInsight -> "category"
+                    message == marketInsight -> "market"
+                    message == savingsInsight -> "savings"
+                    else -> "projection"
+                }
+                NotificationHelper.notifyFinancialInsight(applicationContext, finalMessage, isMarketInsight = message == marketInsight, kind = kind)
             }
             Result.success()
         } catch (e: Exception) {

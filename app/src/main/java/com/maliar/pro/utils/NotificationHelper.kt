@@ -24,8 +24,8 @@ object NotificationHelper {
     private const val INSIGHT_CHANNEL_ID = "financial_insights_channel"
     private const val NOTIFICATION_ID_FINANCIAL_INSIGHT = 5010
     private const val INSIGHT_PREFS = "financial_insight_delivery"
-    private const val KEY_LAST_INSIGHT = "last_message"
-    private const val KEY_LAST_INSIGHT_AT = "last_message_at"
+    private const val KEY_LAST_INSIGHT = "last_message_"
+    private const val KEY_LAST_INSIGHT_AT = "last_message_at_"
     private const val INSIGHT_COOLDOWN_MILLIS = 24L * 60 * 60 * 1000
 
     /** Intent extra [com.maliar.pro.MainActivity] checks to route a cold/warm start to the
@@ -64,13 +64,14 @@ object NotificationHelper {
      *  تیر ۲۳٪ افزایش داشته است" or a projected month-end surplus/deficit. When
      *  [isMarketInsight] is true (a gold/currency swing), tapping the notification opens
      *  the assistant tab with a matching question pre-sent instead of just the app. */
-    fun notifyFinancialInsight(context: Context, message: String, isMarketInsight: Boolean = false) {
+    fun notifyFinancialInsight(context: Context, message: String, isMarketInsight: Boolean = false, kind: String = "general") {
         val prefs = context.getSharedPreferences(INSIGHT_PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
         // A save-time anomaly check and the daily worker both call this method. Keeping the
         // cooldown at this single delivery boundary prevents duplicate notices regardless of
         // which source detected the same condition.
-        if (prefs.getString(KEY_LAST_INSIGHT, null) == message && now - prefs.getLong(KEY_LAST_INSIGHT_AT, 0L) < INSIGHT_COOLDOWN_MILLIS) return
+        val safeKind = kind.filter { it.isLetterOrDigit() }.ifBlank { "general" }
+        if (prefs.getString(KEY_LAST_INSIGHT + safeKind, null) == message && now - prefs.getLong(KEY_LAST_INSIGHT_AT + safeKind, 0L) < INSIGHT_COOLDOWN_MILLIS) return
         ensureInsightChannel(context)
         val notification = NotificationCompat.Builder(context, INSIGHT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -83,7 +84,7 @@ object NotificationHelper {
             .build()
         try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_FINANCIAL_INSIGHT, notification)
-            prefs.edit().putString(KEY_LAST_INSIGHT, message).putLong(KEY_LAST_INSIGHT_AT, now).apply()
+            prefs.edit().putString(KEY_LAST_INSIGHT + safeKind, message).putLong(KEY_LAST_INSIGHT_AT + safeKind, now).apply()
         } catch (e: SecurityException) {
             android.util.Log.w("NotificationHelper", "Notification permission not granted: ${e.message}")
         }
