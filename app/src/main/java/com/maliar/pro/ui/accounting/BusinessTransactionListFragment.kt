@@ -82,14 +82,22 @@ class BusinessTransactionListFragment : Fragment() {
                     incomes, inventory, transactions,
                     accountingManager.getFinancialPeriodStartMillis(), todayStart
                 )
-                val receivables = customerManager.getBalancesList().sumOf { it.balance.coerceAtLeast(0.0) }
-                renderDashboard(dashboardBox, summary, inventory, receivables)
+                val balances = customerManager.getBalancesList()
+                val receivables = balances.sumOf { it.balance.coerceAtLeast(0.0) }
+                val topDebtor = balances.filter { it.balance > 0.0 }.maxByOrNull { it.balance }
+                renderDashboard(dashboardBox, summary, inventory, receivables, topDebtor)
                 renderTransactions(listBox, transactions)
             }
         }
     }
 
-    private fun renderDashboard(box: LinearLayout, summary: BusinessDashboardSummary, inventory: List<ProductInventory>, receivables: Double) {
+    private fun renderDashboard(
+        box: LinearLayout,
+        summary: BusinessDashboardSummary,
+        inventory: List<ProductInventory>,
+        receivables: Double,
+        topDebtor: com.maliar.pro.database.CustomerBalance?
+    ) {
         box.removeAllViews()
         fun line(label: String, value: String) = TextView(requireContext()).apply {
             text = "$label: $value"
@@ -103,6 +111,7 @@ class BusinessTransactionListFragment : Fragment() {
         box.addView(line("تعداد فروش کالا", "${summary.periodSaleCount} مورد"))
         box.addView(line("ارزش بهای تمام‌شدهٔ موجودی", CurrencyFormatter.format(summary.inventoryCostValue)))
         box.addView(line("دریافتنی از مشتریان", CurrencyFormatter.format(receivables)))
+        topDebtor?.let { box.addView(line("بیشترین بدهکار", "${it.customer.name} · ${CurrencyFormatter.format(it.balance)}")) }
         box.addView(line("پرداختی مرتبط با کسب‌وکار", CurrencyFormatter.format(summary.relatedPayments)))
         if (inventory.isNotEmpty()) box.addView(line("کالای ناموجود", "${summary.outOfStockCount} مورد"))
         summary.bestSellingProduct?.let { box.addView(line("پرفروش‌ترین کالا", "${it.name} · ${CurrencyFormatter.format(it.sales)}")) }

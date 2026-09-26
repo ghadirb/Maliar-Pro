@@ -58,7 +58,12 @@ class CustomerLedgerFragment : Fragment() {
         content.addView(rows)
         observer = viewLifecycleOwner.lifecycleScope.launch {
             manager.getAll().collectLatest {
+                // Highest-debt customers first, matching the "بیشترین بدهکاران" business
+                // report requested in the spec; customers with a credit (negative) balance
+                // or none sort after debtors, alphabetically among themselves.
                 val balances = manager.getBalancesList()
+                    .sortedWith(compareByDescending<com.maliar.pro.database.CustomerBalance> { it.balance.coerceAtLeast(0.0) }
+                        .thenBy { it.customer.name })
                 rows.removeAllViews()
                 if (balances.isEmpty()) {
                     rows.addView(note("هنوز مشتری ثبت نشده است."))
