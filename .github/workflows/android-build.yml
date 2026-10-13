@@ -68,6 +68,7 @@ jobs:
         with:
           name: maliar-${{ matrix.store }}-release-apk
           path: app/build/outputs/apk/${{ matrix.store }}/release/*.apk
+          retention-days: 1
 
       - name: Upload release AAB
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_type == 'release' }}
@@ -75,6 +76,7 @@ jobs:
         with:
           name: maliar-${{ matrix.store }}-release-aab
           path: app/build/outputs/bundle/${{ matrix.store }}Release/*.aab
+          retention-days: 1
 
       - name: Build debug APK
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug' }}
@@ -92,3 +94,4 @@ jobs:
         with:
           name: maliar-${{ matrix.store }}-debug-apk
           path: app/build/outputs/apk/${{ matrix.store }}/debug/*.apk
+          retention-days: 1
